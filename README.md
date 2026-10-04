@@ -26,11 +26,14 @@ Il browser non può contattare direttamente Classeviva: il server di Spaggiari n
 
 ### Hosting statico (GitHub Pages, Netlify…)
 
-Se pubblichi solo i file statici, il proxy può girare come Cloudflare Worker gratuito:
+GitHub Pages pubblica solo file statici: l'app si apre, la demo funziona, ma l'accesso con un account reale fallisce (Pages risponde `405` alle richieste di login) perché manca il proxy. In questo caso BCW lo segnala nella schermata di accesso. Il proxy può girare gratis come Cloudflare Worker:
 
-1. crea un Worker su dash.cloudflare.com e incolla `proxy/cloudflare-worker.js`
-2. nelle variabili del Worker imposta `ALLOWED_ORIGINS` con l'indirizzo dell'app (es. `https://tuonome.github.io`)
-3. in BCW tocca "Modifica" accanto a "Server" nella schermata di accesso (oppure Impostazioni › Server) e inserisci l'indirizzo del Worker
+1. su [dash.cloudflare.com](https://dash.cloudflare.com) apri Workers e Pages › Crea › Worker, dagli un nome (es. `bcw-proxy`) e premi Distribuisci
+2. premi Modifica codice, sostituisci tutto il contenuto con quello di `proxy/cloudflare-worker.js` e premi Distribuisci
+3. in Impostazioni › Variabili e segreti aggiungi la variabile `ALLOWED_ORIGINS` con l'origine del sito, senza percorso finale: per GitHub Pages `https://tuonome.github.io`
+4. apri BCW, tocca Modifica accanto a "Server" nella schermata di accesso (oppure Impostazioni › Server) e inserisci l'indirizzo del Worker, es. `https://bcw-proxy.tuonome.workers.dev`
+
+Per controllare che il Worker funzioni apri `https://bcw-proxy.tuonome.workers.dev/ping` nel browser: deve rispondere `{"ok":true}`.
 
 Anche `server.js` accetta richieste da altri siti se imposti `ALLOWED_ORIGINS`.
 

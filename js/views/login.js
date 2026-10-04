@@ -15,11 +15,14 @@ export function renderLogin(ctx, { adding }) {
   const disabled = !s.username || !s.password || s.loading;
   let proxyHost = Proxy.base;
   try { proxyHost = new URL(Proxy.base).host + new URL(Proxy.base).pathname; } catch { /* indirizzo relativo */ }
+  // Verifica subito che ci sia il proxy: su un hosting statico (es. GitHub Pages) manca.
+  ctx.task(`proxy-check-${Proxy.base}`, () => Proxy.check());
   return `<div class="login ${adding ? 'adding' : ''}">
     <div class="login-header">
       <span class="logo">BCW</span><span class="logo-line"></span>
       <span class="logo-subtitle">${adding ? 'Aggiungi un account' : 'Better ClasseViVa'}</span>
     </div>
+    ${proxyWarning()}
     <form class="login-form" data-submit="login-submit" autocomplete="on">
       <div class="login-fields">
         <label class="login-field">${icon('person')}<input name="username" type="text" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
@@ -38,6 +41,21 @@ export function renderLogin(ctx, { adding }) {
       <p class="proxy-line">${icon('server')}<span>Server: ${esc(proxyHost)}</span> · <button class="link-button" data-action="proxy-sheet">Modifica</button></p>
     </div>
   </div>`;
+}
+
+/** Avviso mostrato quando all'indirizzo del proxy non risponde il proxy di BCW. */
+function proxyWarning() {
+  if (Proxy.status !== 'missing' && Proxy.status !== 'unreachable') return '';
+  const text = Proxy.status === 'missing'
+    ? 'Questo sito è pubblicato senza il proxy che inoltra le richieste a Classeviva (succede con hosting statici come GitHub Pages). Crea un Cloudflare Worker gratuito con il file proxy/cloudflare-worker.js e inserisci qui il suo indirizzo.'
+    : `Il proxy (${Proxy.host}) non risponde. Controlla l'indirizzo e che la variabile ALLOWED_ORIGINS del proxy includa ${location.origin}.`;
+  return `<div class="proxy-warning">
+    <div class="row gap-8">${icon('server')}<strong>${Proxy.status === 'missing' ? 'Serve un server proxy' : 'Proxy non raggiungibile'}</strong></div>
+    <p>${esc(text)}</p>
+    <div class="row gap-8">
+      <button class="btn btn-prominent small" data-action="proxy-sheet">Imposta il proxy</button>
+      <a class="btn btn-glass small" href="https://github.com/kubos5/BCW-web#hosting-statico-github-pages-netlify" target="_blank" rel="noopener">Istruzioni</a>
+    </div></div>`;
 }
 
 function profileSheet(ctx) {

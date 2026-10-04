@@ -142,6 +142,12 @@ async function serveStatic(req, res, pathname) {
 const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url, 'http://localhost');
   try {
+    if (pathname === '/api/ping') {
+      // Usato dall'app per verificare che il proxy sia presente.
+      res.writeHead(200, { ...corsHeaders(req.headers.origin), 'Content-Type': 'application/json', 'X-BCW-Proxy': '1', 'Cache-Control': 'no-store' });
+      res.end('{"ok":true}');
+      return;
+    }
     if (pathname.startsWith('/api/')) {
       const target = upstreamURL(pathname);
       if (!target) {
