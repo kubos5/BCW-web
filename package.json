@@ -1,0 +1,14 @@
+{
+  "name": "bcw-web",
+  "version": "1.0.0",
+  "description": "BCW (Better ClasseViVa) per il web: client per il registro elettronico Classeviva.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
