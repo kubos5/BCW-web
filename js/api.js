@@ -31,6 +31,8 @@ export const isOfflineError = (e) => e instanceof APIError && e.kind === 'offlin
 
 const PROXY_KEY = 'bcw.proxy';
 
+export const MISSING_PROXY = 'Manca il server proxy per contattare Classeviva: impostalo con "Imposta il proxy" o da Impostazioni › Server.';
+
 export const Proxy = {
   /** Indirizzo del proxy: per impostazione predefinita lo stesso sito, sotto `/api`. */
   get base() {
@@ -44,12 +46,32 @@ export const Proxy = {
     try { return !!localStorage.getItem(PROXY_KEY); } catch { return false; }
   },
   set(url) {
+    this.status = null;
     try {
       if (url && url.trim()) localStorage.setItem(PROXY_KEY, url.trim().replace(/\/+$/, ''));
       else localStorage.removeItem(PROXY_KEY);
     } catch { /* ignorato */ }
   },
   officialBase() { return `${this.base}/v1`; },
+
+  /** Esito dell'ultima verifica: 'ok', 'missing' (nessun proxy a quell'indirizzo) o 'unreachable'. */
+  status: null,
+
+  /** Controlla che all'indirizzo configurato risponda davvero il proxy di BCW. */
+  async check() {
+    const base = this.base;
+    try {
+      const response = await fetch(`${base}/ping`, { cache: 'no-store' });
+      this.status = response.headers.get('X-BCW-Proxy') ? 'ok' : 'missing';
+    } catch {
+      this.status = navigator.onLine === false ? null : 'unreachable';
+    }
+    return this.status;
+  },
+
+  get host() {
+    try { return new URL(this.base).host; } catch { return this.base; }
+  },
   /** Archivio di un anno scolastico passato (es. `web24` per il 2024/25). */
   archiveBase(startYear) { return `${this.base}/archive/${String(startYear % 100).padStart(2, '0')}`; },
 };
@@ -79,14 +101,19 @@ export class HttpTransport {
         method, headers, body: payload, cache: 'no-store', signal: controller.signal,
       });
     } catch {
-      throw APIError.offline(navigator.onLine === false ? 'Nessuna connessione a Internet.' : 'Impossibile contattare Classeviva.');
+      if (navigator.onLine === false) throw APIError.offline('Nessuna connessione a Internet.');
+      throw APIError.offline(Proxy.isCustom
+        ? `Impossibile contattare il proxy (${Proxy.host}). Controlla l'indirizzo e che il proxy accetti richieste da questo sito.`
+        : 'Impossibile contattare Classeviva.');
     } finally {
       clearTimeout(timer);
     }
     const contentType = response.headers.get('Content-Type');
-    // Un sito statico senza proxy risponde con una pagina HTML (spesso un 404).
-    if (contentType?.includes('text/html') && !response.headers.get('X-BCW-Proxy')) {
-      throw APIError.unavailable('Il server proxy di BCW non risponde. Controlla l\'indirizzo in Impostazioni › Server, oppure prova la demo.');
+    // Il proxy di BCW segna ogni risposta. Senza il segno, a rispondere è il sito stesso:
+    // un hosting statico (es. GitHub Pages) restituisce 404 o, per le POST, 405.
+    if (!response.headers.get('X-BCW-Proxy')) {
+      Proxy.status = 'missing';
+      throw APIError.unavailable(MISSING_PROXY);
     }
     const data = new Uint8Array(await response.arrayBuffer());
     return {

@@ -817,6 +817,21 @@ progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
 .login-error { display: flex; gap: 8px; align-items: flex-start; color: var(--poor); font-size: var(--fs-foot); font-weight: 500; animation: fade-in .3s; }
 .login-error .icon { width: 16px; height: 16px; margin-top: 1px; }
 .login-footer { display: flex; flex-direction: column; gap: 6px; text-align: center; font-size: var(--fs-foot); color: var(--ink2); padding-top: 8px; }
+.proxy-warning {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  font-size: var(--fs-foot);
+  background: color-mix(in srgb, var(--fair) 14%, var(--surface));
+  border: .5px solid color-mix(in srgb, var(--fair) 35%, transparent);
+  animation: fade-in .3s;
+}
+
+.proxy-warning strong { font-size: var(--fs-sub); }
+.proxy-warning > .row > .icon { color: var(--fair); width: 18px; height: 18px; }
+.proxy-warning p { line-height: 1.4; color: color-mix(in srgb, var(--ink) 85%, transparent); }
 .proxy-line { display: inline-flex; justify-content: center; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
 .proxy-line .icon { width: 14px; height: 14px; }
 

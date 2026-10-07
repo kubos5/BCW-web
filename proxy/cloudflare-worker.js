@@ -44,7 +44,12 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (request.method !== 'GET' && request.method !== 'POST') return json(405, 'Metodo non consentito');
 
-    const target = upstreamURL(new URL(request.url).pathname);
+    const { pathname } = new URL(request.url);
+    // Usato dall'app per verificare che il proxy sia presente.
+    if (/^(?:\/api)?\/ping$/.test(pathname)) {
+      return new Response('{"ok":true}', { headers: { ...cors, 'Content-Type': 'application/json', 'X-BCW-Proxy': '1', 'Cache-Control': 'no-store' } });
+    }
+    const target = upstreamURL(pathname);
     if (!target) return json(404, 'Percorso non valido');
 
     const headers = { ...CLASSEVIVA_HEADERS };
