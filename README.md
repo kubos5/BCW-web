@@ -28,12 +28,24 @@ Il browser non può contattare direttamente Classeviva: il server di Spaggiari n
 
 GitHub Pages pubblica solo file statici: l'app si apre, la demo funziona, ma l'accesso con un account reale fallisce (Pages risponde `405` alle richieste di login) perché manca il proxy. In questo caso BCW lo segnala nella schermata di accesso. Il proxy può girare gratis come Cloudflare Worker:
 
-1. su [dash.cloudflare.com](https://dash.cloudflare.com) apri Workers e Pages › Crea › Worker, dagli un nome (es. `bcw-proxy`) e premi Distribuisci
+1. su [dash.cloudflare.com](https://dash.cloudflare.com) apri Workers e Pages › Crea, scegli "Inizia con Hello World", dagli un nome (es. `bcw-proxy`) e premi Distribuisci
 2. premi Modifica codice, sostituisci tutto il contenuto con quello di `proxy/cloudflare-worker.js` e premi Distribuisci
 3. in Impostazioni › Variabili e segreti aggiungi la variabile `ALLOWED_ORIGINS` con l'origine del sito, senza percorso finale: per GitHub Pages `https://tuonome.github.io`
-4. apri BCW, tocca Modifica accanto a "Server" nella schermata di accesso (oppure Impostazioni › Server) e inserisci l'indirizzo del Worker, es. `https://bcw-proxy.tuonome.workers.dev`
+4. scrivi l'indirizzo del Worker in `config.json`, nella radice del repository (vedi sotto)
 
 Per controllare che il Worker funzioni apri `https://bcw-proxy.tuonome.workers.dev/ping` nel browser: deve rispondere `{"ok":true}`.
+
+### Proxy predefinito
+
+Il proxy che BCW usa di base si imposta in `config.json`, così chi apre il sito non deve configurarlo:
+
+```
+{
+  "proxy": "https://bcw-proxy.tuonome.workers.dev"
+}
+```
+
+All'avvio BCW sceglie, in ordine: l'indirizzo inserito a mano dall'utente (Modifica accanto a "Server" nella schermata di accesso, oppure Impostazioni › Server), il proxy del sito stesso se c'è (con `node server.js`), poi quello di `config.json`. Lasciando vuoto il campo si torna al predefinito.
 
 Anche `server.js` accetta richieste da altri siti se imposti `ALLOWED_ORIGINS`.
 
@@ -70,7 +82,9 @@ Le stesse dell'app nativa:
 
 ### Su schermi larghi
 
-Come su Mac: barra laterale con tutte le sezioni e i contatori delle cose da leggere o giustificare, account in fondo alla barra, pagine a due colonne (Dashboard, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca con elenco e comunicazione affiancati, griglie di card, impostazioni a schede. Le scorciatoie usano Alt (⌥ su Mac): Alt+1…9 per le sezioni, Alt+R per aggiornare, Alt+← Alt+→ Alt+T per spostarsi tra i giorni nella Dashboard.
+Come su Mac: barra laterale con tutte le sezioni e i contatori delle cose da leggere o giustificare, account in fondo alla barra, ricerca sempre a portata di mano nel campo in alto a destra, pagine a due colonne (Dashboard, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca con elenco e comunicazione affiancati, griglie di card, impostazioni a schede. In Bacheca, Agenda e Materiale la ricerca della pagina sta nel contenuto. Nelle pagine a più colonne le barre di scorrimento non compaiono, così le colonne mantengono la loro larghezza.
+
+Scorciatoie: ⌘F (Ctrl+F) per cercare; con Alt (⌥ su Mac) Alt+1…9 per le sezioni, Alt+R per aggiornare, Alt+← Alt+→ Alt+T Alt+Maiusc+T per spostarsi tra i giorni nella Dashboard.
 
 Sotto i 900 pixel di larghezza l'app usa il layout di iPhone, con la barra delle schede in basso.
 
@@ -106,9 +120,11 @@ js/
 ├── charts.js         Grafici SVG
 ├── dom.js            Aggiornamento del DOM per confronto
 └── views/            Dashboard, Voti, Tu e sottosezioni, Bacheca, Cerca, Impostazioni, Accesso
+config.json           Proxy predefinito
 server.js             Server statico e proxy (Node, senza dipendenze)
 proxy/                Proxy come Cloudflare Worker
 sw.js                 Service worker per l'uso offline
+logo/                 Logo (BCW con la linea) e linea da sola, in SVG
 ```
 
 Le viste producono HTML a partire dallo stato; `dom.js` applica al documento solo le differenze, così restano intatti fuoco, scorrimento e animazioni.

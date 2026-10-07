@@ -38,7 +38,7 @@ const TYPES = {
 };
 
 /** Solo questi file e cartelle sono pubblici (il proxy e la documentazione no). */
-const PUBLIC = ['index.html', 'manifest.webmanifest', 'sw.js', 'css', 'js', 'icons'];
+const PUBLIC = ['index.html', 'manifest.webmanifest', 'config.json', 'sw.js', 'css', 'js', 'icons'];
 
 function upstreamURL(path) {
   // /api/v1/<percorso>            → https://web.spaggiari.eu/rest/v1/<percorso>

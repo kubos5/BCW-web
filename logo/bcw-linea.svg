@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 66 10.73" width="66" height="10.73" role="img" aria-label="Linea di BCW">
+  <style>
+    .accent { fill: #A23E2F; }
+    @media (prefers-color-scheme: dark) { .accent { fill: #E3826A; } }
+  </style>
+  <rect class="accent" x="1" y="1" width="64" height="8.73" rx="4.36"/>
+</svg>

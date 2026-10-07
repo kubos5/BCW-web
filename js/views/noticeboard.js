@@ -2,7 +2,7 @@
 // risposta e anteprima degli allegati. Su schermi larghi elenco e dettaglio sono affiancati.
 
 import {
-  card, chipRow, filterChip, pill, eyebrow, iconBadge, loadingCard, statusBanner, emptyState, spinner, button,
+  localSearchField, card, chipRow, filterChip, pill, eyebrow, iconBadge, loadingCard, statusBanner, emptyState, spinner, button,
 } from '../components.js';
 import { icon } from '../icons.js';
 import { contains, esc, fmt, uniqueSorted } from '../util.js';
@@ -37,7 +37,8 @@ export const noticeboard = {
     const page = {
       title: 'Bacheca',
       subtitle: ctx.wide && unread ? (unread === 1 ? '1 da leggere' : `${unread} da leggere`) : null,
-      search,
+      // Su schermi larghi il campo sta in cima all'elenco: nella barra c'è la ricerca generale.
+      search: ctx.wide ? null : search,
       refresh: () => model.loadNotices(),
     };
     if (isSplit) {
@@ -119,7 +120,8 @@ function list(ctx, isSplit) {
   const s = listState(ctx);
   const model = ctx.model;
   const categories = uniqueSorted(model.notices.map((n) => n.category));
-  const chips = chipRow(
+  const field = ctx.wide ? localSearchField(s.search, 'Cerca nelle comunicazioni', 'notice-search') : '';
+  const chips = field + chipRow(
     filterChip('Da leggere', { iconName: 'circleFill', selected: s.onlyUnread, action: 'notice-unread' }) +
     filterChip('Tutte', { selected: s.category == null, action: 'notice-category', params: { value: '' } }) +
     categories.map((c) => filterChip(c, { selected: s.category === c, action: 'notice-category', params: { value: c, toggle: 1 } })).join(''),

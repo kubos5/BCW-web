@@ -22,9 +22,18 @@ function dashState(ctx) {
   });
 }
 
+/**
+ * Cambia il giorno scelto. Insieme può cambiare anche l'identità di "Nei prossimi giorni",
+ * così la sezione vecchia esce e quella nuova entra con il giorno: su schermi stretti sempre,
+ * su quelli larghi solo se la sezione è espansa e il suo contenuto cambia davvero.
+ */
 function select(ctx, day) {
   const s = dashState(ctx);
   const target = startOfDay(day);
+  if (target.getTime() === s.selected.getTime()) return;
+  const replacesUpcoming = !ctx.wide ||
+    (!ctx.prefs.isCollapsed('upcoming') && upcomingKey(ctx, s.selected) !== upcomingKey(ctx, target));
+  if (replacesUpcoming) s.upcomingGeneration = (s.upcomingGeneration ?? 0) + 1;
   s.dir = Math.sign(target - s.selected);
   // La direzione dell'animazione cambia solo quando cambia la settimana o il mese.
   if (startOfWeek(target).getTime() !== startOfWeek(s.selected).getTime()) s.weekDir = s.dir;
@@ -74,24 +83,35 @@ export const dashboard = {
     const calendar = mode === 'calendar' ? monthCalendar(ctx, s) : weekStrip(ctx, s);
     const detail = `<div class="day-transition dir-${s.dir}" data-key="day-${dayKey(day)}">${dayDetail(ctx, day)}</div>`;
     const showUpcoming = ctx.prefs.showUpcomingDays;
-    const upcoming = showUpcoming ? `<div class="day-transition dir-${s.dir}" data-key="up-${dayKey(day)}">${upcomingDays(ctx, day)}</div>` : '';
-    const menu = { icon: DashboardMode[mode].icon, label: 'Opzioni della Dashboard', action: 'dashboard-menu' };
-    const subtitle = fmt.relativeDayName(day) === fmt.longDay(day) ? null : fmt.longDay(day);
+    // Cambia identità (e quindi si anima) solo quando lo decide `select`.
+    const upcoming = showUpcoming ? `<div class="day-transition dir-${s.dir}" data-key="up-${s.upcomingGeneration ?? 0}">${upcomingDays(ctx, day)}</div>` : '';
+    const menu = { icon: DashboardMode[mode].icon, label: 'Vista e filtri', action: 'dashboard-menu' };
 
     if (ctx.wide) {
+      // Come su Mac: il titolo sta nel contenuto, sopra il calendario; nella barra restano i
+      // comandi per spostarsi tra i giorni e il menu della vista, allineato al bordo destro
+      // del calendario quando le colonne sono affiancate.
+      const text = fmt.relativeDayName(day);
+      // Se il nome del giorno non entra nella colonna il carattere si riduce, fino al 70%.
+      const family = getComputedStyle(document.documentElement).getPropertyValue('--serif') || 'serif';
+      const available = (ctx.splitWide ? 340 : ctx.mainWidth - 56) - 8;
+      const width = textWidth(text, `700 30px ${family}`);
+      const size = width > available ? Math.max(21, Math.floor((30 * available) / width)) : 30;
+      const heading = `<h1 class="dash-title" data-key="dash-title" style="font-size:${size}px">${esc(text)}</h1>`;
       return {
         title: fmt.relativeDayName(day),
-        subtitle,
+        hideTitle: true,
+        navWidth: ctx.splitWide ? 28 + 340 - 20 : null,
         navActions: [
           { icon: 'chevronLeft', label: 'Giorno precedente', help: 'Giorno precedente (Alt+←)', action: 'day-prev' },
           { icon: 'chevronRight', label: 'Giorno successivo', help: 'Giorno successivo (Alt+→)', action: 'day-next' },
           { text: 'Oggi', action: 'day-today', disabled: isToday(day), help: 'Vai a oggi (Alt+T)' },
           { text: 'Domani', action: 'day-tomorrow', disabled: isTomorrow(day), help: 'Vai a domani (Alt+Maiusc+T)' },
+          { ...menu, cls: 'push-end' },
         ],
-        actions: [menu],
         split: ctx.splitWide
-          ? { sideWidth: 340, side: calendar + upcoming, main: banner + detail }
-          : { side: calendar, main: banner + detail + upcoming },
+          ? { sideWidth: 340, side: heading + calendar + upcoming, main: banner + detail }
+          : { side: heading + calendar, main: banner + detail + upcoming },
         refresh: () => model.refreshAll(),
       };
     }
@@ -127,7 +147,8 @@ export const dashboard = {
         items.push({ label: value.title, icon: value.icon, checked: mode === key, run: () => prefs.set('dashboardMode', key) });
       }
       items.push({ divider: true });
-      items.push({ label: 'Vai a oggi', icon: 'sun', run: () => { select(ctx, new Date()); ctx.update(); } });
+      // Su schermi larghi "Oggi" è già un pulsante nella barra.
+      if (!ctx.wide) items.push({ label: 'Vai a oggi', icon: 'sun', run: () => { select(ctx, new Date()); ctx.update(); } });
       items.push({ label: 'Nascondi compiti fatti', icon: 'checkCircle', checked: prefs.hideCompletedHomework,
         run: () => prefs.set('hideCompletedHomework', !prefs.hideCompletedHomework) });
       if (mode === 'list' || ctx.wide) {
@@ -290,14 +311,24 @@ export function dayDetail(ctx, day) {
 
 // MARK: - Giorni successivi
 
-function upcomingDays(ctx, after) {
+/** Giorni con compiti o eventi nelle tre settimane dopo `after`. */
+function upcomingList(ctx, after) {
   const prefs = ctx.prefs;
   const start = addDays(after, 1);
   const end = addDays(after, 21);
   const upcoming = ctx.model.agenda.filter((e) => e.begin >= start && e.begin < end)
     .filter((e) => !(prefs.hideCompletedHomework && prefs.isCompleted(e)));
-  if (!upcoming.length) return '';
-  const days = [...groupBy(upcoming, (e) => e.day.getTime()).entries()].sort(([a], [b]) => a - b);
+  return [...groupBy(upcoming, (e) => e.day.getTime()).entries()].sort(([a], [b]) => a - b);
+}
+
+function upcomingKey(ctx, after) {
+  return upcomingList(ctx, after).map(([time, events]) => `${time}:${events.map((e) => e.id).join(',')}`).join('|');
+}
+
+function upcomingDays(ctx, after) {
+  const prefs = ctx.prefs;
+  const days = upcomingList(ctx, after);
+  if (!days.length) return '';
   const collapsed = prefs.isCollapsed('upcoming');
   const list = days.map(([time, events]) => {
     const day = new Date(time);

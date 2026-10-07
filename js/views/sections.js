@@ -2,7 +2,7 @@
 // anni precedenti, materie, libri di testo e calendario scolastico.
 
 import {
-  card, cardGrid, chipRow, filterChip, pill, eyebrow, iconBadge, loadingCard, statusBanner, emptyState, spinner,
+  localSearchField, card, cardGrid, chipRow, filterChip, pill, eyebrow, iconBadge, loadingCard, statusBanner, emptyState, spinner,
   statTile, absenceRow, agendaEventRow, lessonRow, subjectTag, segmented, sectionHeader, collapsible, chevron,
   joinRows, button, gradeColorValue, subjectColor, circleButton,
 } from '../components.js';
@@ -107,7 +107,11 @@ export const agenda = {
       (s.kind == null || e.kind === s.kind) && (!s.onlyPending || !prefs.isCompleted(e)) &&
       (contains(e.notes, s.search) || contains(e.subjectName, s.search)));
     const days = [...groupBy(items, (e) => e.day.getTime()).entries()].sort(([a], [b]) => (s.showPast ? b - a : a - b));
-    const picker = segmented([['false', 'In arrivo'], ['true', 'Passati']], String(s.showPast), 'agenda-past', { compact: ctx.wide });
+    const segments = segmented([['false', 'In arrivo'], ['true', 'Passati']], String(s.showPast), 'agenda-past', { compact: ctx.wide });
+    // Su schermi larghi la ricerca della pagina sta sulla stessa riga del periodo.
+    const picker = ctx.wide
+      ? `<div class="row gap-12 wrap">${segments}<span class="flex"></span>${localSearchField(s.search, 'Cerca compiti ed eventi', 'agenda-search')}</div>`
+      : segments;
     const chips = chipRow(filterChip('Da fare', { iconName: 'circle', selected: s.onlyPending, action: 'agenda-pending' }) +
       filterChip('Tutto', { selected: s.kind == null, action: 'agenda-kind', params: { value: '' } }) +
       Object.values(AgendaKind).map((k) => filterChip(k.title, { iconName: k.icon, selected: s.kind === k.id, action: 'agenda-kind', params: { value: k.id } })).join(''));
@@ -119,7 +123,7 @@ export const agenda = {
       : emptyState('Niente da mostrare', 'checklist', 'Nessun elemento corrisponde ai filtri.');
     return {
       title: 'Agenda',
-      search: { value: s.search, placeholder: 'Cerca compiti ed eventi', input: 'agenda-search' },
+      search: ctx.wide ? null : { value: s.search, placeholder: 'Cerca compiti ed eventi', input: 'agenda-search' },
       actions: [{ icon: 'calendarPlus', label: 'Esporta nel calendario', action: 'export-agenda' }],
       body: `<div class="stack gap-16">${picker}${chips}${content}</div>`,
       refresh: () => model.loadAgenda(),
@@ -301,6 +305,7 @@ export const didactics = {
       s.loading = false;
     });
     let body = s.error ? statusBanner(s.error, 'alertTriangle') : '';
+    if (model.didactics.length && ctx.wide) body += localSearchField(s.search, 'Cerca file o cartelle', 'didactics-search');
     if (model.didactics.length) {
       body += chipRow(filterChip('Tutti i docenti', { selected: s.teacher == null, action: 'didactics-teacher', params: { value: '' } }) +
         model.didactics.map((t) => filterChip(t.name, { selected: s.teacher === t.id, action: 'didactics-teacher', params: { value: t.id } })).join(''));
@@ -319,7 +324,7 @@ export const didactics = {
     }
     return {
       title: 'Materiale didattico',
-      search: { value: s.search, placeholder: 'Cerca file o cartelle', input: 'didactics-search' },
+      search: ctx.wide ? null : { value: s.search, placeholder: 'Cerca file o cartelle', input: 'didactics-search' },
       body: `<div class="stack gap-18">${body}</div>`,
       refresh: async () => { s.error = await model.loadDidactics(); },
     };
@@ -544,7 +549,8 @@ export const subjects = {
     });
     const body = !sorted.length
       ? emptyState('Nessuna materia', 'library')
-      : ctx.wide ? cardGrid(rows.join(''), 320) : `<div class="inset-list">${rows.join('')}</div>`;
+      // Le card della stessa riga hanno l'altezza della più alta (es. una materia con molti docenti).
+      : ctx.wide ? cardGrid(rows.join(''), 320, 'equal-rows') : `<div class="inset-list">${rows.join('')}</div>`;
     return { title: 'Materie', body, bottomInset: true, refresh: () => model.loadGrades() };
   },
 };
@@ -568,7 +574,7 @@ export const schoolbooks = {
       body = s.loading ? loadingCard() : emptyState('Nessun libro', 'library', 'La scuola non ha pubblicato le adozioni.');
     } else {
       body = model.schoolbooks.map((course) => `<div class="stack gap-10">${sectionHeader(course.name)}
-        ${ctx.wide ? cardGrid(course.books.map((b) => card(bookRow(b), { padding: 14 })).join(''), 380)
+        ${ctx.wide ? cardGrid(course.books.map((b) => card(bookRow(b), { padding: 14 })).join(''), 380, 'equal-rows')
     : `<div class="inset-list">${course.books.map((b) => `<div class="list-row">${bookRow(b)}</div>`).join('')}</div>`}</div>`).join('');
     }
     return { title: 'Libri di testo', body: `<div class="stack gap-22">${body}</div>`, bottomInset: true };
@@ -618,8 +624,8 @@ export const calendar = {
     const progress = total ? card(`${eyebrow('Anno scolastico')}<div class="row baseline gap-8"><span class="numeral huge">${done}</span><span class="secondary">di ${total} giorni di lezione</span></div>
       <progress value="${done}" max="${Math.max(total, 1)}"></progress><p class="caption secondary">Mancano ${total - done} giorni di scuola</p>`, { cls: 'stack gap-12' }) : '';
     const next = holidays.find((h) => h.end >= today);
-    const nextCard = next ? card(`${eyebrow('Prossima vacanza', 'var(--accent)')}<h3 class="title3">${esc(range(next))}</h3>
-      <p class="secondary">${daysBetween(today, next.start) <= 0 ? 'Sei in vacanza!' : `Tra ${daysBetween(today, next.start)} giorni`}</p>`, { cls: 'stack gap-8' }) : '';
+    const nextCard = next ? card(`${eyebrow('Prossima vacanza', 'var(--accent)')}<div class="next-holiday stack gap-8"><h3 class="title3">${esc(range(next))}</h3>
+      <p class="secondary">${daysBetween(today, next.start) <= 0 ? 'Sei in vacanza!' : `Tra ${daysBetween(today, next.start)} giorni`}</p></div>`, { cls: 'stack gap-8' }) : '';
     const list = holidays.map((h) => {
       const past = h.end < today;
       const count = daysBetween(h.start, h.end) + 1;
@@ -627,7 +633,9 @@ export const calendar = {
         <span class="grow">${esc(range(h))}</span><span class="caption secondary">${count === 1 ? '1 giorno' : `${count} giorni`}</span></div>`;
     });
     const listCard = card(list.length ? `<div class="rows">${list.join('<hr class="divider">')}</div>` : '<p class="secondary">Il calendario non è ancora disponibile.</p>');
-    const top = ctx.wide ? `<div class="two-columns equal">${progress}${nextCard}</div>` : progress + nextCard;
+    // Su schermi larghi i due riepiloghi stanno affiancati; la prossima vacanza ha meno
+    // contenuto, quindi la sua card è più stretta, con data e giorni al centro.
+    const top = ctx.wide && progress && nextCard ? `<div class="year-summary">${progress}${nextCard}</div>` : progress + nextCard;
     return { title: 'Calendario', body: `<div class="stack gap-18">${top}${sectionHeader('Vacanze e chiusure')}${listCard}</div>` };
   },
 };

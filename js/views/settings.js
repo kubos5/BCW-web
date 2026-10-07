@@ -88,7 +88,7 @@ function serverSection() {
   let host = Proxy.base;
   try { host = new URL(Proxy.base).host; } catch { /* relativo */ }
   return section([
-    row('Proxy', `<span class="form-value">${esc(Proxy.isCustom ? host : 'Questo sito')}</span>`),
+    row('Proxy', `<span class="form-value">${esc(Proxy.isCustom ? host : (Proxy.defaultFromConfig ? `${host} (predefinito)` : 'Questo sito'))}</span>`),
     buttonRow('Cambia server…', 'proxy-sheet', 'server'),
   ], { header: 'Server', footer: 'Il browser non può contattare direttamente Classeviva: le richieste passano da un piccolo proxy che le inoltra solo ai server di Spaggiari.' });
 }

@@ -20,10 +20,23 @@ function morphChildren(fromParent, toParent) {
     const key = keyOf(c);
     if (key != null) keyed.set(key, c);
   }
+  const newKeys = new Set();
+  for (let c = toParent.firstChild; c; c = c.nextSibling) {
+    const key = keyOf(c);
+    if (key != null) newKeys.add(key);
+  }
   let cursor = fromParent.firstChild;
   let next = toParent.firstChild;
   while (next) {
     const following = next.nextSibling;
+    // I nodi con una chiave che non c'è più si tolgono subito: altrimenti i nodi successivi
+    // andrebbero spostati davanti a loro, e spostare un elemento gli toglie il fuoco.
+    while (cursor && keyOf(cursor) != null && !newKeys.has(keyOf(cursor))) {
+      const removed = cursor;
+      cursor = cursor.nextSibling;
+      keyed.delete(keyOf(removed));
+      fromParent.removeChild(removed);
+    }
     const key = keyOf(next);
     let match = null;
     if (key != null) {

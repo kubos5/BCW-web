@@ -21,7 +21,8 @@ export const you = {
         <div class="tile-grid">${group.sections.map((key) => sectionTile(ctx, key)).join('')}</div></div>`).join('');
       return {
         title: 'Tu',
-        body: `<div class="stack gap-26"><div class="profile-stats">${profileCard(ctx)}${stats(ctx, true)}</div>${groups}${footer}</div>`,
+        // Profilo e statistiche affiancati se c'è spazio (alti uguali), altrimenti uno sotto l'altro.
+        body: `<div class="stack gap-26"><div class="profile-stats ${ctx.mainWidth - 56 >= 380 + 14 + 520 ? 'side' : ''}">${profileCard(ctx)}${stats(ctx, true)}</div>${groups}${footer}</div>`,
         bottomInset: true,
       };
     }
