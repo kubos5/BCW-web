@@ -33,14 +33,59 @@ const PROXY_KEY = 'bcw.proxy';
 
 export const MISSING_PROXY = 'Manca il server proxy per contattare Classeviva: impostalo con "Imposta il proxy" o da Impostazioni › Server.';
 
+/** "bcw-proxy.esempio.workers.dev/" → "https://bcw-proxy.esempio.workers.dev". */
+export function normalizeProxyURL(value) {
+  const text = String(value ?? '').trim().replace(/\/+$/, '');
+  if (!text) return '';
+  return /^https?:\/\//i.test(text) ? text : `https://${text}`;
+}
+
+const sameSiteProxy = () => new URL('api', document.baseURI).href.replace(/\/+$/, '');
+
+async function fetchWithTimeout(url, ms, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const Proxy = {
-  /** Indirizzo del proxy: per impostazione predefinita lo stesso sito, sotto `/api`. */
+  /** Proxy predefinito, deciso all'avvio da `init()`. */
+  defaultBase: null,
+  /** `true` se il proxy predefinito viene da `config.json`. */
+  defaultFromConfig: false,
+
+  /**
+   * Sceglie il proxy predefinito. Se il sito ha un proxy proprio (`server.js`, sotto `/api`)
+   * si usa quello; altrimenti quello indicato in `config.json` nella radice del sito, così
+   * su un hosting statico (es. GitHub Pages) nessuno deve configurarlo a mano.
+   * Un indirizzo impostato dall'utente ha sempre la precedenza.
+   */
+  async init() {
+    const local = sameSiteProxy();
+    const [configured, hasLocal] = await Promise.all([
+      fetchWithTimeout(new URL('config.json', document.baseURI), 4000, { cache: 'no-cache' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((config) => normalizeProxyURL(config?.proxy))
+        .catch(() => ''),
+      fetchWithTimeout(`${local}/ping`, 3000, { cache: 'no-store' })
+        .then((r) => !!r.headers.get('X-BCW-Proxy'))
+        .catch(() => false),
+    ]);
+    this.defaultFromConfig = !hasLocal && !!configured;
+    this.defaultBase = this.defaultFromConfig ? configured : local;
+  },
+
+  /** Indirizzo del proxy in uso. */
   get base() {
     try {
       const stored = localStorage.getItem(PROXY_KEY);
-      if (stored) return stored.replace(/\/+$/, '');
+      if (stored) return normalizeProxyURL(stored);
     } catch { /* archiviazione non disponibile */ }
-    return new URL('api', document.baseURI).href.replace(/\/+$/, '');
+    return this.defaultBase ?? sameSiteProxy();
   },
   get isCustom() {
     try { return !!localStorage.getItem(PROXY_KEY); } catch { return false; }
@@ -48,7 +93,8 @@ export const Proxy = {
   set(url) {
     this.status = null;
     try {
-      if (url && url.trim()) localStorage.setItem(PROXY_KEY, url.trim().replace(/\/+$/, ''));
+      const value = normalizeProxyURL(url);
+      if (value) localStorage.setItem(PROXY_KEY, value);
       else localStorage.removeItem(PROXY_KEY);
     } catch { /* ignorato */ }
   },

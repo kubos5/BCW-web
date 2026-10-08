@@ -14,7 +14,7 @@ export function renderLogin(ctx, { adding }) {
   const s = loginState(ctx);
   const disabled = !s.username || !s.password || s.loading;
   let proxyHost = Proxy.base;
-  try { proxyHost = new URL(Proxy.base).host + new URL(Proxy.base).pathname; } catch { /* indirizzo relativo */ }
+  try { proxyHost = (new URL(Proxy.base).host + new URL(Proxy.base).pathname).replace(/\/$/, ''); } catch { /* indirizzo relativo */ }
   // Verifica subito che ci sia il proxy: su un hosting statico (es. GitHub Pages) manca.
   ctx.task(`proxy-check-${Proxy.base}`, () => Proxy.check());
   return `<div class="login ${adding ? 'adding' : ''}">
@@ -89,7 +89,7 @@ export function proxySheet() {
         trailing: '<button class="btn btn-prominent" data-action="proxy-save">Salva</button>',
         body: `<div class="stack gap-14 sheet-pad">
           <p class="body-text">Il browser non può contattare direttamente Classeviva: BCW passa da un piccolo server proxy che inoltra le richieste solo ai server di Spaggiari.</p>
-          <p class="caption secondary">Lascia vuoto per usare quello di questo sito (<code>${esc(new URL('api', document.baseURI).href)}</code>), oppure inserisci l'indirizzo del tuo (ad esempio un Cloudflare Worker).</p>
+          <p class="caption secondary">Lascia vuoto per usare quello predefinito (<code>${esc(Proxy.defaultBase ?? '')}</code>), oppure inserisci l'indirizzo di un altro proxy (ad esempio un Cloudflare Worker).</p>
           <input class="text-input" type="url" placeholder="https://bcw-proxy.esempio.workers.dev" value="${esc(s.value)}" data-input="proxy-input" autocapitalize="none" spellcheck="false">
         </div>`,
       };
@@ -143,12 +143,8 @@ export const loginActions = {
   'proxy-sheet': (ctx) => ctx.openSheet(proxySheet()),
   'proxy-input': (ctx, el) => { ctx.state('proxy', {}).value = el.value; },
   'proxy-save': (ctx) => {
-    const value = (ctx.state('proxy', {}).value ?? '').trim();
-    if (value && !/^https?:\/\//i.test(value)) {
-      ctx.toast("L'indirizzo deve iniziare con https://", 'alertTriangle');
-      return;
-    }
-    Proxy.set(value);
+    // Senza schema si aggiunge https:// (es. "bcw-proxy.esempio.workers.dev").
+    Proxy.set(ctx.state('proxy', {}).value ?? '');
     ctx.app.viewState.delete('proxy');
     ctx.closeSheet();
     // La sessione aperta riparte con il nuovo indirizzo.

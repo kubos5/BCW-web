@@ -7,6 +7,7 @@ import { icon } from './icons.js';
 import { drawCharts } from './charts.js';
 import { Lock } from './lock.js';
 import { Reminders } from './reminders.js';
+import { Proxy } from './api.js';
 import { esc } from './util.js';
 import { avatar, spinner, subjectColor } from './components.js';
 import { routes, sections, sectionGroups, commonActions, sectionBadge } from './views/index.js';
@@ -99,10 +100,13 @@ function saveScroll() {
   }
 }
 
+/** Pagine già riportate alla posizione salvata (un attributo verrebbe tolto dal morph). */
+const restoredPages = new WeakSet();
+
 function restoreScroll() {
   const page = document.querySelector('.page.active');
-  if (!page || page.dataset.restored === '1') return;
-  page.dataset.restored = '1';
+  if (!page || restoredPages.has(page)) return;
+  restoredPages.add(page);
   for (const el of page.querySelectorAll('[data-scroll]')) {
     el.scrollTop = app.scroll.get(`${currentPath()}|${el.dataset.scroll}`) ?? 0;
   }
@@ -123,6 +127,12 @@ export function selectSection(key) {
   saveScroll();
   app.menu = null;
   app.sidebarOpen = false;
+  if (app.wide && key !== 'search') {
+    // Come su Mac: scegliere una sezione chiude la ricerca generale.
+    const search = app.viewState.get('search');
+    if (search) search.query = '';
+    app.nav.lastSection = key;
+  }
   if (app.nav.current === key) {
     // Toccando di nuovo la scheda attiva si torna alla sua pagina principale.
     app.nav.stacks[key] = [rootOf(key)];
@@ -294,8 +304,21 @@ function toolbarButton(item, { mobile }) {
     return `<button class="btn btn-glass toolbar-text"${attrs}${disabled} title="${esc(item.help ?? item.text)}">${esc(item.text)}</button>`;
   }
   if (item.html) return item.html;
-  const cls = mobile ? 'btn-circle glass' : 'tool-btn';
+  const cls = `${mobile ? 'btn-circle glass' : 'tool-btn'} ${item.cls ?? ''}`;
   return `<button class="${cls}"${attrs}${disabled} aria-label="${esc(item.label)}" title="${esc(item.help ?? item.label)}">${icon(item.icon)}</button>`;
+}
+
+/** Campo della ricerca generale, sempre visibile nella barra su schermi larghi (come su Mac). */
+function globalSearchField() {
+  const query = app.viewState.get('search')?.query ?? '';
+  return `<label class="search-field global-search" title="Cerca (⌘F / Ctrl+F)">${icon('search')}<input type="search" value="${esc(query)}" placeholder="Compiti, voti, comunicazioni…" data-input="global-search" data-focus="global-search-focus" data-blur="global-search-blur" data-keydown="global-search-key" autocomplete="off" enterkeyhint="search" aria-label="Cerca">${query ? `<button class="search-clear" data-action="global-search" data-clear="1" aria-label="Cancella">${icon('xCircle')}</button>` : ''}</label>`;
+}
+
+/** Torna dalla ricerca generale all'ultima sezione aperta. */
+function endSearch() {
+  const search = app.viewState.get('search');
+  if (search) search.query = '';
+  if (app.nav.current === 'search') selectSection(app.nav.lastSection ?? 'dashboard');
 }
 
 function searchField(search) {
@@ -357,15 +380,15 @@ function renderDesktop(ctx, page) {
   const depth = ctx.depth;
   const back = depth > 1 ? `<button class="tool-btn" data-action="nav-back" aria-label="Indietro" title="Indietro">${icon('chevronLeft')}</button>` : '';
   const nav = (page.navActions ?? []).map((a) => toolbarButton(a, { mobile: false })).join('');
+  const navStyle = page.navWidth ? ` style="width:${page.navWidth}px"` : '';
   const actions = (page.actions ?? []).map((a) => toolbarButton(a, { mobile: false })).join('');
   const refresh = `<button class="tool-btn" data-action="refresh-all" ${model.isRefreshing ? 'disabled' : ''} aria-label="Aggiorna" title="Aggiorna i dati da Classeviva (Alt+R)">${model.isRefreshing ? spinner() : icon('refresh')}</button>`;
   const toolbar = `<header class="toolbar">
     <button class="tool-btn sidebar-toggle" data-action="toggle-sidebar" aria-label="Barra laterale">${icon('sidebar')}</button>
     ${back}
-    <div class="toolbar-title"><h1>${esc(page.title)}</h1>${page.subtitle ? `<p>${esc(page.subtitle)}</p>` : ''}</div>
-    <div class="toolbar-nav">${nav}</div>
+    ${page.hideTitle ? '' : `<div class="toolbar-title"><h1>${esc(page.title)}</h1>${page.subtitle ? `<p>${esc(page.subtitle)}</p>` : ''}</div>`}
+    <div class="toolbar-nav ${page.navWidth ? 'aligned' : ''}"${navStyle}>${nav}</div>
     <span class="flex"></span>
-    ${page.search ? searchField(page.search) : ''}
     <div class="toolbar-actions">${actions}${refresh}</div></header>`;
 
   let content;
@@ -382,6 +405,7 @@ function renderDesktop(ctx, page) {
   return `<div class="shell desktop ${app.sidebarOpen ? 'sidebar-open' : ''}">
     ${renderSidebar()}
     <section class="page active desktop" data-key="page-${esc(path)}" data-path="${esc(path)}">${toolbar}<div class="page-content">${content}</div></section>
+    <div class="global-search-slot" data-key="global-search">${globalSearchField()}</div>
   </div>`;
 }
 
@@ -531,6 +555,34 @@ const shellActions = {
     app.update();
   },
   'account-menu': (ctx, el) => openMenu(el, accountMenuItems(ctx), { align: 'start' }),
+  'global-search': (ctx, el) => {
+    const search = ctx.state('search', { query: '' });
+    if (el.dataset.clear) {
+      endSearch();
+      return;
+    }
+    search.query = el.value;
+    if (search.query && app.nav.current !== 'search') selectSection('search');
+  },
+  'global-search-focus': () => {
+    // Selezionando il campo si apre la pagina di ricerca.
+    if (app.nav.current !== 'search') selectSection('search');
+  },
+  'global-search-blur': () => {
+    // Uscendo dal campo vuoto si torna alla sezione di prima.
+    if (!(app.viewState.get('search')?.query) && app.nav.current === 'search') {
+      setTimeout(() => {
+        if (!document.activeElement?.matches?.('.global-search input')) endSearch();
+      }, 150);
+    }
+  },
+  'global-search-key': (ctx, el, event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      el.blur();
+      endSearch();
+    }
+  },
   'lock-pin-input': (ctx, el) => { app.pinInput = el.value; },
   'lock-pin': async () => {
     const ok = await Lock.unlockWithPin(app.pinInput);
@@ -587,6 +639,21 @@ root.addEventListener('input', (event) => {
 root.addEventListener('change', (event) => {
   const el = event.target.closest('[data-change]');
   if (el) dispatch(el.dataset.change, el, event);
+});
+
+root.addEventListener('focusin', (event) => {
+  const el = event.target.closest?.('[data-focus]');
+  if (el) dispatch(el.dataset.focus, el, event);
+});
+
+root.addEventListener('focusout', (event) => {
+  const el = event.target.closest?.('[data-blur]');
+  if (el) dispatch(el.dataset.blur, el, event);
+});
+
+root.addEventListener('keydown', (event) => {
+  const el = event.target.closest?.('[data-keydown]');
+  if (el) dispatch(el.dataset.keydown, el, event);
 });
 
 root.addEventListener('submit', (event) => {
@@ -703,6 +770,17 @@ document.addEventListener('keydown', (event) => {
   }
   if (model.phase !== 'signedIn' || Lock.isLocked || app.sheet || app.dialog) return;
   const typing = event.target.closest?.('input, textarea, select');
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.code === 'KeyF') {
+    // Come il comando Cerca del Mac (⌘F): mette il cursore nel campo di ricerca.
+    event.preventDefault();
+    if (app.wide) {
+      root.querySelector('.global-search input')?.focus();
+    } else {
+      selectSection('search');
+      requestAnimationFrame(() => root.querySelector('.search-field input')?.focus());
+    }
+    return;
+  }
   if (!event.altKey || event.metaKey || event.ctrlKey) return;
   const digit = event.code.startsWith('Digit') ? event.code.slice(5) : null;
   if (digit) {
@@ -758,7 +836,7 @@ document.addEventListener('visibilitychange', () => {
 let hiddenAt = null;
 
 async function start() {
-  await Lock.detect();
+  await Promise.all([Lock.detect(), Proxy.init()]);
   const initial = location.hash ? parsePath(location.hash).path : null;
   let saved = null;
   try { saved = localStorage.getItem('bcw.section'); } catch { /* ignorato */ }

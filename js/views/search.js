@@ -14,7 +14,8 @@ export const search = {
     const s = ctx.state('search', { query: '' });
     ctx.task('search-didactics', () => (model.didactics.length ? null : model.loadDidactics()));
     const q = s.query.trim();
-    const field = { value: s.query, placeholder: 'Compiti, voti, comunicazioni…', input: 'search-input' };
+    // Su schermi larghi il campo è quello della ricerca generale nella barra.
+    const field = ctx.wide ? null : { value: s.query, placeholder: 'Compiti, voti, comunicazioni…', input: 'search-input' };
 
     if (!q) {
       const suggestions = ['Verifica', 'Interrogazione', ...uniqueSorted(model.grades.map((g) => g.subjectName)).slice(0, 8)];
@@ -69,7 +70,7 @@ export const search = {
     'search-input': (ctx, el) => { ctx.state('search', { query: '' }).query = el.dataset.clear ? '' : el.value; },
     'search-suggestion': (ctx, el) => {
       ctx.state('search', { query: '' }).query = el.dataset.value;
-      requestAnimationFrame(() => document.querySelector('.search-field input')?.focus());
+      requestAnimationFrame(() => document.querySelector('.global-search input, .search-field input')?.focus());
     },
   },
 };

@@ -239,6 +239,15 @@ export function select(options, selected, action, { label = '' } = {}) {
     `<option value="${esc(value)}"${String(value) === String(selected) ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select>${icon('chevronUpDown')}</span>`;
 }
 
+/**
+ * Ricerca dentro una singola pagina (Bacheca, Agenda, Materiale) su schermi larghi: nella
+ * barra c'è già quella generale, quindi il campo sta nel contenuto (come `LocalSearchField`).
+ */
+export function localSearchField(value, placeholder, action) {
+  return `<label class="local-search">${icon('search')}<input type="search" value="${esc(value)}" placeholder="${esc(placeholder)}" data-input="${action}" autocomplete="off" aria-label="${esc(placeholder)}">` +
+    `${value ? `<button class="search-clear" data-action="${action}" data-clear="1" aria-label="Cancella" title="Cancella">${icon('xCircle')}</button>` : ''}</label>`;
+}
+
 export function avatar(initials, { size = 66, color = 'var(--accent)', cls = '' } = {}) {
   return `<span class="avatar ${cls}" style="--size:${size}px;${tint(color)}">${esc(initials)}</span>`;
 }

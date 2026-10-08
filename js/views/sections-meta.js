@@ -1,13 +1,14 @@
 // Sezioni dell'app: le schede di iOS più le pagine che su iPhone stanno dentro "Tu",
-// con titolo, icona, colore e scorciatoia (come la barra laterale di macOS).
+// con titolo, icona, colore e scorciatoia (come la barra laterale di macOS). Su schermi
+// larghi la ricerca non è una sezione: è il campo sempre visibile nella barra.
 
 export const sections = {
   dashboard: { title: 'Dashboard', icon: 'timeline', tint: 'var(--accent)', shortcut: '1' },
   grades: { title: 'Voti', icon: 'chart', tint: 'var(--accent)', shortcut: '2' },
   you: { title: 'Tu', icon: 'userCircle', tint: 'var(--accent)', shortcut: '3' },
-  search: { title: 'Cerca', icon: 'search', tint: 'var(--accent)', shortcut: '4' },
-  noticeboard: { title: 'Bacheca', icon: 'megaphone', tint: 'var(--accent)', shortcut: '5' },
-  notes: { title: 'Note e annotazioni', icon: 'messageAlert', tint: 'var(--poor)' },
+  search: { title: 'Cerca', icon: 'search', tint: 'var(--accent)' },
+  noticeboard: { title: 'Bacheca', icon: 'megaphone', tint: 'var(--accent)', shortcut: '4' },
+  notes: { title: 'Note e annotazioni', icon: 'messageAlert', tint: 'var(--poor)', shortcut: '5' },
   reports: { title: 'Scrutini e pagelle', icon: 'fileSearch', tint: 'var(--neutral)' },
   previous: { title: 'Anni precedenti', icon: 'history', tint: 'var(--ink2)' },
   absences: { title: 'Assenze e ritardi', icon: 'userClock', tint: 'var(--fair)', shortcut: '6' },
@@ -25,7 +26,7 @@ export const extraRows = {
 };
 
 export const sectionGroups = [
-  { title: null, sections: ['dashboard', 'grades', 'you', 'search'] },
+  { title: null, sections: ['dashboard', 'grades', 'you'] },
   { title: 'Comunicazioni', sections: ['noticeboard', 'notes'] },
   { title: 'Valutazioni', sections: ['reports', 'previous'] },
   { title: 'Frequenza', sections: ['absences'] },
