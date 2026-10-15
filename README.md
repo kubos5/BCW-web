@@ -71,7 +71,7 @@ Le stesse dell'app nativa:
 - dato un obiettivo di media, il voto necessario nelle prossime 1-5 prove
 - media di tutti i voti o media delle medie, con o senza pesi
 - Tu con profilo, statistiche e tutte le altre sezioni
-- bacheca con filtri e ricerca, adesione, firma e risposta alle comunicazioni e anteprima degli allegati
+- bacheca con filtri e ricerca, adesione, firma e risposta alle comunicazioni e anteprima degli allegati: immagini da ingrandire (pulsanti, pizzico, doppio tocco, Ctrl + rotellina, tasti + − 0) e scorrere, adatte alla finestra o alla larghezza, anteprima a schermo intero con i controlli in alto, apertura in una nuova scheda senza scaricare e Scarica
 - note disciplinari e annotazioni, assenze e ritardi con quelli da giustificare
 - scrutini e pagelle con riepilogo per periodo e insufficienze
 - anni precedenti: pagelle dall'archivio di Classeviva e accesso al sito per il resto
@@ -127,7 +127,8 @@ Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, con la barra 
 Il sito segue [Material 3 Expressive](https://m3.material.io/):
 
 - colori generati con material-color-utilities (schema Tonal Spot) dal rosso mattone di BCW `#A23E2F`, con tema chiaro e scuro; materie e stati (bene, sufficiente, insufficiente) hanno le loro palette tonali. Scegliendo un altro colore d'accento lo schema viene rigenerato nel browser (`js/theme.js`) e salvato, così all'apertura si applica subito
-- font Google Sans Flex (incluso nel sito), con l'asse ROND per titoli e numeri arrotondati
+- font Google Sans Flex (incluso nel sito), con l'asse ROND per titoli e numeri arrotondati; anche il logo è scritto con questo font
+- favicon con la linea di BCW nel colore del tema scelto nell'app (chiaro, scuro e colore d'accento)
 - icone Material Symbols Rounded
 - angoli ampi, liste segmentate, gruppi di pulsanti collegati, barra di navigazione corta e barra laterale (navigation rail), fogli dal basso e dialoghi
 - forme espressive (MaterialShapes): i voti in un "biscotto" a nove lobi, l'indicatore di caricamento che cambia forma ruotando, avatar e stati vuoti nelle forme di Material
@@ -159,7 +160,8 @@ js/
 ├── vendor/           material-color-utilities (licenza Apache 2.0), raccolta in un file
 ├── demo.js, pdf.js   Server demo e PDF di esempio
 ├── components.js     Componenti (card, liste, badge voto, anelli ondulati, righe agenda…)
-├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo
+├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo (testo e linea)
+├── viewer.js         Anteprima dei file con zoom e schermo intero
 ├── charts.js         Grafici SVG
 ├── dom.js            Aggiornamento del DOM per confronto
 └── views/            Dashboard, Orario, Voti, Tu e sottosezioni, Bacheca, Cerca, Impostazioni, Accesso

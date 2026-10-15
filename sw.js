@@ -1,7 +1,7 @@
 // Service worker: rende BCW installabile e la apre anche offline.
 // I dati del registro sono salvati a parte (IndexedDB) dall'app stessa.
 
-const VERSION = 'bcw-v6';
+const VERSION = 'bcw-v7';
 const SHELL = [
   './',
   'index.html',
@@ -37,6 +37,7 @@ const SHELL = [
   'js/reminders.js',
   'js/store.js',
   'js/util.js',
+  'js/viewer.js',
   'js/views/index.js',
   'js/views/sections-meta.js',
   'js/views/dashboard.js',

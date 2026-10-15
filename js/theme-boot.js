@@ -22,5 +22,11 @@
       var meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.content = dark ? theme.dark : theme.light;
     }
+    // Favicon nel colore del marchio del tema scelto (lo aggiorna poi js/theme.js).
+    var brand = getComputedStyle(html).getPropertyValue('--brand').trim();
+    var icon = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+    if (brand && icon) {
+      icon.href = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="4" y="28.18" width="56" height="7.64" rx="3.82" fill="' + brand + '"/></svg>');
+    }
   } catch { /* aspetto predefinito */ }
 })();

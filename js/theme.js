@@ -104,6 +104,31 @@ export const Theme = {
     }
   },
 
+  /**
+   * Favicon con la linea di BCW nel colore del marchio del tema in uso (chiaro o scuro e
+   * colore d'accento scelti nell'app). Anche la versione PNG, per i browser senza SVG.
+   */
+  updateFavicon() {
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim();
+    if (!color || color === faviconColor) return;
+    faviconColor = color;
+    const svg = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+    if (svg) svg.href = faviconSVG(color);
+    const png = document.querySelector('link[rel="icon"][type="image/png"]');
+    if (png) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 192;
+      const c = canvas.getContext('2d');
+      if (c?.roundRect) {
+        c.fillStyle = color;
+        c.beginPath();
+        c.roundRect(12, 84.5, 168, 23, 11.5);
+        c.fill();
+        png.href = canvas.toDataURL('image/png');
+      }
+    }
+  },
+
   /** Colore della barra del browser (`theme-color`) per il tema chiaro o scuro. */
   surface(dark) {
     const element = document.getElementById(STYLE_ID);
@@ -113,6 +138,12 @@ export const Theme = {
 };
 
 let pending = null;
+let faviconColor = null;
+
+/** La linea di BCW (come icons/favicon.svg) in un colore. */
+export function faviconSVG(color) {
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="4" y="28.18" width="56" height="7.64" rx="3.82" fill="${color}"/></svg>`)}`;
+}
 
 async function generate(prefs, signature) {
   let cached = null;

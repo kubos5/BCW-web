@@ -1098,9 +1098,11 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 }
 
 .rail-header { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 4px 8px; flex: none; }
-.rail-logo { height: 18px; width: auto; transition: opacity var(--effects-dur) var(--effects); }
-.bcw-logo .logo-ink { fill: var(--on-surface); }
-.bcw-logo .logo-accent { fill: var(--brand); }
+.rail-logo { font-size: 20px; transition: opacity var(--effects-dur) var(--effects); }
+/* Logo: "BCW" e la linea del marchio, in em così si ridimensiona con font-size. */
+.bcw-logo { display: inline-flex; align-items: baseline; gap: .42em; font-size: 20px; line-height: 1; color: var(--on-surface); white-space: nowrap; }
+.logo-text { font-family: var(--font); font-weight: 800; letter-spacing: -.01em; font-variation-settings: "ROND" var(--rond); }
+.logo-line { display: inline-block; width: 1.1em; height: .15em; margin-bottom: .2em; border-radius: var(--r-full); background: var(--brand); }
 .rail-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; }
 .rail-group { display: flex; flex-direction: column; gap: 2px; }
 .rail-group h2 { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--on-surface-variant); padding: 16px 16px 6px; white-space: nowrap; overflow: hidden; }
@@ -1346,9 +1348,40 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .shell.desktop ~ .snackbar, .snackbar:only-of-type { bottom: calc(24px + var(--safe-bottom)); }
 @keyframes snack-in { from { opacity: 0; transform: translate(-50%, 24px) scale(.9); } }
 
+/* Anteprima dei file (js/viewer.js). */
+.viewer-bar { grid-template-columns: auto minmax(0, 1fr) auto; }
+.viewer-bar h2 { text-align: left; padding-left: 4px; }
+.viewer-bar .sheet-trail { align-items: center; gap: 4px; }
+.viewer-bar .viewer-download { margin-left: 4px; }
 .viewer-body { flex: 1; min-height: 0; display: grid; place-items: center; padding: 0 16px 16px; }
-.viewer-body img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--r-l); }
 .viewer-body iframe { width: 100%; height: 100%; border: 0; border-radius: var(--r-l); background: var(--surface-container-lowest); }
+/* Immagini: adattate all'area; ingrandite si scorrono in tutte le direzioni (unica eccezione
+   allo scorrimento orizzontale, come in qualsiasi visore di immagini). */
+.viewer-scroll { position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: thin; }
+.viewer-stage { display: flex; width: 100%; height: 100%; padding: 0 16px 88px; }
+.viewer-stage img { display: block; flex: none; margin: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--r-l); user-select: none; -webkit-user-select: none; -webkit-user-drag: none; cursor: zoom-in; }
+.viewer-scroll.zoomed .viewer-stage { width: max-content; height: max-content; min-width: 100%; min-height: 100%; padding: 0 0 88px; }
+.viewer-scroll.zoomed .viewer-stage img { max-width: none; max-height: none; border-radius: 0; cursor: grab; }
+.viewer-scroll.dragging, .viewer-scroll.dragging img { cursor: grabbing; }
+.viewer-toolbar {
+  position: absolute; left: 50%; bottom: calc(16px + var(--safe-bottom)); z-index: 2; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: var(--r-full);
+  background: var(--surface-container-highest); color: var(--on-surface); box-shadow: var(--elev-3);
+}
+.viewer-zoom-label { min-width: 72px; height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-full); background: var(--secondary-container); color: var(--on-secondary-container); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; transition: border-radius var(--spring-fast-dur) var(--spring-fast); }
+.viewer-zoom-label:active { border-radius: var(--r-m); }
+.viewer-toolbar-divider { width: 1px; height: 24px; margin: 0 4px; background: var(--outline-variant); }
+/* Schermo intero: riempie la finestra, i controlli restano in alto. */
+.viewer-layer.full { padding: 0; }
+.sheet-layer.centered.viewer-layer.full .sheet.viewer { max-width: none; width: 100%; height: 100%; max-height: none; border-radius: 0; box-shadow: none; background: var(--surface-container-lowest); }
+.viewer-layer.full .viewer-bar { padding-top: calc(4px + var(--safe-top)); background: var(--surface-container); }
+.viewer-layer.full .viewer-stage { padding-top: 16px; }
+.viewer-layer.full .viewer-scroll.zoomed .viewer-stage { padding-top: 0; }
+.viewer-layer.full .viewer-body { padding: 16px; }
+@media (max-width: 599px) {
+  .viewer-download span { display: none; }
+  .viewer-download { width: 40px; min-width: 40px; padding: 0; }
+}
 
 .lock-screen {
   position: fixed;
@@ -1378,7 +1411,7 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .card-grid.equal-rows > .card { height: 100%; }
 .two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .page-footer { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0 0; color: var(--on-surface-variant); font-size: 12px; text-align: center; }
-.page-footer .bcw-logo { height: 14px; width: auto; margin-bottom: 2px; }
+.page-footer .bcw-logo { font-size: 15px; margin-bottom: 2px; }
 .page-footer strong { font-size: 13px; font-weight: 600; }
 .banner-slot { margin-bottom: 12px; }
 
@@ -1469,7 +1502,7 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .login-art .a { width: 96px; height: 96px; left: calc(50% - 190px); top: 4px; color: var(--primary-container); animation: lock-spin 40s linear infinite; }
 .login-art .b { width: 76px; height: 76px; left: calc(50% + 112px); top: 92px; color: var(--tertiary-container); animation: lock-spin 32s linear infinite reverse; }
 .login-art .c { width: 44px; height: 44px; left: calc(50% + 64px); top: 6px; color: var(--secondary-container); animation: lock-spin 24s linear infinite; }
-.login .logo { width: 176px; height: auto; }
+.login .logo { font-size: 44px; }
 .logo-subtitle { font-size: 16px; color: var(--on-surface-variant); font-weight: 500; }
 .login-form { display: flex; flex-direction: column; gap: 12px; }
 .login-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }

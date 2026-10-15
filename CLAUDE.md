@@ -18,8 +18,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
 - Design Material 3 Expressive: colori come variabili CSS (`--primary`, `--surface-container…`, `--good/--fair/--poor/
   --neutral` con `-container`, `--subject-N`); alias brevi `--bg`, `--card`, `--ink`, `--ink2`, `--accent`. Font Google
   Sans Flex in `fonts/` (asse ROND per i titoli). Icone Material Symbols Rounded incorporate in `js/icons.js` (varianti
-  `…Fill`); forme in `js/shapes.js` (`shape(name)` dentro un `.shaped`); logo inline (`js/logo.js`) così segue il tema
-  scelto nell'app. Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
+  `…Fill`); forme in `js/shapes.js` (`shape(name)` dentro un `.shaped`); logo come testo (`js/logo.js`: "BCW" in Google
+  Sans Flex e la linea in `--brand`), così segue il tema scelto nell'app; il favicon si ridisegna con `--brand`
+  (`Theme.updateFavicon()`). Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
 - Larghezze: sotto 600 px barra di navigazione in basso (Dashboard, Orario, Voti, Tu, Cerca); 600–839 le stesse schede in
   una barra laterale compatta; da 840 barra laterale espansa con tutte le sezioni (riducibile; tra 840 e 1000 si apre
   sopra il contenuto) e pagina in un pannello con angoli ampi.
@@ -47,5 +48,7 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   `css/bcw.css` (chiaro e scuro), salvato in `bcw.theme` e applicato all'avvio da `js/theme-boot.js`. Angoli, animazioni
   e caratteri sono attributi su `<html>` (`data-corners`, `data-motion`, `data-rounded`): usare `--r-*` per gli angoli,
   `--spring*` per il movimento e `"ROND" var(--rond)` per i titoli.
+- Anteprima dei file in `js/viewer.js` (`openFile(file)`): immagini con zoom relativo alla dimensione adattata
+  (`zoom`, `fit`), schermo intero (`full`), apertura in una nuova scheda e Scarica.
 - Per provare usare "Prova la demo" (`js/demo.js`, dati deterministici generati nel browser); nell'Orario "Genera"
   crea la bozza dalle lezioni della demo.

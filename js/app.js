@@ -9,6 +9,7 @@ import { icon } from './icons.js';
 import { drawCharts } from './charts.js';
 import { Lock } from './lock.js';
 import { Theme } from './theme.js';
+import { viewerState, renderViewer, viewerActions, viewerKey, installViewerGestures } from './viewer.js';
 import { Reminders } from './reminders.js';
 import { Proxy } from './api.js';
 import { esc } from './util.js';
@@ -301,7 +302,7 @@ export function confirm({ title, message, confirmLabel = 'OK', destructive = fal
 
 /** Anteprima di un file scaricato (come Quick Look). */
 export function openFile(file) {
-  app.viewer = file;
+  app.viewer = viewerState(file);
   app.update();
 }
 
@@ -522,20 +523,7 @@ function renderOverlays() {
         ${sheet.footer ? `<footer class="sheet-footer">${sheet.footer}</footer>` : ''}
       </div></div>`;
   }
-  if (app.viewer) {
-    const f = app.viewer;
-    const preview = f.type.startsWith('image/')
-      ? `<img src="${f.url}" alt="${esc(f.name)}">`
-      : (f.type.includes('pdf') || f.type.startsWith('text/'))
-        ? `<iframe src="${f.url}" title="${esc(f.name)}"></iframe>`
-        : `<div class="empty-state"><h3>${esc(f.name)}</h3><p>L'anteprima non è disponibile per questo tipo di file.</p></div>`;
-    html += `<div class="sheet-layer centered viewer-layer" data-key="viewer">
-      <div class="scrim" data-action="viewer-close"></div>
-      <div class="sheet viewer large" role="dialog" aria-modal="true" aria-label="${esc(f.name)}">
-        <header class="sheet-bar"><div class="sheet-lead"><button class="icon-btn" data-action="viewer-close" aria-label="Chiudi" title="Chiudi">${icon('x')}</button></div><h2>${esc(f.name)}</h2>
-        <div class="sheet-trail"><a class="btn xs tonal" href="${f.url}" download="${esc(f.name)}">${icon('download')}<span>Scarica</span></a></div></header>
-        <div class="viewer-body">${preview}</div></div></div>`;
-  }
+  if (app.viewer) html += renderViewer(app.viewer);
   if (app.dialog) {
     const d = app.dialog;
     // Dialoghi con più scelte (`actions`) oppure conferma/annulla.
@@ -606,6 +594,7 @@ function applyThemeColor() {
   const color = Theme.surface(dark);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta && meta.content !== color) meta.content = color;
+  Theme.updateFavicon();
 }
 
 // MARK: - Azioni
@@ -626,7 +615,6 @@ const shellActions = {
   },
   'refresh-all': () => model.refreshAll(),
   'sheet-close': () => closeSheet(),
-  'viewer-close': () => { app.viewer = null; app.update(); },
   'dialog-cancel': () => {
     const d = app.dialog;
     app.dialog = null;
@@ -728,7 +716,7 @@ function accountMenuItems(ctx) {
   return items;
 }
 
-const allActions = { ...shellActions, ...commonActions, ...loginActions };
+const allActions = { ...shellActions, ...viewerActions(app), ...commonActions, ...loginActions };
 for (const view of Object.values(routes)) Object.assign(allActions, view.actions ?? {});
 
 function dispatch(name, el, event) {
@@ -971,6 +959,8 @@ root.addEventListener('touchend', async () => {
   }
 }, { passive: true });
 
+installViewerGestures(root, app);
+
 // MARK: - Tastiera
 
 const shortcutSections = Object.entries(sections).filter(([, s]) => s.shortcut);
@@ -982,6 +972,10 @@ document.addEventListener('keydown', (event) => {
     else if (app.viewer) app.viewer = null;
     else if (app.sheet) closeSheet();
     else if (app.railOpen) app.railOpen = false;
+    app.update();
+    return;
+  }
+  if (!app.dialog && !app.menu && viewerKey(event, app)) {
     app.update();
     return;
   }
