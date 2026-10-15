@@ -38,15 +38,6 @@ export const Lock = {
     return null;
   },
 
-  get name() {
-    const ua = navigator.userAgent;
-    if (/iPhone|iPad/.test(ua)) return 'Face ID o Touch ID';
-    if (/Macintosh/.test(ua)) return 'Touch ID';
-    if (/Windows/.test(ua)) return 'Windows Hello';
-    if (/Android/.test(ua)) return 'sblocco del dispositivo';
-    return 'sblocco del dispositivo';
-  },
-
   /** Attiva il blocco con una passkey del dispositivo. */
   async enablePasskey() {
     const credential = await navigator.credentials.create({

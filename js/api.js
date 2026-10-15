@@ -171,8 +171,19 @@ export class HttpTransport {
   }
 }
 
+/** Le intestazioni arrivano come Latin-1: i nomi in UTF-8 (es. "n°") vanno ridecodificati. */
+function utf8(text) {
+  if (!/[\u0080-\u00ff]/.test(text) || /[^\u0000-\u00ff]/.test(text)) return text;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(text, (c) => c.charCodeAt(0)));
+  } catch {
+    return text;
+  }
+}
+
 function fileName(disposition) {
   if (!disposition) return null;
+  disposition = utf8(disposition);
   for (const part of disposition.split(';')) {
     const trimmed = part.trim();
     const lower = trimmed.toLowerCase();
@@ -347,6 +358,10 @@ export class ClassevivaClient {
     }
     if (result.status < 200 || result.status >= 300) {
       if (result.status === 401) throw APIError.notAuthenticated();
+      // Un proxy non aggiornato non segue i reindirizzamenti (es. alcuni allegati della Bacheca).
+      if (result.status >= 300 && result.status < 400) {
+        throw APIError.server(result.status, 'Il proxy non ha seguito un reindirizzamento di Classeviva: va aggiornato con l\'ultima versione di proxy/cloudflare-worker.js.');
+      }
       throw APIError.server(result.status, errorMessage(result) ?? '');
     }
     return result;
@@ -407,6 +422,11 @@ export class ClassevivaClient {
   /** Scarica un file, pronto per l'anteprima. */
   async download(studentPath, { method = 'GET', suggestedName }) {
     const result = await this.raw(method, studentPath);
+    // Al posto del file Classeviva può rispondere con un errore in JSON.
+    if (isJSON(result)) {
+      const message = errorMessage(result);
+      if (message) throw APIError.server(result.status, message);
+    }
     return makeFile(result, suggestedName);
   }
 

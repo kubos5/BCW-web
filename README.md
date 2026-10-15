@@ -35,6 +35,8 @@ GitHub Pages pubblica solo file statici: l'app si apre, la demo funziona, ma l'a
 
 Per controllare che il Worker funzioni apri `https://bcw-proxy.tuonome.workers.dev/ping` nel browser: deve rispondere `{"ok":true}`.
 
+Quando `proxy/cloudflare-worker.js` cambia, ripeti il punto 2 per aggiornare il Worker. Ad esempio, dalla versione che segue i reindirizzamenti di Classeviva si scaricano gli allegati della Bacheca serviti da un altro indirizzo.
+
 ### Proxy predefinito
 
 Il proxy che BCW usa di base si imposta in `config.json`, così chi apre il sito non deve configurarlo:
@@ -77,13 +79,13 @@ Le stesse dell'app nativa:
 - ricerca globale su compiti, voti, comunicazioni, materiale e note
 - promemoria la sera prima di compiti e verifiche, all'orario scelto
 - aggiunta al Calendario di compiti, verifiche ed eventi (file .ics), anche di tutta l'agenda con gli avvisi già impostati
-- blocco dell'app con Face ID, Touch ID o Windows Hello (passkey del dispositivo), oppure con un codice
+- blocco dell'app con una passkey (Face ID, Touch ID, Windows Hello o lo sblocco del dispositivo), oppure con un codice
 - consultazione offline con i dati dell'ultima volta
 - account genitore con più figli, più account salvati e passaggio dall'uno all'altro (anche tenendo premuta la scheda Tu), con una dissolvenza tra i dati di un account e quelli dell'altro
 - modalità demo con dati di esempio, anche con un account già collegato (uscendo si torna all'account)
 - notifiche per nuovi voti, comunicazioni, note, assenze e compiti, da attivare in Impostazioni › Notifiche
-- impostazioni divise in Generale, Voti, Dashboard, Orario, Notifiche e Account
-- tema chiaro, scuro o automatico
+- impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account
+- aspetto personalizzabile (Impostazioni › Aspetto): tema chiaro, scuro o automatico, colore d'accento (campioni o un colore qualsiasi) da cui si generano tutti i colori del sito, stile dei colori (Tonale, Vivace, Espressivo, Fedele, Neutro, Arcobaleno, Macedonia), contrasto, angoli più o meno arrotondati, animazioni espressive, standard o ridotte, caratteri arrotondati
 
 ### Orario
 
@@ -124,7 +126,7 @@ Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, con la barra 
 
 Il sito segue [Material 3 Expressive](https://m3.material.io/):
 
-- colori generati con material-color-utilities (schema Tonal Spot) dal rosso mattone di BCW `#A23E2F`, con tema chiaro e scuro; materie e stati (bene, sufficiente, insufficiente) hanno le loro palette tonali
+- colori generati con material-color-utilities (schema Tonal Spot) dal rosso mattone di BCW `#A23E2F`, con tema chiaro e scuro; materie e stati (bene, sufficiente, insufficiente) hanno le loro palette tonali. Scegliendo un altro colore d'accento lo schema viene rigenerato nel browser (`js/theme.js`) e salvato, così all'apertura si applica subito
 - font Google Sans Flex (incluso nel sito), con l'asse ROND per titoli e numeri arrotondati
 - icone Material Symbols Rounded
 - angoli ampi, liste segmentate, gruppi di pulsanti collegati, barra di navigazione corta e barra laterale (navigation rail), fogli dal basso e dialoghi
@@ -152,6 +154,9 @@ js/
 ├── reminders.js      Promemoria
 ├── calendar-export.js Esportazione .ics
 ├── lock.js           Blocco con passkey o codice
+├── theme.js          Aspetto: colori dal colore d'accento, angoli, animazioni, caratteri
+├── theme-boot.js     Applica l'aspetto salvato prima del primo disegno
+├── vendor/           material-color-utilities (licenza Apache 2.0), raccolta in un file
 ├── demo.js, pdf.js   Server demo e PDF di esempio
 ├── components.js     Componenti (card, liste, badge voto, anelli ondulati, righe agenda…)
 ├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo

@@ -42,5 +42,10 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   settimana dell'orario) le barre di scorrimento sono nascoste.
 - Colori solo dalle variabili CSS, mai nero/bianco puri come sfondo (i colori scelti dall'utente nell'orario passano
   da `light-dark()`).
+- Aspetto (Impostazioni › Aspetto, `js/theme.js`): con un colore d'accento, stile o contrasto diversi dai predefiniti
+  si genera con `js/vendor/material-color-utilities.js` un `<style id="bcw-theme">` con le stesse variabili di
+  `css/bcw.css` (chiaro e scuro), salvato in `bcw.theme` e applicato all'avvio da `js/theme-boot.js`. Angoli, animazioni
+  e caratteri sono attributi su `<html>` (`data-corners`, `data-motion`, `data-rounded`): usare `--r-*` per gli angoli,
+  `--spring*` per il movimento e `"ROND" var(--rond)` per i titoli.
 - Per provare usare "Prova la demo" (`js/demo.js`, dati deterministici generati nel browser); nell'Orario "Genera"
   crea la bozza dalle lezioni della demo.

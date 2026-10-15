@@ -21,6 +21,30 @@ function upstreamURL(pathname) {
   return null;
 }
 
+/**
+ * Inoltra la richiesta seguendo i reindirizzamenti come l'app iOS (alcuni allegati della
+ * Bacheca vengono serviti da un altro indirizzo). Il token va solo ai server di Classeviva.
+ */
+async function fetchUpstream(url, { method, headers, body }) {
+  let response = await fetch(url, { method, headers, body, redirect: 'manual' });
+  for (let hops = 0; hops < 5 && [301, 302, 303, 307, 308].includes(response.status); hops++) {
+    const location = response.headers.get('Location');
+    if (!location) break;
+    const next = new URL(location, url);
+    if (next.protocol !== 'https:') break;
+    headers = { ...headers };
+    if (!/(^|\.)spaggiari\.eu$/.test(next.hostname)) delete headers['Z-Auth-Token'];
+    if (response.status !== 307 && response.status !== 308) {
+      method = 'GET';
+      body = undefined;
+      delete headers['Content-Type'];
+    }
+    url = next.href;
+    response = await fetch(url, { method, headers, body, redirect: 'manual' });
+  }
+  return response;
+}
+
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin');
   const allowed = (env.ALLOWED_ORIGINS || '*').split(',').map((s) => s.trim());
@@ -63,7 +87,7 @@ export default {
       headers['Content-Type'] = 'application/json';
     }
     try {
-      const upstream = await fetch(target, { method: request.method, headers, body, redirect: 'manual' });
+      const upstream = await fetchUpstream(target, { method: request.method, headers, body });
       const out = new Headers({ ...cors, 'X-BCW-Proxy': '1', 'Cache-Control': 'no-store' });
       for (const name of ['Content-Type', 'Content-Disposition']) {
         const value = upstream.headers.get(name);

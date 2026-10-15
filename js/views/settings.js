@@ -1,4 +1,4 @@
-// Impostazioni (Generale, Voti, Dashboard, Orario, Notifiche, Account) e pagina Account.
+// Impostazioni (Generale, Aspetto, Voti, Dashboard, Orario, Notifiche, Account) e pagina Account.
 // Sugli schermi stretti sono un elenco di sottopagine, su quelli larghi schede (come la
 // finestra Impostazioni del Mac).
 
@@ -8,6 +8,8 @@ import { AverageMode } from '../gradebook.js';
 import { AppearanceMode, DashboardMode, TitleAbbreviation, NewsKind } from '../prefs.js';
 import { Reminders } from '../reminders.js';
 import { Lock } from '../lock.js';
+import { AccentPresets, ColorStyle, Contrast, Corners, Motion, RoundedText, DEFAULT_ACCENT, normalizeHex, loadColorLibrary, swatchColors, Theme } from '../theme.js';
+import { shape } from '../shapes.js';
 import { Proxy } from '../api.js';
 import { makeICS, downloadFile } from '../calendar-export.js';
 import { accountColorID, accountInitials } from '../store.js';
@@ -40,13 +42,76 @@ function buttonRow(label, action, iconName, { destructive = false, disabled = fa
 
 // MARK: - Sezioni
 
-function appearanceSection(ctx) {
+function securitySection(ctx) {
   const p = ctx.prefs;
-  const lockLabel = Lock.biometryAvailable ? `Blocca con ${Lock.name}` : 'Blocca con un codice';
+  const lockLabel = Lock.biometryAvailable ? 'Blocca con passkey' : 'Blocca con un codice';
   return section([
-    row('Tema', select(Object.entries(AppearanceMode), p.get('appearance'), 'pref-appearance', { label: 'Tema' }), { iconName: 'sun' }),
     toggleRow(lockLabel, p.get('useLock') && !!Lock.method, 'pref-lock', { iconName: 'lock' }),
-  ], { header: 'Aspetto e sicurezza', footer: "BCW si blocca all'apertura e quando torni dopo almeno 30 secondi in un'altra app o scheda." });
+  ], { header: 'Sicurezza', footer: "BCW si blocca all'apertura e quando torni dopo almeno 30 secondi in un'altra app o scheda." });
+}
+
+/** Il tema scuro è attivo in questo momento? */
+function isDark(ctx) {
+  const mode = ctx.prefs.get('appearance');
+  return mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+/** Campioni dei colori d'accento (come quelli di Android) e selettore per un colore qualsiasi. */
+function accentPicker(ctx) {
+  const p = ctx.prefs;
+  const accent = normalizeHex(p.get('accentColor')) ?? DEFAULT_ACCENT;
+  const lib = Theme.library;
+  // La libreria dei colori serve per le anteprime: si carica una volta sola.
+  if (!lib) ctx.task('color-library', () => loadColorLibrary().catch(() => {}));
+  const dark = isDark(ctx);
+  const preview = (hex) => {
+    const [a, b, c] = lib ? swatchColors(lib, hex, p.get('colorStyle'), dark) : [hex, hex, hex];
+    return `--c1:${a};--c2:${b};--c3:${c}`;
+  };
+  const isPreset = AccentPresets.some(([hex]) => hex === accent);
+  const swatches = AccentPresets.map(([hex, name]) => {
+    const selected = hex === accent;
+    return `<button class="accent-swatch ${selected ? 'selected' : ''}" style="${preview(hex)}" data-action="pref-accent" data-value="${hex}" aria-label="${esc(name)}" aria-pressed="${selected}" title="${esc(name)}">
+      <span class="accent-fill"></span>${selected ? `<span class="accent-check">${icon('check')}</span>` : ''}</button>`;
+  }).join('');
+  const custom = `<label class="accent-swatch custom ${isPreset ? '' : 'selected'}" style="${isPreset ? '' : preview(accent)}" title="Scegli un colore qualsiasi">
+    <span class="accent-fill"></span><span class="accent-check">${icon(isPreset ? 'colorize' : 'check')}</span>
+    <input type="color" value="${accent}" data-input="pref-accent-pick" data-change="pref-accent-pick" aria-label="Scegli un colore qualsiasi"></label>`;
+  return `<div class="list-item accent-picker"><div class="accent-grid">${swatches}${custom}</div>
+    <div class="accent-value"><span class="accent-dot" style="background:${accent}"></span><span class="numeral">${accent.toUpperCase()}</span>
+    ${accent !== DEFAULT_ACCENT ? `<button class="btn xs text" data-action="pref-accent" data-value="${DEFAULT_ACCENT}">${icon('refresh')}<span>Colore di BCW</span></button>` : ''}</div></div>`;
+}
+
+/** Piccola anteprima dei componenti con i colori e le forme scelti. */
+function themePreview() {
+  return `<div class="list-item theme-preview" aria-hidden="true">
+    <span class="tp-shape shaped">${shape('cookie9Sided')}<span>${icon('palette')}</span></span>
+    <span class="tp-body"><strong>Anteprima</strong><small>Pulsanti, schede e forme</small>
+      <span class="tp-row"><span class="btn xs filled">Primario</span><span class="btn xs tonal">Tonale</span><span class="tp-chip">Terziario</span></span></span>
+    <span class="tp-tones"><i style="background:var(--primary)"></i><i style="background:var(--secondary-container)"></i><i style="background:var(--tertiary-container)"></i><i style="background:var(--surface-container-highest)"></i></span></div>`;
+}
+
+function appearancePane(ctx) {
+  const p = ctx.prefs;
+  return section([
+    themePreview(),
+    row('Tema', select(Object.entries(AppearanceMode), p.get('appearance'), 'pref-appearance', { label: 'Tema' }), { iconName: 'sun' }),
+  ], { header: 'Tema' }) + section([
+    accentPicker(ctx),
+    row('Stile dei colori', select(Object.entries(ColorStyle).map(([k, v]) => [k, v.title]), p.get('colorStyle'), 'pref-color-style', { label: 'Stile dei colori' }),
+      { iconName: 'colorStyle', subtitle: ColorStyle[p.get('colorStyle')]?.subtitle }),
+    row('Contrasto', select(Object.entries(Contrast), p.get('contrast'), 'pref-contrast', { label: 'Contrasto' }), { iconName: 'contrast' }),
+  ], {
+    header: "Colore d'accento",
+    footer: 'Tutti i colori di BCW (pulsanti, superfici, schede) sono generati dal colore scelto con i colori dinamici di Material 3, nel tema chiaro e in quello scuro. I colori di materie, voti e assenze non cambiano.',
+  }) + section([
+    row('Angoli', select(Object.entries(Corners), p.get('corners'), 'pref-corners', { label: 'Angoli' }), { iconName: 'corners' }),
+    row('Animazioni', select(Object.entries(Motion), p.get('motion'), 'pref-motion', { label: 'Animazioni' }), { iconName: 'motion' }),
+    row('Caratteri arrotondati', select(Object.entries(RoundedText), p.get('roundedText'), 'pref-rounded-text', { label: 'Caratteri arrotondati' }), { iconName: 'textStyle' }),
+  ], {
+    header: 'Forme e movimento',
+    footer: 'Espressive: animazioni a molla con un piccolo rimbalzo, come in Material 3 Expressive. Standard: senza rimbalzo. Ridotte: brevi e senza movimenti ampi. I caratteri arrotondati usano l\'asse ROND di Google Sans Flex.',
+  });
 }
 
 function dataSection() {
@@ -76,7 +141,7 @@ function aboutSection() {
 }
 
 function generalPane(ctx) {
-  return appearanceSection(ctx) + dataSection() + serverSection() + aboutSection();
+  return securitySection(ctx) + dataSection() + serverSection() + aboutSection();
 }
 
 function gradesPane(ctx) {
@@ -178,6 +243,7 @@ function accountsPane(ctx) {
 
 const panes = {
   general: { title: 'Generale', icon: 'gear', tint: 'var(--on-surface-variant)', render: generalPane },
+  appearance: { title: 'Aspetto', icon: 'palette', tint: 'var(--tertiary)', render: appearancePane },
   grades: { title: 'Voti', icon: 'graduationCap', tint: 'var(--subject-1)', render: gradesPane },
   dashboard: { title: 'Dashboard', icon: 'dashboard', tint: 'var(--primary)', render: dashboardPane },
   timetable: { title: 'Orario', icon: 'timetable', tint: 'var(--subject-3)', render: timetablePane },
@@ -215,7 +281,7 @@ export const settings = {
     };
     return {
       title: 'Impostazioni',
-      body: `<div class="form">${section([nav('general')])}${section(['grades', 'dashboard', 'timetable', 'notifications'].map(nav))}${section([nav('accounts')])}</div>`,
+      body: `<div class="form">${section([nav('general'), nav('appearance')])}${section(['grades', 'dashboard', 'timetable', 'notifications'].map(nav))}${section([nav('accounts')])}</div>`,
       bottomInset: true,
     };
   },
@@ -229,6 +295,16 @@ export const settings = {
     'pref-upcoming': (ctx, el) => ctx.prefs.set('showUpcomingDays', el.checked),
     'pref-abbreviation': (ctx, el) => ctx.prefs.set('titleAbbreviation', el.value),
     'pref-appearance': (ctx, el) => ctx.prefs.set('appearance', el.value),
+    'pref-accent': (ctx, el) => ctx.prefs.set('accentColor', el.dataset.value),
+    'pref-accent-pick': (ctx, el) => {
+      const value = normalizeHex(el.value);
+      if (value) ctx.prefs.set('accentColor', value);
+    },
+    'pref-color-style': (ctx, el) => ctx.prefs.set('colorStyle', el.value),
+    'pref-contrast': (ctx, el) => ctx.prefs.set('contrast', el.value),
+    'pref-corners': (ctx, el) => ctx.prefs.set('corners', el.value),
+    'pref-motion': (ctx, el) => ctx.prefs.set('motion', el.value),
+    'pref-rounded-text': (ctx, el) => ctx.prefs.set('roundedText', el.value),
     'pref-tt-tests': (ctx, el) => ctx.prefs.set('timetableShowsTests', el.checked),
     'tt-alignment': (ctx, el) => requestAlignment(ctx, el.value),
     'pref-reminder-hour': (ctx, el) => {

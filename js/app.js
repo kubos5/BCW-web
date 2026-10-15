@@ -8,6 +8,7 @@ import { morph, data } from './dom.js';
 import { icon } from './icons.js';
 import { drawCharts } from './charts.js';
 import { Lock } from './lock.js';
+import { Theme } from './theme.js';
 import { Reminders } from './reminders.js';
 import { Proxy } from './api.js';
 import { esc } from './util.js';
@@ -583,7 +584,7 @@ function renderLock() {
   const unlock = method === 'pin'
     ? `<form class="pin-form" data-submit="lock-pin"><input class="text-input" type="password" inputmode="numeric" autocomplete="off" placeholder="Codice" data-input="lock-pin-input" value="${esc(app.pinInput)}" aria-label="Codice di sblocco" autofocus>
        <button class="btn filled m" type="submit">${icon('lockOpen')}<span>Sblocca</span></button></form>`
-    : `<button class="btn filled m" data-action="lock-unlock">${icon('faceId')}<span>Sblocca con ${esc(Lock.name)}</span></button>`;
+    : `<button class="btn filled m" data-action="lock-unlock">${icon('key')}<span>Sblocca con la passkey</span></button>`;
   return `<div class="lock-screen" data-key="lock">
     <div class="lock-center"><span class="lock-art shaped">${shape('cookie12Sided')}${icon('lock')}</span><h2>BCW è bloccata</h2>${app.lockError ? `<p class="error">${esc(app.lockError)}</p>` : ''}</div>
     <div class="lock-actions">${unlock}</div></div>`;
@@ -594,8 +595,15 @@ function applyTheme() {
   const html = document.documentElement;
   if (mode === 'system') html.removeAttribute('data-theme');
   else if (html.getAttribute('data-theme') !== mode) html.setAttribute('data-theme', mode);
+  Theme.applyLayout(model.preferences);
+  Theme.applyColors(model.preferences).then((changed) => { if (changed) applyThemeColor(); });
+  applyThemeColor();
+}
+
+function applyThemeColor() {
+  const mode = model.preferences.get('appearance');
   const dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  const color = dark ? '#130d0b' : '#fff8f6';
+  const color = Theme.surface(dark);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta && meta.content !== color) meta.content = color;
 }
