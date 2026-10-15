@@ -1,13 +1,15 @@
 // Service worker: rende BCW installabile e la apre anche offline.
 // I dati del registro sono salvati a parte (IndexedDB) dall'app stessa.
 
-const VERSION = 'bcw-v4';
+const VERSION = 'bcw-v5';
 const SHELL = [
   './',
   'index.html',
   'manifest.webmanifest',
   'config.json',
   'css/bcw.css',
+  'fonts/GoogleSansFlex-latin-wght-ROND.woff2',
+  'logo/bcw-logo.svg',
   'icons/favicon.svg',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -22,7 +24,11 @@ const SHELL = [
   'js/gradebook.js',
   'js/icons.js',
   'js/lock.js',
+  'js/logo.js',
   'js/models.js',
+  'js/news.js',
+  'js/shapes.js',
+  'js/timetable.js',
   'js/pdf.js',
   'js/prefs.js',
   'js/reminders.js',
@@ -31,6 +37,8 @@ const SHELL = [
   'js/views/index.js',
   'js/views/sections-meta.js',
   'js/views/dashboard.js',
+  'js/views/timetable.js',
+  'js/views/timetable-sheets.js',
   'js/views/grades.js',
   'js/views/you.js',
   'js/views/noticeboard.js',

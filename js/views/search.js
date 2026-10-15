@@ -15,7 +15,7 @@ export const search = {
     ctx.task('search-didactics', () => (model.didactics.length ? null : model.loadDidactics()));
     const q = s.query.trim();
     // Su schermi larghi il campo è quello della ricerca generale nella barra.
-    const field = ctx.wide ? null : { value: s.query, placeholder: 'Compiti, voti, comunicazioni…', input: 'search-input' };
+    const field = ctx.wide ? null : { value: s.query, placeholder: 'Compiti, voti, altro…', input: 'search-input' };
 
     if (!q) {
       const suggestions = ['Verifica', 'Interrogazione', ...uniqueSorted(model.grades.map((g) => g.subjectName)).slice(0, 8)];

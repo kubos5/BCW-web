@@ -232,6 +232,22 @@ async function idb(mode, fn) {
   });
 }
 
+/**
+ * File salvati dall'app (es. gli allegati dell'orario), nello stesso database della cache.
+ * Le chiavi hanno la forma `<spazio>/<nome>`.
+ */
+export const BlobStore = {
+  put(key, blob) { return idb('readwrite', (s) => s.put(blob, key)); },
+  get(key) { return idb('readonly', (s) => s.get(key)); },
+  remove(key) { return idb('readwrite', (s) => s.delete(key)); },
+  /** Chiavi che iniziano con `<spazio>/`. */
+  async keys(space) {
+    const range = IDBKeyRange.bound(`${space}/`, `${space}/￿`);
+    return (await idb('readonly', (s) => s.getAllKeys(range))) ?? [];
+  },
+  removeAll(space) { return DiskCache.remove(space); },
+};
+
 /** Cache delle risposte JSON, usata per la modalità offline. */
 export class DiskCache {
   constructor(namespace) {

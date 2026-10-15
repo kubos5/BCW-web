@@ -7,13 +7,15 @@ import { DemoTransport } from './demo.js';
 import { GradeBook } from './gradebook.js';
 import { Preferences } from './prefs.js';
 import { Reminders } from './reminders.js';
+import { TimetableStore } from './timetable.js';
+import { News } from './news.js';
 import {
   parseAbsencesResponse, parseAgendaResponse, parseCalendarResponse, parseCardResponse, parseDidacticsResponse,
   parseDocumentCheck, parseDocumentsResponse, parseGradesResponse, parseLessonsResponse, parseNoteReadResponse,
   parseNoticeDetail, parseNoticeboardResponse, parseNotesResponse, parsePeriodsResponse, parseSchoolbooksResponse,
   parseSubjectsResponse,
 } from './models.js';
-import { addDays, apiString, dayKey, isSameDay, nameCased, schoolYear, startOfDay, uuid, StableID } from './util.js';
+import { addDays, apiString, dayKey, nameCased, schoolYear, startOfDay, uuid, StableID } from './util.js';
 
 const ACCOUNTS_KEY = 'bcw.accounts';
 const ACTIVE_KEY = 'bcw.activeAccount';
@@ -57,6 +59,10 @@ export class AppModel {
     this.activeAccountID = null;
     this.sessionID = uuid();
     this.archives = new Map();
+    /** L'interfaccia è sfumata durante un cambio di sessione (altro account, demo…). */
+    this.isChangingSession = false;
+    this.pendingSessionChange = null;
+    this.timetable = new TimetableStore(() => this.onChange?.());
     this.resetFields();
   }
 
@@ -81,6 +87,9 @@ export class AppModel {
     this.schoolbooks = [];
     this.lessonsByDay = new Map();
     this.loadedLessonDays = new Set();
+    this.eventsByDay = new Map();
+    this.absencesByDay = new Map();
+    this.calendarByDay = new Map();
     this.isRefreshing = false;
     this.isOffline = false;
     this.lastUpdated = null;
@@ -96,11 +105,13 @@ export class AppModel {
 
   bootstrap() {
     this.accounts = readJSON(ACCOUNTS_KEY, []);
+    const storedID = readJSON(ACTIVE_KEY, null);
     if (readJSON(DEMO_KEY, false)) {
-      this.startDemo();
+      // Uscendo dalla demo si torna all'account che era attivo, anche dopo un riavvio.
+      if (this.accounts.some((a) => a.id === storedID)) this.activeAccountID = storedID;
+      this.beginDemo();
       return;
     }
-    const storedID = readJSON(ACTIVE_KEY, null);
     const account = this.accounts.find((a) => a.id === storedID) ?? this.accounts[0];
     if (!account) {
       this.phase = 'signedOut';
@@ -135,9 +146,61 @@ export class AppModel {
       this.accounts.push(account);
     }
     this.saveAccounts();
+    if (this.phase === 'signedIn') {
+      // Account aggiunto ad app aperta: i dati cambiano mentre l'interfaccia è sfumata.
+      this.changeSession(() => {
+        this.activate(account, false);
+        this.client.adoptSession(probe);
+        this.refreshAll();
+      });
+      return;
+    }
     this.activate(account, false);
     this.client.adoptSession(probe);
     await this.refreshAll();
+  }
+
+  // MARK: Cambio di sessione con dissolvenza
+
+  /**
+   * Cambia sessione (account, demo…) sfumando l'interfaccia: i dati cambiano mentre non si
+   * vedono e l'interfaccia riappare quando ci sono (subito con la cache, al massimo dopo 3 s).
+   * Se arriva un altro cambio durante la dissolvenza vale l'ultimo.
+   */
+  changeSession(change) {
+    if (this.phase !== 'signedIn') {
+      change();
+      return;
+    }
+    this.pendingSessionChange = change;
+    if (this.isChangingSession) return;
+    this.isChangingSession = true;
+    this.onChange?.();
+    setTimeout(async () => {
+      const next = this.pendingSessionChange;
+      this.pendingSessionChange = null;
+      next?.();
+      await this.waitForSessionContent();
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      if (this.pendingSessionChange) {
+        // Un altro cambio è arrivato nel frattempo: lo si esegue restando sfumati.
+        this.isChangingSession = false;
+        const again = this.pendingSessionChange;
+        this.pendingSessionChange = null;
+        this.changeSession(again);
+        return;
+      }
+      this.isChangingSession = false;
+      this.onChange?.();
+    }, 200);
+  }
+
+  async waitForSessionContent() {
+    const started = Date.now();
+    while (Date.now() - started < 3000) {
+      if (this.card || this.agenda.length || this.grades.length || this.lastUpdated || this.lastError || this.phase !== 'signedIn') return;
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
   }
 
   /** Passa a un altro account salvato. */
@@ -145,7 +208,10 @@ export class AppModel {
     const account = this.accounts.find((a) => a.id === id);
     if (!account) return;
     if (!this.isDemo && account.id === this.activeAccountID) return;
-    this.activate(account);
+    this.changeSession(() => {
+      if (this.isDemo) this.leaveDemo();
+      this.activate(account);
+    });
   }
 
   /** Rende attivo un account: azzera i dati, mostra subito la cache e aggiorna. */
@@ -157,6 +223,7 @@ export class AppModel {
     writeJSON(ACTIVE_KEY, account.id);
     this.loginName = account.name;
     this.client = new ClassevivaClient(new HttpTransport(Proxy.officialBase()), `live-${account.id}`, account.credentials);
+    this.timetable.load(account.id);
     this.phase = 'signedIn';
     this.changed();
     const client = this.client;
@@ -165,14 +232,41 @@ export class AppModel {
     });
   }
 
+  /** Apre la demo, anche con un account collegato (uscendo si torna a quello). */
   startDemo() {
+    if (this.isDemo) return;
+    this.changeSession(() => this.beginDemo());
+  }
+
+  beginDemo() {
     this.resetData();
     this.isDemo = true;
     writeJSON(DEMO_KEY, true);
     this.client = new ClassevivaClient(new DemoTransport(), 'demo', { username: 'demo', password: 'demo' });
+    this.timetable.load('demo');
     this.phase = 'signedIn';
     this.changed();
     this.refreshAll();
+  }
+
+  /** Chiude la demo e cancella i suoi dati (cache e orario). */
+  leaveDemo() {
+    this.resetData();
+    DiskCache.remove('demo');
+    TimetableStore.removeData('demo');
+    this.timetable.load(null);
+    writeJSON(DEMO_KEY, null);
+    this.isDemo = false;
+  }
+
+  /** L'account a cui si torna uscendo dalla demo. */
+  get accountAfterDemo() {
+    return this.activeAccount ?? this.accounts[0] ?? null;
+  }
+
+  get demoExitMessage() {
+    const account = this.accountAfterDemo;
+    return account ? `Stai usando la modalità demo. Uscendo tornerai a ${account.name}.` : 'Stai usando la modalità demo.';
   }
 
   /**
@@ -181,13 +275,16 @@ export class AppModel {
    */
   signOut() {
     if (this.isDemo) {
-      this.resetData();
-      DiskCache.remove('demo');
-      writeJSON(DEMO_KEY, null);
-      this.isDemo = false;
-      const next = this.accounts.find((a) => a.id === this.activeAccountID) ?? this.accounts[0];
-      if (next) this.activate(next);
-      else this.endSession();
+      const next = this.accountAfterDemo;
+      if (next) {
+        this.changeSession(() => {
+          this.leaveDemo();
+          this.activate(next);
+        });
+      } else {
+        this.leaveDemo();
+        this.endSession();
+      }
       return;
     }
     if (this.activeAccountID) this.removeAccount(this.activeAccountID);
@@ -199,7 +296,6 @@ export class AppModel {
     const account = this.accounts.find((a) => a.id === id);
     if (!account) return;
     const wasActive = id === this.activeAccountID && !this.isDemo;
-    if (wasActive) this.resetData();
     this.removeCaches(account.id);
     this.accounts = this.accounts.filter((a) => a.id !== id);
     this.saveAccounts();
@@ -207,12 +303,17 @@ export class AppModel {
       this.changed();
       return;
     }
-    if (this.accounts[0]) this.activate(this.accounts[0]);
-    else this.endSession();
+    if (this.accounts[0]) {
+      const next = this.accounts[0];
+      this.changeSession(() => this.activate(next));
+    } else {
+      this.endSession();
+    }
   }
 
   endSession() {
     this.resetData();
+    this.timetable.load(null);
     this.activeAccountID = null;
     writeJSON(ACTIVE_KEY, null);
     Reminders.reschedule([], 18, false, new Set());
@@ -342,6 +443,7 @@ export class AppModel {
       this.lessonsByDay = new Map();
       this.loadedLessonDays = new Set();
       this.lastUpdated = new Date();
+      if (!this.isDemo) News.process(this);
     } finally {
       if (this.refreshingClient === client) {
         this.refreshingClient = null;
@@ -607,9 +709,25 @@ export class AppModel {
     return null;
   }
 
-  events(day) { return this.agenda.filter((e) => isSameDay(e.begin, day)); }
-  absencesOn(day) { return this.absences.filter((a) => isSameDay(a.date, day)); }
-  calendarStatus(day) { return this.calendarDays.find((d) => isSameDay(d.date, day)) ?? null; }
+  // Indici per giorno, ricostruiti quando cambiano i dati (confrontare le date su tutto
+  // l'elenco a ogni cella del calendario era lento).
+  index(list, dateOf, cacheKey) {
+    if (this[`_${cacheKey}Source`] !== list) {
+      const map = new Map();
+      for (const item of list) {
+        const key = dayKey(dateOf(item));
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(item);
+      }
+      this[`_${cacheKey}Source`] = list;
+      this[`_${cacheKey}`] = map;
+    }
+    return this[`_${cacheKey}`];
+  }
+
+  events(day) { return this.index(this.agenda, (e) => e.begin, 'eventsIndex').get(dayKey(day)) ?? []; }
+  absencesOn(day) { return this.index(this.absences, (a) => a.date, 'absencesIndex').get(dayKey(day)) ?? []; }
+  calendarStatus(day) { return this.index(this.calendarDays, (d) => d.date, 'calendarIndex').get(dayKey(day))?.[0] ?? null; }
   get unjustifiedAbsences() { return this.absences.filter((a) => !a.isJustified); }
 }
 

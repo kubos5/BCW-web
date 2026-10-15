@@ -34,11 +34,12 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
   '.md': 'text/markdown; charset=utf-8',
 };
 
 /** Solo questi file e cartelle sono pubblici (il proxy e la documentazione no). */
-const PUBLIC = ['index.html', 'manifest.webmanifest', 'config.json', 'sw.js', 'css', 'js', 'icons'];
+const PUBLIC = ['index.html', 'manifest.webmanifest', 'config.json', 'sw.js', 'css', 'js', 'icons', 'fonts', 'logo'];
 
 function upstreamURL(path) {
   // /api/v1/<percorso>            → https://web.spaggiari.eu/rest/v1/<percorso>

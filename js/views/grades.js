@@ -147,7 +147,7 @@ function averageHero(book, period) {
       ${averageRing(avg, { size: 30, lineWidth: 4, showsLabel: false })}
       <span><small>${esc(p.name)}</small><strong class="numeral">${GradeFormat.average(avg)}</strong></span></button>`;
   }).join('');
-  return card(`<div class="hero">${averageRing(average, { size: 118, lineWidth: 11 })}
+  return card(`<div class="hero">${averageRing(average, { size: 118, lineWidth: 9 })}
       <div class="hero-text">${eyebrow(period == null ? 'Media generale' : 'Media del periodo')}
         <h2>${esc(periodName)}</h2><p>${count} voti che fanno media</p>${status}</div></div>
     ${tiles ? `<div class="period-tiles">${tiles}</div>` : ''}`, { padding: 18 });
@@ -236,7 +236,7 @@ export function subjectDetail(ctx, subjectId) {
   if (!teachers.length) teachers = [...new Set(list.map((g) => g.teacherName).filter(Boolean))].sort(byName);
 
   const values = list.filter((g) => g.countsTowardAverage).map((g) => g.value);
-  const header = card(`<div class="hero">${averageRing(GradeBook.average(list, book.weighted), { size: 96, lineWidth: 9 })}
+  const header = card(`<div class="hero">${averageRing(GradeBook.average(list, book.weighted), { size: 96, lineWidth: 8 })}
     <div class="hero-text">${eyebrow('Media di materia', subjectColor(subjectId))}<h2>${esc(name)}</h2>
       ${teachers.length ? `<p>${esc(teachers.join(', '))}</p>` : ''}
       ${values.length ? `<span class="best-worst"><span style="color:var(--good)">${icon('arrowUp')}${GradeFormat.short(Math.max(...values))}</span>

@@ -1,32 +1,33 @@
-// Sezioni dell'app: le schede di iOS più le pagine che su iPhone stanno dentro "Tu",
-// con titolo, icona, colore e scorciatoia (come la barra laterale di macOS). Su schermi
-// larghi la ricerca non è una sezione: è il campo sempre visibile nella barra.
+// Sezioni dell'app: le destinazioni principali (Dashboard, Orario, Voti, Tu) più le pagine che
+// su schermi stretti stanno dentro "Tu", con titolo, icona, colore e scorciatoia (come la barra
+// laterale del Mac). Su schermi larghi la ricerca non è una sezione: è il campo nella barra.
 
 export const sections = {
-  dashboard: { title: 'Dashboard', icon: 'timeline', tint: 'var(--accent)', shortcut: '1' },
-  grades: { title: 'Voti', icon: 'chart', tint: 'var(--accent)', shortcut: '2' },
-  you: { title: 'Tu', icon: 'userCircle', tint: 'var(--accent)', shortcut: '3' },
-  search: { title: 'Cerca', icon: 'search', tint: 'var(--accent)' },
-  noticeboard: { title: 'Bacheca', icon: 'megaphone', tint: 'var(--accent)', shortcut: '4' },
-  notes: { title: 'Note e annotazioni', icon: 'messageAlert', tint: 'var(--poor)', shortcut: '5' },
+  dashboard: { title: 'Dashboard', icon: 'dashboard', iconSelected: 'dashboardFill', tint: 'var(--primary)', shortcut: '1' },
+  timetable: { title: 'Orario', icon: 'timetable', iconSelected: 'timetableFill', tint: 'var(--primary)', shortcut: '2' },
+  grades: { title: 'Voti', icon: 'grades', iconSelected: 'gradesFill', tint: 'var(--primary)', shortcut: '3' },
+  you: { title: 'Tu', icon: 'you', iconSelected: 'youFill', tint: 'var(--primary)', shortcut: '4' },
+  search: { title: 'Cerca', icon: 'search', tint: 'var(--primary)' },
+  noticeboard: { title: 'Bacheca', icon: 'megaphone', tint: 'var(--primary)', shortcut: '5' },
+  notes: { title: 'Note e annotazioni', icon: 'messageAlert', tint: 'var(--poor)', shortcut: '6' },
   reports: { title: 'Scrutini e pagelle', icon: 'fileSearch', tint: 'var(--neutral)' },
-  previous: { title: 'Anni precedenti', icon: 'history', tint: 'var(--ink2)' },
-  absences: { title: 'Assenze e ritardi', icon: 'userClock', tint: 'var(--fair)', shortcut: '6' },
-  didactics: { title: 'Materiale didattico', icon: 'folder', tint: 'var(--subject-3)', shortcut: '8' },
-  lessons: { title: 'Registro delle lezioni', icon: 'bookText', tint: 'var(--subject-1)', shortcut: '9' },
-  agenda: { title: 'Agenda completa', icon: 'checklist', tint: 'var(--subject-5)', shortcut: '7' },
+  previous: { title: 'Anni precedenti', icon: 'history', tint: 'var(--on-surface-variant)' },
+  absences: { title: 'Assenze e ritardi', icon: 'userClock', tint: 'var(--fair)', shortcut: '7' },
+  didactics: { title: 'Materiale didattico', icon: 'folder', tint: 'var(--subject-3)', shortcut: '9' },
+  lessons: { title: 'Registro delle lezioni', icon: 'bookText', tint: 'var(--subject-1)' },
+  agenda: { title: 'Agenda completa', icon: 'checklist', tint: 'var(--subject-5)', shortcut: '8' },
   subjects: { title: 'Materie e docenti', icon: 'users', tint: 'var(--subject-2)' },
   schoolbooks: { title: 'Libri di testo', icon: 'library', tint: 'var(--subject-4)' },
   calendar: { title: 'Calendario scolastico', icon: 'calendarClock', tint: 'var(--subject-7)' },
 };
 
-/** Solo per il menu di "Tu" su iPhone (su schermi larghi si apre dal menu dell'account). */
+/** Solo per il menu di "Tu" su schermi stretti (su quelli larghi si apre dal menu dell'account). */
 export const extraRows = {
-  settings: { title: 'Impostazioni', icon: 'gear', tint: 'var(--ink2)' },
+  settings: { title: 'Impostazioni', icon: 'gear', tint: 'var(--on-surface-variant)' },
 };
 
 export const sectionGroups = [
-  { title: null, sections: ['dashboard', 'grades', 'you'] },
+  { title: null, sections: ['dashboard', 'timetable', 'grades', 'you'] },
   { title: 'Comunicazioni', sections: ['noticeboard', 'notes'] },
   { title: 'Valutazioni', sections: ['reports', 'previous'] },
   { title: 'Frequenza', sections: ['absences'] },
@@ -52,7 +53,7 @@ export function sectionSubtitle(model, key) {
     case 'subjects': return `${model.subjects.length} materie`;
     case 'schoolbooks': return "Adozioni dell'anno in corso";
     case 'calendar': return 'Vacanze e giorni di lezione';
-    case 'settings': return 'Medie, promemoria, sicurezza';
+    case 'settings': return 'Medie, orario, promemoria, backup';
     default: return '';
   }
 }

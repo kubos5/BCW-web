@@ -3,6 +3,8 @@
 
 import { icon } from '../icons.js';
 import { spinner, button } from '../components.js';
+import { shape } from '../shapes.js';
+import { logo } from '../logo.js';
 import { APIError, Proxy } from '../api.js';
 import { esc } from '../util.js';
 
@@ -19,7 +21,8 @@ export function renderLogin(ctx, { adding }) {
   ctx.task(`proxy-check-${Proxy.base}`, () => Proxy.check());
   return `<div class="login ${adding ? 'adding' : ''}">
     <div class="login-header">
-      <span class="logo">BCW</span><span class="logo-line"></span>
+      ${adding ? '' : `<span class="login-art" aria-hidden="true">${shape('softBurst', 'a')}${shape('cookie9Sided', 'b')}${shape('pill', 'c')}</span>`}
+      ${logo('logo')}
       <span class="logo-subtitle">${adding ? 'Aggiungi un account' : 'Better ClasseViVa'}</span>
     </div>
     ${proxyWarning()}
@@ -27,13 +30,12 @@ export function renderLogin(ctx, { adding }) {
       <div class="login-fields">
         <label class="login-field">${icon('person')}<input name="username" type="text" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
           placeholder="Codice utente o email" value="${esc(s.username)}" data-input="login-username" aria-label="Codice utente o email"></label>
-        <hr class="divider inset-48">
         <label class="login-field">${icon('key')}<input name="password" type="password" autocomplete="current-password"
           placeholder="Password" value="${esc(s.password)}" data-input="login-password" aria-label="Password"></label>
       </div>
       ${s.error ? `<p class="login-error">${icon('alertTriangleFill')}<span>${esc(s.error)}</span></p>` : ''}
-      <button class="btn btn-prominent large login-submit" type="submit"${disabled ? ' disabled' : ''}>${s.loading ? spinner() : '<span>Accedi</span>'}</button>
-      ${adding ? '' : button('Prova la demo', { action: 'login-demo', cls: 'large wide' })}
+      <button class="btn filled m wide login-submit" type="submit"${disabled ? ' disabled' : ''}>${s.loading ? spinner() : '<span>Accedi</span>'}</button>
+      ${adding ? '' : button('Prova la demo', { action: 'login-demo', iconName: 'sparkles', style: 'tonal', cls: 'm wide' })}
     </form>
     <div class="login-footer">
       <p>Usa le stesse credenziali di Classeviva. Restano solo in questo browser e vengono inviate esclusivamente ai server di Classeviva.</p>
@@ -53,8 +55,8 @@ function proxyWarning() {
     <div class="row gap-8">${icon('server')}<strong>${Proxy.status === 'missing' ? 'Serve un server proxy' : 'Proxy non raggiungibile'}</strong></div>
     <p>${esc(text)}</p>
     <div class="row gap-8">
-      <button class="btn btn-prominent small" data-action="proxy-sheet">Imposta il proxy</button>
-      <a class="btn btn-glass small" href="https://github.com/kubos5/BCW-web#hosting-statico-github-pages-netlify" target="_blank" rel="noopener">Istruzioni</a>
+      <button class="btn filled xs" data-action="proxy-sheet">Imposta il proxy</button>
+      <a class="btn tonal xs" href="https://github.com/kubos5/BCW-web#hosting-statico-github-pages-netlify" target="_blank" rel="noopener">Istruzioni</a>
     </div></div>`;
 }
 
@@ -65,8 +67,8 @@ function profileSheet(ctx) {
     render: () => ({
       title: 'Scegli il profilo',
       size: 'medium',
-      body: `<div class="inset-list">${s.choices.map((c, i) => `<button class="list-row" data-action="login-choice" data-index="${i}">
-        <span class="grow"><strong>${esc(c.name)}</strong><small>${esc(c.school)}</small></span>${icon('chevronRight', { cls: 'chev-right' })}</button>`).join('')}</div>`,
+      body: `<div class="sheet-pad"><div class="list-group">${s.choices.map((c, i) => `<button class="list-item" data-action="login-choice" data-index="${i}">
+        <span class="li-text"><strong>${esc(c.name)}</strong><small>${esc(c.school)}</small></span>${icon('chevronRight', { cls: 'trailing-icon' })}</button>`).join('')}</div></div>`,
     }),
   };
 }
@@ -86,7 +88,7 @@ export function proxySheet() {
       return {
         title: 'Server proxy',
         size: 'medium',
-        trailing: '<button class="btn btn-prominent" data-action="proxy-save">Salva</button>',
+        trailing: '<button class="btn filled xs" data-action="proxy-save">Salva</button>',
         body: `<div class="stack gap-14 sheet-pad">
           <p class="body-text">Il browser non può contattare direttamente Classeviva: BCW passa da un piccolo server proxy che inoltra le richieste solo ai server di Spaggiari.</p>
           <p class="caption secondary">Lascia vuoto per usare quello predefinito (<code>${esc(Proxy.defaultBase ?? '')}</code>), oppure inserisci l'indirizzo di un altro proxy (ad esempio un Cloudflare Worker).</p>

@@ -16,11 +16,23 @@ const defaults = {
   titleAbbreviation: 'automatic',
   collapsedSections: [],
   completedHomework: [],
+  timetableMode: 'list',
+  timetableShowsTests: false,
+  newsNotifications: [],
 };
 
 export const DashboardMode = { list: { title: 'Lista', icon: 'list' }, calendar: { title: 'Calendario', icon: 'calendar' } };
 export const TitleAbbreviation = { automatic: 'Automatica', always: 'Sempre', never: 'Mai' };
 export const AppearanceMode = { system: 'Automatico', light: 'Chiaro', dark: 'Scuro' };
+
+/** Tipi di novità che si possono notificare (Impostazioni › Notifiche › Novità). */
+export const NewsKind = {
+  grades: { id: 'grades', title: 'Nuovi voti', icon: 'graduationCap' },
+  notices: { id: 'notices', title: 'Nuove comunicazioni', icon: 'megaphone' },
+  notes: { id: 'notes', title: 'Note e annotazioni', icon: 'messageAlert' },
+  absences: { id: 'absences', title: 'Assenze e ritardi', icon: 'userClock' },
+  agenda: { id: 'agenda', title: 'Nuovi compiti e verifiche', icon: 'checklist' },
+};
 
 export class Preferences {
   constructor(onChange) {
@@ -53,6 +65,16 @@ export class Preferences {
   get dashboardMode() { return this.values.dashboardMode; }
   get hideCompletedHomework() { return this.values.hideCompletedHomework; }
   get showUpcomingDays() { return this.values.showUpcomingDays; }
+
+  get timetableShowsTests() { return this.values.timetableShowsTests; }
+
+  newsEnabled(kind) { return this.values.newsNotifications.includes(kind); }
+
+  setNews(kind, enabled) {
+    const list = this.values.newsNotifications.filter((k) => k !== kind);
+    if (enabled) list.push(kind);
+    this.set('newsNotifications', list);
+  }
 
   isCollapsed(section) { return this.collapsed.has(section); }
 
