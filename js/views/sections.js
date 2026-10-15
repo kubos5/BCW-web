@@ -4,7 +4,7 @@
 import {
   localSearchField, card, cardGrid, chipRow, filterChip, pill, eyebrow, iconBadge, loadingCard, statusBanner, emptyState, spinner,
   statTile, absenceRow, agendaEventRow, lessonRow, subjectTag, segmented, sectionHeader, collapsible, chevron,
-  joinRows, button, gradeColorValue, subjectColor, circleButton,
+  joinRows, button, gradeColorValue, subjectColor, circleButton, wavyProgress,
 } from '../components.js';
 import { icon } from '../icons.js';
 import { data } from '../dom.js';
@@ -360,7 +360,7 @@ export const didactics = {
           popup?.close();
           if (item.kind === 'text') {
             ctx.openSheet({ id: `text-${id}`, render: () => ({ title: content.name, size: 'medium',
-              leading: '<span></span>', trailing: '<button class="btn btn-glass" data-action="sheet-close">Fine</button>',
+              trailing: '<button class="btn filled xs" data-action="sheet-close">Fine</button>',
               body: `<div class="text-sheet">${esc(item.text)}</div>` }) });
           } else {
             ctx.openFile(item.file);
@@ -478,7 +478,7 @@ export const previous = {
 
     const webCard = card(`<div class="row gap-12">${iconBadge('compass', 'var(--neutral)')}<div><strong class="headline">Voti, assenze e note</strong><p class="caption secondary">Disponibili sul sito di Classeviva</p></div></div>
       <p class="body-text">Classeviva non rende disponibili all'app i dati degli anni passati. Accedi al sito, che si apre in una nuova scheda, e, dal menu principale, scegli "Vai all'a.s. ${esc(archive.title)}".</p>
-      <a class="btn btn-prominent large" href="${ArchiveModel.webURL}" target="_blank" rel="noopener">${icon('externalLink')}<span>Apri l'archivio di Classeviva</span></a>`, { cls: 'stack gap-14' });
+      <a class="btn filled m" href="${ArchiveModel.webURL}" target="_blank" rel="noopener">${icon('externalLink')}<span>Apri l'archivio di Classeviva</span></a>`, { cls: 'stack gap-14' });
 
     let docs = sectionHeader('Pagelle e documenti', { subtitle: `Anno scolastico ${archive.title}` });
     if (s.error) docs += statusBanner(s.error, 'alertTriangle');
@@ -541,7 +541,7 @@ export const subjects = {
     const summaries = model.gradeBook.subjects();
     const rows = sorted.map((subject) => {
       const average = summaries.find((x) => x.subjectId === subject.id)?.average ?? null;
-      return `<button class="${ctx.wide ? 'card ' : ''}list-row" style="--pad:14px" data-action="open-subject" data-id="${subject.id}" data-key="sub-${subject.id}">
+      return `<button class="${ctx.wide ? 'card ' : 'list-item '}list-row" style="--pad:14px" data-action="open-subject" data-id="${subject.id}" data-key="sub-${subject.id}">
         <span class="dot big" style="background:${subjectColor(subject.id)}"></span>
         <span class="grow"><strong>${esc(subject.name)}</strong>${subject.teachers.length ? `<small>${esc(subject.teachers.join(', '))}</small>` : ''}</span>
         <span class="numeral list-average" style="color:${gradeColorValue(average)}">${GradeFormat.average(average)}</span>
@@ -550,7 +550,7 @@ export const subjects = {
     const body = !sorted.length
       ? emptyState('Nessuna materia', 'library')
       // Le card della stessa riga hanno l'altezza della più alta (es. una materia con molti docenti).
-      : ctx.wide ? cardGrid(rows.join(''), 320, 'equal-rows') : `<div class="inset-list">${rows.join('')}</div>`;
+      : ctx.wide ? cardGrid(rows.join(''), 320, 'equal-rows') : `<div class="list-group">${rows.join('')}</div>`;
     return { title: 'Materie', body, bottomInset: true, refresh: () => model.loadGrades() };
   },
 };
@@ -575,7 +575,7 @@ export const schoolbooks = {
     } else {
       body = model.schoolbooks.map((course) => `<div class="stack gap-10">${sectionHeader(course.name)}
         ${ctx.wide ? cardGrid(course.books.map((b) => card(bookRow(b), { padding: 14 })).join(''), 380, 'equal-rows')
-    : `<div class="inset-list">${course.books.map((b) => `<div class="list-row">${bookRow(b)}</div>`).join('')}</div>`}</div>`).join('');
+    : `<div class="list-group">${course.books.map((b) => `<div class="list-item list-row">${bookRow(b)}</div>`).join('')}</div>`}</div>`).join('');
     }
     return { title: 'Libri di testo', body: `<div class="stack gap-22">${body}</div>`, bottomInset: true };
   },
@@ -622,7 +622,7 @@ export const calendar = {
     const range = (h) => (h.start.getTime() === h.end.getTime() ? fmt.longDay(h.start) : `${fmt.shortDay(h.start)} – ${fmt.shortDay(h.end)}`);
 
     const progress = total ? card(`${eyebrow('Anno scolastico')}<div class="row baseline gap-8"><span class="numeral huge">${done}</span><span class="secondary">di ${total} giorni di lezione</span></div>
-      <progress value="${done}" max="${Math.max(total, 1)}"></progress><p class="caption secondary">Mancano ${total - done} giorni di scuola</p>`, { cls: 'stack gap-12' }) : '';
+      ${wavyProgress(done, Math.max(total, 1), { label: 'Giorni di lezione' })}<p class="caption secondary">Mancano ${total - done} giorni di scuola</p>`, { cls: 'stack gap-12' }) : '';
     const next = holidays.find((h) => h.end >= today);
     const nextCard = next ? card(`${eyebrow('Prossima vacanza', 'var(--accent)')}<div class="next-holiday stack gap-8"><h3 class="title3">${esc(range(next))}</h3>
       <p class="secondary">${daysBetween(today, next.start) <= 0 ? 'Sei in vacanza!' : `Tra ${daysBetween(today, next.start)} giorni`}</p></div>`, { cls: 'stack gap-8' }) : '';

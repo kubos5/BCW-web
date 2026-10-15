@@ -28,7 +28,7 @@ export const noticeboard = {
     const model = ctx.model;
     if (ctx.route.param) {
       const notice = model.notices.find((n) => String(n.id) === ctx.route.param);
-      return { title: '', inline: true, body: notice ? noticeDetail(ctx, notice) : emptyState('Comunicazione non trovata', 'megaphone') };
+      return { title: ctx.wide ? 'Comunicazione' : '', inline: true, body: notice ? noticeDetail(ctx, notice) : emptyState('Comunicazione non trovata', 'megaphone') };
     }
     const s = listState(ctx);
     const unread = model.unreadNoticesCount;

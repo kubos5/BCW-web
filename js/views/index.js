@@ -8,7 +8,8 @@ import { noticeboard } from './noticeboard.js';
 import {
   notes, absences, agenda, lessons, didactics, reports, previous, subjects, schoolbooks, calendar,
 } from './sections.js';
-import { settings, account } from './settings.js';
+import { settings, account, accountSwitcherSheet } from './settings.js';
+import { timetable } from './timetable.js';
 import { addAccountSheet } from './login.js';
 import { addToCalendar } from '../calendar-export.js';
 import { fmt } from '../util.js';
@@ -16,7 +17,7 @@ import { fmt } from '../util.js';
 export { sections, sectionGroups, sectionBadge } from './sections-meta.js';
 
 export const routes = {
-  dashboard, grades, you, search, noticeboard, notes, reports, previous, absences, didactics, lessons, agenda,
+  dashboard, timetable, grades, you, search, noticeboard, notes, reports, previous, absences, didactics, lessons, agenda,
   subjects, schoolbooks, calendar, settings, account,
 };
 
@@ -54,6 +55,16 @@ export const commonActions = {
     if (ctx.prefs.isCompleted(event)) navigator.vibrate?.(8);
   },
   'agenda-expand': (ctx, el) => {
+    // In "Nei prossimi giorni" un tocco su una riga con il testo intero porta al giorno.
+    if (el.dataset?.plain) {
+      const notes = el.querySelector?.('.agenda-notes');
+      const expandedRow = el.closest?.('.agenda-row')?.classList.contains('expanded');
+      const truncated = notes && notes.scrollHeight > notes.clientHeight + 1;
+      if (!expandedRow && !truncated) {
+        ctx.run('day-select', { dataset: { time: el.dataset.plain } });
+        return;
+      }
+    }
     const expanded = ctx.state('expanded', () => new Set());
     const key = `${el.dataset.scope ?? ''}${el.dataset.id}`;
     if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
@@ -79,12 +90,14 @@ export const commonActions = {
       { label: 'Rimuovi', icon: 'trash', destructive: true, run: () => ctx.run('account-remove', el) },
     ], { align: 'start' });
   },
-  'add-account': (ctx) => ctx.openSheet(addAccountSheet()),
+  'add-account': (ctx) => (ctx.app.sheet ? ctx.pushSheet(addAccountSheet()) : ctx.openSheet(addAccountSheet())),
+  'start-demo': (ctx) => ctx.model.startDemo(),
+  'account-switcher': (ctx) => ctx.openSheet(accountSwitcherSheet()),
   'sign-out': (ctx) => {
     const model = ctx.model;
     ctx.confirm({
       title: model.isDemo ? 'Vuoi uscire dalla demo?' : `Vuoi uscire da ${model.displayName}?`,
-      message: model.isDemo ? 'Stai usando la modalità demo.' : 'Le credenziali di questo account verranno rimosse da questo browser.',
+      message: model.isDemo ? model.demoExitMessage : 'Le credenziali di questo account verranno rimosse da questo browser.',
       confirmLabel: 'Esci',
       destructive: true,
       onConfirm: () => model.signOut(),

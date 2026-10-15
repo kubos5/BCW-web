@@ -34,11 +34,12 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
   '.md': 'text/markdown; charset=utf-8',
 };
 
 /** Solo questi file e cartelle sono pubblici (il proxy e la documentazione no). */
-const PUBLIC = ['index.html', 'manifest.webmanifest', 'config.json', 'sw.js', 'css', 'js', 'icons'];
+const PUBLIC = ['index.html', 'manifest.webmanifest', 'config.json', 'sw.js', 'css', 'js', 'icons', 'fonts', 'logo'];
 
 function upstreamURL(path) {
   // /api/v1/<percorso>            → https://web.spaggiari.eu/rest/v1/<percorso>
@@ -60,6 +61,32 @@ function corsHeaders(origin) {
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
+}
+
+/**
+ * Inoltra la richiesta seguendo i reindirizzamenti come l'app iOS (alcuni allegati della
+ * Bacheca vengono serviti da un altro indirizzo). Il token va solo ai server di Classeviva.
+ */
+async function fetchUpstream(url, { method, headers, body }) {
+  const signal = AbortSignal.timeout(25_000);
+  let response = await fetch(url, { method, headers, body, redirect: 'manual', signal });
+  for (let hops = 0; hops < 5 && [301, 302, 303, 307, 308].includes(response.status); hops++) {
+    const location = response.headers.get('location');
+    if (!location) break;
+    const next = new URL(location, url);
+    if (next.protocol !== 'https:') break;
+    headers = { ...headers };
+    if (!/(^|\.)spaggiari\.eu$/.test(next.hostname)) delete headers['Z-Auth-Token'];
+    if (response.status !== 307 && response.status !== 308) {
+      method = 'GET';
+      body = undefined;
+      delete headers['Content-Type'];
+      delete headers['Content-Length'];
+    }
+    url = next.href;
+    response = await fetch(url, { method, headers, body, redirect: 'manual', signal });
+  }
+  return response;
 }
 
 async function readBody(req) {
@@ -96,7 +123,7 @@ async function proxy(req, res, target) {
     headers['Content-Length'] = String(body.length);
   }
   try {
-    const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual', signal: AbortSignal.timeout(25_000) });
+    const upstream = await fetchUpstream(target, { method: req.method, headers, body });
     const data = Buffer.from(await upstream.arrayBuffer());
     const out = { ...cors, 'X-BCW-Proxy': '1', 'Cache-Control': 'no-store' };
     const type = upstream.headers.get('content-type');

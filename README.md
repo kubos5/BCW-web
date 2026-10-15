@@ -1,6 +1,6 @@
 # BCW: Better ClasseViVa per il web
 
-La versione web di [BCW](https://github.com/kubos5/BCW), il client per il registro elettronico [Classeviva](https://web.spaggiari.eu) di Gruppo Spaggiari Parma. Stesse funzioni, stessi colori e stesso design dell'app per iPhone, iPad e Mac, in HTML e JavaScript senza dipendenze né passaggi di compilazione.
+La versione web di [BCW](https://github.com/kubos5/BCW), il client per il registro elettronico [Classeviva](https://web.spaggiari.eu) di Gruppo Spaggiari Parma. Stesse funzioni dell'app per iPhone, iPad e Mac, con un design Material 3 Expressive, in HTML e JavaScript senza dipendenze né passaggi di compilazione.
 
 > BCW non è affiliato a Gruppo Spaggiari Parma S.p.A.
 
@@ -35,6 +35,8 @@ GitHub Pages pubblica solo file statici: l'app si apre, la demo funziona, ma l'a
 
 Per controllare che il Worker funzioni apri `https://bcw-proxy.tuonome.workers.dev/ping` nel browser: deve rispondere `{"ok":true}`.
 
+Quando `proxy/cloudflare-worker.js` cambia, ripeti il punto 2 per aggiornare il Worker. Ad esempio, dalla versione che segue i reindirizzamenti di Classeviva si scaricano gli allegati della Bacheca serviti da un altro indirizzo.
+
 ### Proxy predefinito
 
 Il proxy che BCW usa di base si imposta in `config.json`, così chi apre il sito non deve configurarlo:
@@ -60,13 +62,16 @@ BCW è una Progressive Web App: in Safari su iPhone e iPad usa Condividi › Agg
 Le stesse dell'app nativa:
 
 - Dashboard con lista settimanale o calendario mensile, aperta di default sul giorno dopo; per ogni giorno compiti, verifiche, eventi, presenze e, per i giorni passati, le lezioni in una sezione separata; prossimi giorni e sezioni comprimibili
+- sui telefoni il calendario della Dashboard (settimana o mese) galleggia sopra i giorni e si riduce a una striscia scorrendo, scattando tra intero e ridotto; toccando la striscia si riapre e scorrendo di lato si passa al giorno prima o dopo
+- in "Nei prossimi giorni" ogni giorno si comprime toccandone il titolo; toccando il resto si va a quel giorno
+- toccando di nuovo la scheda Dashboard si torna in cima alla pagina e, se si è già in cima, alla giornata di domani
 - puoi segnare i compiti come fatti e, opzionalmente, nasconderli
 - Voti con media generale e medie dei periodi, grafico dell'andamento, ultimi voti espandibili e filtrabili per materia e periodo, elenco delle materie
 - effetto di ogni voto sulla media della materia (▲/▼) e grafico dei voti di ogni materia
 - dato un obiettivo di media, il voto necessario nelle prossime 1-5 prove
 - media di tutti i voti o media delle medie, con o senza pesi
 - Tu con profilo, statistiche e tutte le altre sezioni
-- bacheca con filtri e ricerca, adesione, firma e risposta alle comunicazioni e anteprima degli allegati
+- bacheca con filtri e ricerca, adesione, firma e risposta alle comunicazioni e anteprima degli allegati: immagini da ingrandire (pulsanti, pizzico, doppio tocco, Ctrl + rotellina, tasti + − 0) e scorrere, adatte alla finestra o alla larghezza, anteprima a schermo intero con i controlli in alto, apertura in una nuova scheda senza scaricare e Scarica
 - note disciplinari e annotazioni, assenze e ritardi con quelli da giustificare
 - scrutini e pagelle con riepilogo per periodo e insufficienze
 - anni precedenti: pagelle dall'archivio di Classeviva e accesso al sito per il resto
@@ -74,19 +79,42 @@ Le stesse dell'app nativa:
 - ricerca globale su compiti, voti, comunicazioni, materiale e note
 - promemoria la sera prima di compiti e verifiche, all'orario scelto
 - aggiunta al Calendario di compiti, verifiche ed eventi (file .ics), anche di tutta l'agenda con gli avvisi già impostati
-- blocco dell'app con Face ID, Touch ID o Windows Hello (passkey del dispositivo), oppure con un codice
+- blocco dell'app con una passkey (Face ID, Touch ID, Windows Hello o lo sblocco del dispositivo), oppure con un codice
 - consultazione offline con i dati dell'ultima volta
-- account genitore con più figli, più account salvati e passaggio dall'uno all'altro
-- modalità demo con dati di esempio
-- tema chiaro, scuro o automatico
+- account genitore con più figli, più account salvati e passaggio dall'uno all'altro (anche tenendo premuta la scheda Tu), con una dissolvenza tra i dati di un account e quelli dell'altro
+- modalità demo con dati di esempio, anche con un account già collegato (uscendo si torna all'account)
+- notifiche per nuovi voti, comunicazioni, note, assenze e compiti, da attivare in Impostazioni › Notifiche
+- impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account
+- aspetto personalizzabile (Impostazioni › Aspetto): tema chiaro, scuro o automatico, colore d'accento (campioni o un colore qualsiasi) da cui si generano tutti i colori del sito, stile dei colori (Tonale, Vivace, Espressivo, Fedele, Neutro, Arcobaleno, Macedonia), contrasto, angoli più o meno arrotondati, animazioni espressive, standard o ridotte, caratteri arrotondati
+
+### Orario
+
+La scheda Orario contiene l'orario settimanale, che si compila a mano o si genera dalle lezioni registrate:
+
+- tre viste: Lista (la settimana in alto e gli eventi del giorno sotto), Calendario (il mese e gli eventi del giorno, su schermi larghi) e Giorno (le ore della giornata; su schermi larghi l'intera settimana)
+- sui telefoni la settimana galleggia sopra gli eventi e si riduce a una striscia scorrendo, come nella Dashboard; scorrendo di lato si passa al giorno prima o dopo
+- toccando un evento si vedono i dettagli e si aggiungono note, file e foto, per un solo giorno o per ogni settimana
+- le verifiche segnate dai docenti su Classeviva compaiono da sole sulla lezione della materia e si possono nascondere; altre verifiche si segnano a mano, per un giorno o per ogni settimana
+- Verifiche nascoste (dal menu dell'orario): l'elenco delle verifiche nascoste, con il motivo, da cui si possono mostrare di nuovo, e le regole per nasconderle in automatico (per docente, materia, giorno della settimana, periodo, parole nel testo o materie che quel giorno non sono in orario)
+- modificando un evento si può applicare la modifica a tutti quelli con lo stesso nome
+- gli eventi uguali di seguito (es. due ore di matematica) sono uniti in un gruppo, quelli contemporanei sono affiancati
+- intervalli che nella vista Giorno stanno sopra le lezioni senza cambiarne la durata e nella vista Lista sono un separatore ondulato con l'orario
+- le verifiche nella vista Lista si mostrano solo attivando "Mostra le verifiche" (Impostazioni o menu dell'orario)
+- modalità Modifica orario (dal menu dell'orario), nella vista Giorno: gli eventi si spostano trascinandoli (sul telefono dopo averli tenuti premuti; su schermi larghi anche da un giorno all'altro), si allungano dal bordo inferiore, se ne crea uno nuovo con un doppio tocco su un'ora vuota e toccandoli si modificano gli orari a mano
+- allineamento dell'orario: automatico (eventi da 30 minuti o un'ora, alla mezz'ora) o libero (qualsiasi orario e durata); passando all'automatico gli eventi non allineati vengono allineati dopo una conferma; gli intervalli si posizionano sempre liberamente
+- colori: quelli delle lezioni, colori personalizzati salvati, colori presi dalle palette (anche personalizzate) oppure una palette a sfumatura applicata a una serie di eventi di una giornata
+- generazione automatica di una bozza dell'orario dalle lezioni registrate, mostrata in anteprima con i bordi tratteggiati prima di applicarla
+- backup dell'orario da esportare e reimportare dalle Impostazioni (con i file allegati), compatibile con l'app BCW per iPhone, iPad e Mac
+
+L'orario è salvato solo nel browser, separato per ogni account (il documento in `localStorage`, i file in IndexedDB).
 
 ### Su schermi larghi
 
-Come su Mac: barra laterale con tutte le sezioni e i contatori delle cose da leggere o giustificare, account in fondo alla barra, ricerca sempre a portata di mano nel campo in alto a destra, pagine a due colonne (Dashboard, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca con elenco e comunicazione affiancati, griglie di card, impostazioni a schede. In Bacheca, Agenda e Materiale la ricerca della pagina sta nel contenuto. Nelle pagine a più colonne le barre di scorrimento non compaiono, così le colonne mantengono la loro larghezza.
+Come su Mac: barra laterale con tutte le sezioni e i contatori delle cose da leggere o giustificare (si riduce alle sole icone con il pulsante in alto), account in fondo alla barra, ricerca sempre a portata di mano nel campo in alto a destra, pagine a due colonne (Dashboard, Orario, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca con elenco e comunicazione affiancati, griglie di card, impostazioni a schede. Nella Dashboard il giorno scelto è il titolo della pagina, con "Domani" e il menu della vista accanto. In Bacheca, Agenda e Materiale la ricerca della pagina sta nel contenuto. Nelle pagine a più colonne le barre di scorrimento non compaiono, così le colonne mantengono la loro larghezza.
 
-Scorciatoie: ⌘F (Ctrl+F) per cercare; con Alt (⌥ su Mac) Alt+1…9 per le sezioni, Alt+R per aggiornare, Alt+← Alt+→ Alt+T Alt+Maiusc+T per spostarsi tra i giorni nella Dashboard.
+Scorciatoie: ⌘F (Ctrl+F) per cercare; con Alt (⌥ su Mac) Alt+1…9 per le sezioni (1 Dashboard, 2 Orario, 3 Voti, 4 Tu, 5 Bacheca, 6 Note, 7 Assenze, 8 Agenda, 9 Materiale), Alt+R per aggiornare, Alt+Maiusc+T per andare a domani nella Dashboard, Alt+T per tornare a oggi e Alt+N per un nuovo evento nell'Orario, Invio per uscire da Modifica orario.
 
-Sotto i 900 pixel di larghezza l'app usa il layout di iPhone, con la barra delle schede in basso.
+Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, con la barra di navigazione in basso (tra 600 e 840 pixel le schede stanno in una barra laterale compatta).
 
 ### Differenze dovute al web
 
@@ -96,7 +124,16 @@ Sotto i 900 pixel di larghezza l'app usa il layout di iPhone, con la barra delle
 
 ### Design
 
-Stessa palette dell'app: `#F7F2E8` per lo sfondo chiaro, `#1E1D1C` per lo sfondo scuro, accento rosso mattone `#A23E2F`. Il font è New York sui dispositivi Apple (tramite `ui-serif`); altrove, dove New York non è disponibile, si usa Source Serif 4, una serif dalle proporzioni simili. Barre, pulsanti e tab bar riprendono l'effetto vetro di iOS 26.
+Il sito segue [Material 3 Expressive](https://m3.material.io/):
+
+- colori generati con material-color-utilities (schema Tonal Spot) dal rosso mattone di BCW `#A23E2F`, con tema chiaro e scuro; materie e stati (bene, sufficiente, insufficiente) hanno le loro palette tonali. Scegliendo un altro colore d'accento lo schema viene rigenerato nel browser (`js/theme.js`) e salvato, così all'apertura si applica subito
+- font Google Sans Flex (incluso nel sito), con l'asse ROND per titoli e numeri arrotondati; anche il logo è scritto con questo font
+- favicon con la linea di BCW nel colore del tema scelto nell'app (chiaro, scuro e colore d'accento)
+- icone Material Symbols Rounded
+- angoli ampi, liste segmentate, gruppi di pulsanti collegati, barra di navigazione corta e barra laterale (navigation rail), fogli dal basso e dialoghi
+- forme espressive (MaterialShapes): i voti in un "biscotto" a nove lobi, l'indicatore di caricamento che cambia forma ruotando, avatar e stati vuoti nelle forme di Material
+- medie in anelli con la parte piena ondulata e barre di avanzamento ondulate
+- animazioni a molla (pulsanti che stringono gli angoli alla pressione, selezioni che diventano pillole)
 
 ---
 
@@ -104,22 +141,30 @@ Stessa palette dell'app: `#F7F2E8` per lo sfondo chiaro, `#1E1D1C` per lo sfondo
 
 ```
 index.html            Pagina dell'app
-css/bcw.css           Design system: colori, font, componenti, layout iOS e Mac
+css/bcw.css           Design system Material 3 Expressive: colori, tipografia, forme, componenti, layout
+fonts/                Google Sans Flex (licenza OFL)
 js/
 ├── app.js            Shell: navigazione, barre, menu, fogli, dialoghi, scorciatoie
 ├── api.js            Client Classeviva, proxy, cache offline (IndexedDB)
 ├── models.js         Modelli decodificati in modo tollerante
 ├── store.js          Stato dell'app, account, caricamento dei dati, archivi
+├── timetable.js      Orario: modello, salvataggio, gruppi, verifiche, colori, generatore, backup
+├── news.js           Notifiche delle novità
 ├── gradebook.js      Medie, andamento, voto necessario
 ├── prefs.js          Preferenze
 ├── reminders.js      Promemoria
 ├── calendar-export.js Esportazione .ics
 ├── lock.js           Blocco con passkey o codice
+├── theme.js          Aspetto: colori dal colore d'accento, angoli, animazioni, caratteri
+├── theme-boot.js     Applica l'aspetto salvato prima del primo disegno
+├── vendor/           material-color-utilities (licenza Apache 2.0), raccolta in un file
 ├── demo.js, pdf.js   Server demo e PDF di esempio
-├── components.js     Componenti (card, badge voto, anelli, righe agenda…)
+├── components.js     Componenti (card, liste, badge voto, anelli ondulati, righe agenda…)
+├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo (testo e linea)
+├── viewer.js         Anteprima dei file con zoom e schermo intero
 ├── charts.js         Grafici SVG
 ├── dom.js            Aggiornamento del DOM per confronto
-└── views/            Dashboard, Voti, Tu e sottosezioni, Bacheca, Cerca, Impostazioni, Accesso
+└── views/            Dashboard, Orario, Voti, Tu e sottosezioni, Bacheca, Cerca, Impostazioni, Accesso
 config.json           Proxy predefinito
 server.js             Server statico e proxy (Node, senza dipendenze)
 proxy/                Proxy come Cloudflare Worker
