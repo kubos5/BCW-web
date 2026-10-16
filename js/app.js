@@ -255,6 +255,8 @@ function makeContext() {
     pageScroller,
     expandCalendar,
     afterRender: (fn) => app.afterRender.push(fn),
+    /** Scorre un'area senza colorare la barra superiore (scorrimenti fatti dall'app). */
+    scrollQuietly,
     toast: showToast,
   };
 }
@@ -341,6 +343,7 @@ function render() {
   for (const fn of pending) {
     try { fn(root); } catch (error) { console.error(error); }
   }
+  updateBarState();
 }
 
 function renderSignedOut() {
@@ -914,14 +917,35 @@ root.addEventListener('scroll', (event) => {
     applyCollapse();
     if (page.querySelector('.cal-float')) scheduleSnap();
   }
-  // La barra superiore prende il colore del contenitore quando il contenuto scorre sotto.
-  const path = currentPath();
-  const scrolled = [...page.querySelectorAll('[data-scroll]')].some((s) => s.scrollTop > (page.classList.contains('mobile') && !page.classList.contains('has-inline') ? 40 : 2));
-  if (scrolled !== app.scrolled.has(path)) {
-    if (scrolled) app.scrolled.add(path); else app.scrolled.delete(path);
-    page.querySelector('.app-bar')?.classList.toggle('scrolled', scrolled);
-  }
+  // Uno scorrimento fatto dall'app (es. l'Orario che va alla prima ora) non cambia la barra.
+  if (quietScrollers.delete(el)) return;
+  updateBarState(page, { canTint: true });
 }, true);
+
+/** Scorrimenti fatti dall'app: non colorano la barra superiore. */
+const quietScrollers = new WeakSet();
+
+function scrollQuietly(el, top) {
+  if (Math.abs(el.scrollTop - top) < 1) return;
+  quietScrollers.add(el);
+  el.scrollTop = top;
+}
+
+/**
+ * La barra superiore prende il colore del contenitore quando il contenuto scorre sotto.
+ * Dopo ogni disegno (`canTint` falso) si toglie soltanto, se la vista è cambiata e il
+ * contenuto non è più scorso; le aree con `data-bar-ignore` (es. la griglia dell'Orario,
+ * che ha la sua intestazione) non contano.
+ */
+function updateBarState(page = root.querySelector('.page.active'), { canTint = false } = {}) {
+  if (!page) return;
+  const path = currentPath();
+  const threshold = page.classList.contains('mobile') && !page.classList.contains('has-inline') ? 40 : 2;
+  const scrolled = [...page.querySelectorAll('[data-scroll]:not([data-bar-ignore])')].some((el) => el.scrollTop > threshold);
+  if (scrolled === app.scrolled.has(path) || (scrolled && !canTint)) return;
+  if (scrolled) app.scrolled.add(path); else app.scrolled.delete(path);
+  page.querySelector('.app-bar')?.classList.toggle('scrolled', scrolled);
+}
 
 let pull = null;
 root.addEventListener('touchstart', (event) => {

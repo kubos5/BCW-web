@@ -30,6 +30,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
 - Calendario galleggiante sui telefoni (`page.floating`, Dashboard e Orario): `.cal-float` sopra `.page-scroll`, che
   ha il margine superiore dell'altezza intera; l'avanzamento `--p` (0 intero, 1 striscia) segue `scrollTop` e lo
   imposta `applyCollapse()` dopo ogni disegno; a metà strada scatta. Il giorno accanto si raggiunge con `data-day-swipe`.
+- Barra superiore colorata (`.app-bar.scrolled`) solo quando l'utente scorre il contenuto: gli scorrimenti fatti
+  dall'app passano da `ctx.scrollQuietly(el, top)`, le aree con `data-bar-ignore` non contano e dopo ogni disegno il
+  colore si toglie se il contenuto non è più scorso.
 - Orario: logica in `js/timetable.js` (stesso JSON dell'app iOS: minuti dalla mezzanotte, giorni 1 = lunedì, UUID
   maiuscoli, date senza millisecondi, backup `com.bcw.timetable-backup`), viste in `views/timetable.js` e fogli in
   `views/timetable-sheets.js`. Un documento per account in `localStorage` (`bcw.timetable.<account>`), file in IndexedDB
