@@ -481,7 +481,7 @@ function scheduleHourScroll(ctx, days, floating) {
     if (!grid) return;
     const offset = grid.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
     const range = floating ? floating.full - floating.collapsed : 0;
-    scroller.scrollTop = Math.max(range, offset + hour * hh - (floating ? floating.collapsed + 12 : 8));
+    ctx.scrollQuietly(scroller, Math.max(range, offset + hour * hh - (floating ? floating.collapsed + 12 : 8)));
   });
 }
 
@@ -508,7 +508,7 @@ function timeline(ctx, days, selected) {
   const grid = `<div class="tt-grid ${canEdit ? 'editing' : ''}" style="--hh:${hh}px;height:${24 * hh}px" data-days="${days.length}">
     ${hours.join('')}<div class="tt-cols">${columns}</div>${nowLine}</div>`;
   const inner = `${header}${grid}`;
-  if (ctx.wide) return `<div class="tt-timeline">${header}<div class="timeline-scroll" data-scroll="timeline">${grid}</div></div>`;
+  if (ctx.wide) return `<div class="tt-timeline">${header}<div class="timeline-scroll" data-scroll="timeline" data-bar-ignore>${grid}</div></div>`;
   return `<div class="tt-timeline mobile ${canEdit ? 'editing' : ''}">${inner}</div>`;
 }
 
