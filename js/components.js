@@ -60,10 +60,11 @@ export function joinRows(items, render, sep = divider()) {
 }
 
 /** Lista segmentata: voci separate da 2 px, la prima e l'ultima con gli angoli ampi. */
-export function listGroup(items, { header, footer, cls = '' } = {}) {
+export function listGroup(items, { header, footer, cls = '', background, attrs = '' } = {}) {
   const rows = items.filter(Boolean).join('');
   if (!rows) return '';
-  return `<section class="list-section ${cls}">${header ? `<h3 class="list-header">${esc(header)}</h3>` : ''}<div class="list-group">${rows}</div>${footer ? `<p class="list-footer">${esc(footer)}</p>` : ''}</section>`;
+  const style = background ? ` style="--cell-bg:${background}"` : '';
+  return `<section class="list-section ${cls}"${attrs}>${header ? `<h3 class="list-header">${esc(header)}</h3>` : ''}<div class="list-group"${style}>${rows}</div>${footer ? `<p class="list-footer">${esc(footer)}</p>` : ''}</section>`;
 }
 
 /**
@@ -198,11 +199,86 @@ export function pill(text, { short, color = 'var(--primary)', filled = false, cl
   return `<span class="pill ${filled ? 'filled' : ''} ${short ? 'has-short' : ''} ${cls}" style="${tint(color)}" title="${esc(text)}">${content}</span>`;
 }
 
-/** Riquadro con un numero (assenze, ritardi, medie…): l'icona sta in una forma. */
-export function statTile(title, value, iconName, color = 'var(--primary)', shapeName = 'cookie4Sided') {
-  return card(`<span class="stat-icon shaped" style="${tint(color)}">${shape(shapeName)}${icon(iconName)}</span>
-    <span class="stat-value numeral">${esc(value)}</span><span class="stat-title">${esc(title)}</span>`, { padding: 16, cls: 'stat-tile' });
+/**
+ * Riquadro con un numero (assenze, ritardi, medie…): l'icona sta in una forma. In una griglia
+ * collegata (`corners`: tl, tr, bl, br, l, r, c) solo gli angoli verso l'esterno sono ampi.
+ * `vertical` mette l'icona sopra il numero (riquadri stretti, es. tre per riga).
+ */
+export function statTile(title, value, iconName, color = 'var(--primary)', shapeName = 'cookie4Sided', { corners = '', vertical = false, action, params = {} } = {}) {
+  const art = `<span class="stat-icon shaped" style="${tint(color)}">${shape(shapeName)}${icon(iconName)}</span>`;
+  const text = `<span class="stat-text"><span class="stat-value numeral">${esc(value)}</span><span class="stat-title">${esc(title)}</span></span>`;
+  const cls = `stat-tile ${vertical ? 'vertical' : ''} ${corners ? `corners-${corners}` : ''}`;
+  const inner = vertical ? art + text : text + art;
+  if (action) return `<button class="card ${cls}" data-action="${action}"${data(params)}>${inner}</button>`;
+  return `<div class="card ${cls}">${inner}</div>`;
 }
+
+/** Chip di stato (32 px, contenitore tonale): un conteggio o uno stato del giorno. */
+export function statusChip(text, iconName, tone = 'secondary') {
+  return `<span class="status-chip tone-${tone}">${icon(iconName)}<span>${esc(text)}</span></span>`;
+}
+
+/**
+ * Sezione di una pagina in stile M3 Expressive: intestazione (icona nel colore, titolo, valore a
+ * destra, avanzamento facoltativo e freccia) e sotto le voci in una lista segmentata. Toccando
+ * l'intestazione la lista si chiude; lo stato è ricordato tra un avvio e l'altro.
+ */
+export function segmentedSection(ctx, { section, title, iconName, color = 'var(--primary)', trailing = '', progress = null, cells }) {
+  const collapsed = ctx.prefs.isCollapsed(section);
+  const bar = progress == null ? '' : `<span class="seg-progress">${wavyProgress(progress, 1, { label: title })}</span>`;
+  return `<section class="seg-section" data-key="sec-${section}">
+    <button class="seg-head" data-action="toggle-section" data-section="${section}" aria-expanded="${!collapsed}">
+      <span class="seg-icon" style="color:${color}">${icon(iconName)}</span><span class="seg-title">${esc(title)}</span><span class="flex"></span>
+      ${bar}${trailing ? `<span class="seg-trailing numeral-mono">${esc(trailing)}</span>` : ''}${chevron(collapsed)}</button>
+    ${collapsible(!collapsed, `<div class="list-group">${cells.join('')}</div>`, { spacing: 6 })}</section>`;
+}
+
+/** Voce di una lista segmentata con il contenuto libero e i margini delle voci. */
+export function segCell(content, { cls = '', attrs = '' } = {}) {
+  return `<div class="seg-cell ${cls}"${attrs}>${content}</div>`;
+}
+
+/**
+ * Data in un riquadro (iniziali del giorno e numero), come nella vista Programma di Google
+ * Calendar: piena nel colore primario se è oggi, nel contenitore terziario se c'è una verifica.
+ */
+export function dateBadge(day, { highlighted = false, today = false } = {}) {
+  return `<span class="date-badge ${today ? 'today' : ''} ${highlighted ? 'highlighted' : ''}"><small>${esc(fmt.weekdayShort(day).toUpperCase())}</small><span class="numeral">${day.getDate()}</span></span>`;
+}
+
+/**
+ * Gruppo di pulsanti collegati di M3 Expressive con etichette libere (es. periodo e media):
+ * 2 px tra i pulsanti, angoli interni piccoli ed esterni pieni; quello scelto diventa tutto
+ * arrotondato e pieno. `options`: [[valore, html]].
+ */
+export function connectedGroup(options, selected, action, { height = 56, params = {}, cls = '' } = {}) {
+  return `<div class="connected-group ${cls}" role="tablist" style="--h:${height}px">${options.map(([value, label]) => {
+    const isSelected = String(value ?? '') === String(selected ?? '');
+    return `<button role="tab" class="${isSelected ? 'selected' : ''}" aria-selected="${isSelected}" data-action="${action}" data-value="${esc(value ?? '')}"${data(params)}>${label}</button>`;
+  }).join('')}</div>`;
+}
+
+/** Schede principali di Material 3: etichette di uguale larghezza con l'indicatore sotto quella scelta. */
+export function primaryTabs(tabs, selected, action) {
+  return `<div class="primary-tabs" role="tablist">${tabs.map(([value, label]) => {
+    const isSelected = String(value) === String(selected);
+    return `<button role="tab" class="${isSelected ? 'selected' : ''}" aria-selected="${isSelected}" data-action="${action}" data-value="${esc(value)}"><span>${esc(label)}<i></i></span></button>`;
+  }).join('')}</div>`;
+}
+
+/**
+ * Barra degli strumenti flottante di M3 Expressive: una pillola di 64 px in basso al centro.
+ * Quella vivace (contenitore primario) segnala una modalità temporanea, come la modifica.
+ */
+export function floatingToolbar(content, { vibrant = false, label = 'Strumenti' } = {}) {
+  return `<div class="floating-toolbar ${vibrant ? 'vibrant' : ''}" role="toolbar" aria-label="${esc(label)}">${content}</div>`;
+}
+
+export function toolbarButton(iconName, { action, label, selected = false, params = {} }) {
+  return `<button class="tb-btn ${selected ? 'selected' : ''}" data-action="${action}"${data(params)} aria-label="${esc(label)}" title="${esc(label)}" aria-pressed="${selected}">${icon(iconName)}</button>`;
+}
+
+export const toolbarSeparator = () => '<span class="tb-sep"></span>';
 
 export function iconBadge(iconName, color = 'var(--primary)', size = 40) {
   return `<span class="icon-badge" style="${tint(color)};--size:${size}px">${icon(iconName)}</span>`;
@@ -372,4 +448,35 @@ export function localSearchField(value, placeholder, action) {
 export function avatar(initials, { size = 64, color, cls = '', shapeName = 'circle' } = {}) {
   const tinted = color ? `tinted" style="--size:${size}px;--tint:${color}` : `" style="--size:${size}px`;
   return `<span class="avatar shaped ${cls} ${tinted}">${shape(shapeName)}<span>${esc(initials)}</span></span>`;
+}
+
+// MARK: - Giorni
+
+/**
+ * Pagina che cambia con la transizione ad asse condiviso X (giorni, schede): la nuova entra
+ * dal lato del verso (`dir`), quella vecchia esce dall'altro (vedi `animateAxisExits` in app.js).
+ */
+export function axisPage(name, dir, key, content, { cls = '' } = {}) {
+  const d = dir < 0 ? -1 : 1;
+  return `<div class="axis ${cls}" data-axis="${name}" data-axis-dir="${d}"><div class="axis-page ${dir ? 'axis-in' : ''}" style="--dir:${d}" data-key="${esc(key)}">${content}</div></div>`;
+}
+
+/**
+ * Il giorno in grande (Dashboard e Orario): "Domani" o il giorno della settimana, la data sotto,
+ * a destra il pulsante per tornare al giorno predefinito e sotto i chip di stato.
+ */
+export function dayHero(day, { jump = null, chips = [] } = {}) {
+  const relative = isTodayLike(day);
+  const title = relative ? fmt.relativeDayName(day) : fmt.weekdayLong(day);
+  const subtitle = relative ? fmt.longDay(day) : fmt.dayMonthYear(day);
+  const button = jump ? `<button class="btn s tonal day-jump" data-action="${jump.action}" title="${esc(jump.help ?? jump.title)}">${icon('today')}<span>${esc(jump.title)}</span></button>` : '';
+  return `<div class="day-hero"><div class="day-hero-row"><div class="day-hero-text"><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></div>${button}</div>
+    ${chips.length ? `<div class="chip-flow">${chips.join('')}</div>` : ''}</div>`;
+}
+
+function isTodayLike(day) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((new Date(day).setHours(0, 0, 0, 0) - today) / 86_400_000);
+  return diff >= -1 && diff <= 1;
 }

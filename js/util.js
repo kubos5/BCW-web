@@ -132,6 +132,8 @@ export const fmt = {
   shortDay: (d) => it({ day: 'numeric', month: 'short' }, d),
   shortDayWithYear: (d) => it({ day: 'numeric', month: 'short', year: 'numeric' }, d),
   weekdayShort: (d) => capFirst(it({ weekday: 'short' }, d)).replace('.', ''),
+  /** "Giovedì". */
+  weekdayLong: (d) => capFirst(it({ weekday: 'long' }, d)),
   /** "Giovedì 15". */
   weekdayLongDay: (d) => capFirst(it({ weekday: 'long', day: 'numeric' }, d)),
   /** "15 ottobre". */

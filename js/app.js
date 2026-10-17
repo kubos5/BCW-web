@@ -1,6 +1,7 @@
-// Shell dell'app in stile Material 3 Expressive: barra di navigazione in basso sui telefoni,
-// barra di navigazione laterale compatta sui tablet in verticale e barra laterale espansa con
-// tutte le sezioni sugli schermi larghi (come la barra laterale dell'app per Mac). Più barre
+// Shell dell'app in stile Material 3 Expressive: barra di navigazione in basso sui telefoni
+// (quattro schede, la ricerca è la barra in cima alla Dashboard), barra di navigazione laterale
+// sui tablet in verticale e, sugli schermi larghi, barra superiore con la ricerca e l'account
+// (come Gmail e Drive) e barra di navigazione espansa con tutte le sezioni. Più barre
 // superiori, menu, fogli, dialoghi, scorciatoie e gesti.
 
 import { AppModel, accountColorID, accountInitials } from './store.js';
@@ -10,6 +11,7 @@ import { drawCharts } from './charts.js';
 import { Lock } from './lock.js';
 import { Theme } from './theme.js';
 import { viewerState, renderViewer, viewerActions, viewerKey, installViewerGestures } from './viewer.js';
+import { datePickerState, renderDatePicker, datePickerActions } from './date-picker.js';
 import { Reminders } from './reminders.js';
 import { Proxy } from './api.js';
 import { esc } from './util.js';
@@ -36,7 +38,12 @@ const app = {
   dialog: null,
   menu: null,
   viewer: null,
+  datePicker: null,
   toast: null,
+  /** Ricerca aperta dalla barra in cima alla Dashboard (telefoni e tablet). */
+  searching: false,
+  /** Menu del pulsante d'azione flottante aperto. */
+  fabOpen: false,
   width: window.innerWidth,
   nav: { stacks: {}, current: null },
   scroll: new Map(),
@@ -60,7 +67,7 @@ const app = {
   get railWidth() { return this.wide ? (this.railOverlays || this.railCollapsed ? 96 : 264) : (this.medium ? 88 : 0); },
   /** Larghezza dell'area principale (senza la barra laterale e i margini del pannello). */
   get mainWidth() { return this.width - this.railWidth - (this.wide ? 12 : 0); },
-  /** Colonne affiancate solo se c'è spazio (come `SplitColumns` sul Mac). */
+  /** Colonne affiancate solo se c'è spazio. */
   get splitWide() {
     const threshold = this.splitWasWide ? 768 : 792;
     this.splitWasWide = this.wide && this.mainWidth >= threshold;
@@ -86,7 +93,7 @@ window.bcw = app;
 
 // MARK: - Navigazione
 
-const tabs = ['dashboard', 'timetable', 'grades', 'you', 'search'];
+const tabs = ['dashboard', 'timetable', 'grades', 'you'];
 
 function parsePath(path) {
   const parts = path.replace(/^#?\/?/, '').split('/').filter(Boolean);
@@ -102,6 +109,7 @@ function stackKeyFor(path) {
     return name;
   }
   if (tabs.includes(name)) return name;
+  if (name === 'search') return 'dashboard';
   return 'you';
 }
 
@@ -160,8 +168,22 @@ export function selectSection(key) {
   saveScroll();
   app.menu = null;
   app.railOpen = false;
+  app.fabOpen = false;
+  if (!app.wide && key === 'search') {
+    openSearch();
+    return;
+  }
+  if (app.searching) {
+    app.searching = false;
+    const search = app.viewState.get('search');
+    if (search) search.query = '';
+    if (key === 'dashboard') {
+      app.update();
+      return;
+    }
+  }
   if (app.wide && key !== 'search') {
-    // Come su Mac: scegliere una sezione chiude la ricerca generale.
+    // Scegliere una sezione chiude la ricerca generale.
     const search = app.viewState.get('search');
     if (search) search.query = '';
     app.nav.lastSection = key;
@@ -198,6 +220,10 @@ export function back() {
 }
 
 function resetNavigation(path) {
+  if (!app.wide && parsePath(path).name === 'search') {
+    app.searching = true;
+    path = 'dashboard';
+  }
   const key = stackKeyFor(path);
   app.nav.current = key;
   app.nav.stacks = { [key]: path === key ? [key] : [key, path] };
@@ -253,7 +279,8 @@ function makeContext() {
     openFile,
     scrollToTop,
     pageScroller,
-    expandCalendar,
+    openSearch,
+    openDatePicker,
     afterRender: (fn) => app.afterRender.push(fn),
     /** Scorre un'area senza colorare la barra superiore (scorrimenti fatti dall'app). */
     scrollQuietly,
@@ -302,6 +329,13 @@ export function confirm({ title, message, confirmLabel = 'OK', destructive = fal
   app.update();
 }
 
+/** Selettore della data di Material 3: `onPick(giorno)` riceve il giorno scelto. */
+export function openDatePicker(options) {
+  app.datePicker = datePickerState(options);
+  app.menu = null;
+  app.update();
+}
+
 /** Anteprima di un file scaricato (come Quick Look). */
 export function openFile(file) {
   app.viewer = viewerState(file);
@@ -334,9 +368,10 @@ function render() {
   else if (model.phase === 'signedOut') html = renderSignedOut();
   else html = renderSignedIn();
   html += renderOverlays();
+  const leaving = captureAxisPages();
   morph(root, html);
+  animateAxisExits(leaving);
   restoreScroll();
-  applyCollapse();
   drawCharts(root);
   positionMenu();
   const pending = app.afterRender.splice(0);
@@ -344,6 +379,46 @@ function render() {
     try { fn(root); } catch (error) { console.error(error); }
   }
   updateBarState();
+}
+
+// MARK: Transizione ad asse condiviso
+
+/**
+ * Pagine che cambiano con la transizione ad asse condiviso X di Material 3 (giorni, schede dei
+ * Voti): un contenitore `[data-axis]` con un solo figlio con `data-key` e `data-axis-dir`
+ * (1 avanti, −1 indietro). La pagina che entra si anima da sé (classe `axis-in`); quella che
+ * esce, tolta dal morph, si ridisegna sopra per un istante mentre scivola e svanisce.
+ */
+function captureAxisPages() {
+  return [...root.querySelectorAll('[data-axis]')].map((container) => {
+    const node = container.firstElementChild;
+    if (!node?.dataset.key) return null;
+    const clip = (container.closest('[data-scroll]') ?? container).getBoundingClientRect();
+    return { name: container.dataset.axis, node, rect: node.getBoundingClientRect(), clip };
+  }).filter(Boolean);
+}
+
+/** Spostamento del dito al rilascio di uno scorrimento laterale (la pagina esce da lì). */
+let swipeRelease = 0;
+
+function animateAxisExits(leaving) {
+  for (const { name, node, rect, clip } of leaving) {
+    if (node.isConnected || !rect.width) continue;
+    const container = root.querySelector(`[data-axis="${name}"]`);
+    if (!container || container.firstElementChild?.dataset.key === node.dataset.key) continue;
+    const dir = Number(container.dataset.axisDir) || 1;
+    const top = Math.max(clip.top, 0);
+    const layer = document.createElement('div');
+    layer.className = 'axis-exit-layer';
+    layer.style.cssText = `left:${clip.left}px;top:${top}px;width:${clip.width}px;height:${Math.max(0, clip.bottom - top)}px`;
+    node.classList.remove('axis-in');
+    node.classList.add('axis-exit');
+    node.style.cssText = `left:${rect.left - clip.left}px;top:${rect.top - top}px;width:${rect.width}px;--from:${swipeRelease}px;--to:${-dir * 48 + swipeRelease}px`;
+    layer.appendChild(node);
+    document.body.appendChild(layer);
+    setTimeout(() => layer.remove(), 400);
+  }
+  swipeRelease = 0;
 }
 
 function renderSignedOut() {
@@ -382,10 +457,10 @@ function barItem(item) {
   return `<button class="icon-btn ${item.cls ?? ''}"${attrs}${disabled} aria-label="${esc(item.label)}" title="${esc(item.help ?? item.label)}">${icon(item.icon)}</button>`;
 }
 
-/** Campo della ricerca generale, sempre visibile nella barra su schermi larghi (come su Mac). */
+/** Campo della ricerca generale, nella barra in alto su schermi larghi (come Gmail e Drive). */
 function globalSearchField() {
   const query = app.viewState.get('search')?.query ?? '';
-  return `<label class="search-bar global-search" title="Cerca (Ctrl+F)">${icon('search')}<input type="search" value="${esc(query)}" placeholder="Compiti, voti, altro…" data-input="global-search" data-focus="global-search-focus" data-blur="global-search-blur" data-keydown="global-search-key" autocomplete="off" enterkeyhint="search" aria-label="Cerca">${query ? `<button class="icon-btn small" data-action="global-search" data-clear="1" aria-label="Cancella">${icon('x')}</button>` : ''}</label>`;
+  return `<label class="search-bar global-search" title="Cerca (Ctrl+F)">${icon('search')}<input type="search" value="${esc(query)}" placeholder="Cerca nel registro" data-input="global-search" data-focus="global-search-focus" data-blur="global-search-blur" data-keydown="global-search-key" autocomplete="off" enterkeyhint="search" aria-label="Cerca">${query ? `<button class="icon-btn small" data-action="global-search" data-clear="1" aria-label="Cancella">${icon('x')}</button>` : ''}</label>`;
 }
 
 /** Torna dalla ricerca generale all'ultima sezione aperta. */
@@ -395,8 +470,71 @@ function endSearch() {
   if (app.nav.current === 'search') selectSection(app.nav.lastSection ?? 'dashboard');
 }
 
+/** Ricerca sui telefoni: la barra in cima alla Dashboard diventa il campo. */
+export function openSearch() {
+  if (app.nav.current !== 'dashboard' || (app.nav.stacks.dashboard?.length ?? 1) > 1) {
+    app.nav.current = 'dashboard';
+    app.nav.stacks.dashboard = ['dashboard'];
+    syncHash();
+  }
+  app.searching = true;
+  app.fabOpen = false;
+  app.afterRender.push((r) => r.querySelector('.search-app-bar input')?.focus());
+  app.update();
+}
+
+function closeSearch() {
+  app.searching = false;
+  const search = app.viewState.get('search');
+  if (search) search.query = '';
+  app.update();
+}
+
 function searchField(search) {
   return `<label class="search-bar page-search">${icon('search')}<input type="search" value="${esc(search.value)}" placeholder="${esc(search.placeholder)}" data-input="${search.input}" autocomplete="off" enterkeyhint="search">${search.value ? `<button class="icon-btn small" data-action="${search.input}" data-clear="1" aria-label="Cancella">${icon('x')}</button>` : ''}</label>`;
+}
+
+/** Avatar dell'account attivo (in un biscotto): apre gli account. */
+function accountAvatar(action, size = 34) {
+  return `<button class="account-avatar" data-action="${action}" aria-label="Account, ${esc(model.displayName)}" title="${esc(model.displayName)}">${avatar(model.initials, { size, shapeName: 'cookie9Sided' })}</button>`;
+}
+
+/**
+ * Barra superiore con la barra di ricerca (come Gmail e Google Foto): una pillola sospesa di 56
+ * px con l'icona, l'invito e, a destra, i pulsanti della pagina e l'avatar. Toccandola diventa
+ * il campo (freccia per tornare indietro, X per cancellare) e i risultati prendono il posto
+ * della pagina.
+ */
+function searchAppBar(page) {
+  if (app.searching) {
+    const query = app.viewState.get('search')?.query ?? '';
+    return `<header class="search-app-bar"><div class="sab-pill active">
+      <button class="icon-btn" data-action="search-close" aria-label="Chiudi la ricerca" title="Chiudi la ricerca">${icon('arrowBack')}</button>
+      <input type="search" value="${esc(query)}" placeholder="Compiti, voti, altro…" data-input="search-input" data-keydown="search-key" autocomplete="off" enterkeyhint="search" aria-label="Cerca">
+      ${query ? `<button class="icon-btn" data-action="search-input" data-clear="1" aria-label="Cancella" title="Cancella">${icon('x')}</button>` : ''}</div></header>`;
+  }
+  const actions = (page.actions ?? []).map(barItem).join('');
+  return `<header class="search-app-bar"><div class="sab-pill">
+    <button class="sab-open" data-action="search-open" aria-label="Cerca">${icon('search')}<span>${esc(page.searchBar.prompt ?? 'Cerca nel registro')}</span></button>
+    <div class="sab-trail">${actions}${accountAvatar('account-switcher')}</div></div></header>`;
+}
+
+/** Menu del pulsante d'azione flottante: il FAB diventa un cerchio con la X e sopra salgono le voci. */
+function fabMenu(menu) {
+  const open = app.fabOpen;
+  const items = open ? menu.items.map((item, index) => `<button class="fab-item" style="--i:${menu.items.length - 1 - index}" data-action="fab-run" data-run="${item.action}"${item.disabled ? ' disabled' : ''}>${icon(item.icon)}<span>${esc(item.title)}</span></button>`).join('') : '';
+  return `<div class="fab-menu ${open ? 'open' : ''}" data-key="fab-menu">
+    ${open ? '<div class="fab-scrim" data-action="fab-toggle"></div>' : ''}
+    <div class="fab-stack">${items}
+      <button class="fab-toggle" data-action="fab-toggle" aria-expanded="${open}" aria-label="${esc(open ? 'Chiudi il menu' : menu.label)}" title="${esc(open ? 'Chiudi il menu' : menu.label)}">${icon(open ? 'x' : menu.icon)}</button></div></div>`;
+}
+
+function pageExtras(page) {
+  let html = page.overlay ?? '';
+  if (page.toolbar) html += `<div class="toolbar-slot" data-key="toolbar">${page.toolbar}</div>`;
+  else if (page.fabMenu) html += fabMenu(page.fabMenu);
+  else if (page.fab) html += `<button class="fab page-fab" data-action="${page.fab.action}" aria-label="${esc(page.fab.label)}" title="${esc(page.fab.label)}"${page.fab.disabled ? ' disabled' : ''}>${icon(page.fab.icon)}</button>`;
+  return html;
 }
 
 // MARK: Telefoni e tablet
@@ -404,36 +542,44 @@ function searchField(search) {
 function renderMobile(ctx, page) {
   const path = currentPath();
   const depth = ctx.depth;
-  const inline = !!page.inline || depth > 1 || !!page.floating;
-  const scrolled = app.scrolled.has(path);
-  const leading = depth > 1
-    ? `<button class="icon-btn" data-action="nav-back" aria-label="Indietro" title="Indietro">${icon('arrowBack')}</button>` : '';
-  const actions = (page.actions ?? []).map(barItem).join('');
-  const bar = `<header class="app-bar ${scrolled ? 'scrolled' : ''} ${inline ? 'inline' : ''} ${leading ? 'has-leading' : ''}">
-    ${leading}<div class="app-bar-title"><h1>${esc(page.title)}</h1>${page.subtitle && inline ? `<p>${esc(page.subtitle)}</p>` : ''}</div>
-    <div class="app-bar-actions">${actions}</div></header>`;
-  const large = inline ? '' : `<h1 class="large-title">${esc(page.title)}</h1>`;
-  const search = page.search ? searchField(page.search) : '';
-  const refreshing = app.refreshing.has(path);
-  let body;
-  if (page.split) body = `<div class="stack gap-16">${page.split.side}${page.split.main}</div>`;
-  else body = page.body ?? '';
-  const floating = page.floating
-    ? `<div class="cal-float ${page.floating.cls ?? ''}" data-key="float" style="--full:${page.floating.full}px;--range:${page.floating.full - page.floating.collapsed}px" data-collapsed-height="${page.floating.collapsed}">${page.floating.html}</div>` : '';
-  const fab = page.fab
-    ? `<button class="fab page-fab" data-action="${page.fab.action}" aria-label="${esc(page.fab.label)}" title="${esc(page.fab.label)}"${page.fab.disabled ? ' disabled' : ''}>${icon(page.fab.icon)}</button>` : '';
-  const pageHTML = `<section class="page active mobile ${inline ? 'has-inline' : ''} ${floating ? 'has-float' : ''}" data-key="page-${esc(path)}" data-path="${esc(path)}">
-    ${bar}
-    <div class="page-main">
-      ${floating}
-      <div class="page-scroll" data-scroll="main" data-refreshable="${page.refresh ? '1' : ''}"${floating ? ` style="--full:${page.floating.full}px"` : ''}>
-        <div class="ptr ${refreshing ? 'active' : ''}">${loadingIndicator({ contained: true })}</div>
-        ${large}${search}
-        <div class="page-body ${page.bottomInset ? 'bottom-inset' : ''}">${body}</div>
-      </div>
-      ${page.overlay ?? ''}${fab}
-    </div></section>`;
-  return `<div class="shell mobile ${app.medium ? 'medium' : 'compact'} ${model.isChangingSession ? 'changing' : ''}">${pageHTML}${renderNavBar()}</div>`;
+  const searching = app.searching && ctx.route.name === 'dashboard';
+  let bar;
+  if (page.searchBar) {
+    bar = searchAppBar(page);
+  } else {
+    const scrolled = app.scrolled.has(path);
+    const leading = depth > 1
+      ? `<button class="icon-btn" data-action="nav-back" aria-label="Indietro" title="Indietro">${icon('arrowBack')}</button>` : '';
+    const actions = (page.actions ?? []).map(barItem).join('');
+    // Le pagine principali delle schede hanno il titolo grande nella riga dei pulsanti.
+    bar = `<header class="app-bar ${scrolled ? 'scrolled' : ''} ${depth === 1 ? 'large' : ''} ${leading ? 'has-leading' : ''}">
+      ${leading}<div class="app-bar-title"><h1>${esc(page.title)}</h1>${page.subtitle ? `<p>${esc(page.subtitle)}</p>` : ''}</div>
+      <div class="app-bar-actions">${actions}</div></header>`;
+  }
+  let content;
+  if (searching) {
+    // Vista di ricerca di Material 3: i risultati prendono il posto della pagina.
+    const results = routes.search.render(ctx);
+    content = `<div class="page-main"><div class="page-scroll" data-scroll="search" data-bar-ignore>
+      <div class="page-body fade-through" data-key="search-body">${results.body}</div></div></div>`;
+  } else {
+    const search = page.search ? searchField(page.search) : '';
+    const refreshing = app.refreshing.has(path);
+    const body = page.split ? `<div class="stack gap-16">${page.split.side}${page.split.main}</div>` : (page.body ?? '');
+    // Con una parte ferma in alto (la settimana) il contenuto non scorre sotto la barra.
+    const ignore = page.fixed || page.searchBar ? ' data-bar-ignore' : '';
+    content = `${page.fixed ? `<div class="page-fixed" data-key="fixed">${page.fixed}</div>` : ''}
+      <div class="page-main">
+        <div class="page-scroll" data-scroll="main" data-refreshable="${page.refresh ? '1' : ''}"${ignore}>
+          <div class="ptr ${refreshing ? 'active' : ''}">${loadingIndicator({ contained: true })}</div>
+          ${search}<div class="page-body ${page.bottomInset ? 'bottom-inset' : ''} ${page.fabMenu || page.fab || page.toolbar ? 'fab-inset' : ''}">${page.body != null || page.split ? body : ''}</div>
+        </div>
+        ${pageExtras(page)}
+      </div>`;
+  }
+  const hidesNav = searching || page.hidesNav;
+  const pageHTML = `<section class="page active mobile" data-key="page-${esc(path)}" data-path="${esc(path)}">${bar}${content}</section>`;
+  return `<div class="shell mobile ${app.medium ? 'medium' : 'compact'} ${hidesNav ? 'nav-hidden' : ''} ${model.isChangingSession ? 'changing' : ''}">${pageHTML}${renderNavBar()}</div>`;
 }
 
 function renderNavBar() {
@@ -445,7 +591,8 @@ function renderNavBar() {
     return `<button class="nav-item ${selected ? 'selected' : ''}" data-action="select-section" data-key-name="${key}" ${key === 'you' ? 'data-longpress="account-switcher"' : ''} aria-label="${label}" aria-current="${selected ? 'page' : 'false'}">
       <span class="nav-indicator">${icon(selected && s.iconSelected ? s.iconSelected : s.icon)}${badgeCount ? `<span class="badge">${badgeCount}</span>` : ''}</span><span class="nav-label">${label}</span></button>`;
   };
-  return `<nav class="nav-bar" aria-label="Schede">${item('dashboard', 'Dashboard')}${item('timetable', 'Orario')}${item('grades', 'Voti')}${item('you', 'Tu', badge)}${item('search', 'Cerca')}</nav>`;
+  // La ricerca sta nella barra in cima alla Dashboard, come nelle app Google.
+  return `<nav class="nav-bar" aria-label="Schede">${item('dashboard', 'Dashboard')}${item('timetable', 'Orario')}${item('grades', 'Voti')}${item('you', 'Tu', badge)}</nav>`;
 }
 
 // MARK: Schermi larghi
@@ -456,12 +603,10 @@ function renderDesktop(ctx, page) {
   const scrolled = app.scrolled.has(path);
   const back = depth > 1 ? `<button class="icon-btn" data-action="nav-back" aria-label="Indietro" title="Indietro">${icon('arrowBack')}</button>` : '';
   const actions = (page.actions ?? []).map(barItem).join('');
-  const refresh = `<button class="icon-btn" data-action="refresh-all" ${model.isRefreshing ? 'disabled' : ''} aria-label="Aggiorna" title="Aggiorna i dati da Classeviva (Alt+R)">${model.isRefreshing ? loadingIndicator({ size: 'small' }) : icon('refresh')}</button>`;
-  const toolbar = `<header class="app-bar desktop ${scrolled ? 'scrolled' : ''}">
+  const toolbar = `<header class="app-bar desktop ${scrolled ? 'scrolled' : ''} ${depth === 1 ? 'large' : ''}">
     ${back}
     <div class="app-bar-title"><h1>${esc(page.title)}</h1>${page.subtitle ? `<p>${esc(page.subtitle)}</p>` : ''}</div>
-    <span class="flex"></span>
-    <div class="app-bar-actions">${actions}${refresh}</div></header>`;
+    <div class="app-bar-actions">${actions}</div></header>`;
 
   let content;
   if (page.full) {
@@ -472,12 +617,22 @@ function renderDesktop(ctx, page) {
       <div class="split-main" data-scroll="main"><div class="column">${page.split.main}</div></div></div>`;
   } else {
     const body = page.split ? `${page.split.side}${page.split.main}` : page.body;
-    content = `<div class="page-scroll" data-scroll="main"><div class="page-body ${page.narrow ? 'narrow' : ''}">${body}</div></div>`;
+    content = `<div class="page-scroll" data-scroll="main"><div class="page-body ${page.narrow ? 'narrow' : ''} ${page.fabMenu || page.toolbar ? 'fab-inset' : ''}">${body}</div></div>`;
   }
-  return `<div class="shell desktop ${app.railIsCollapsed ? 'rail-collapsed' : ''} ${app.railOverlays ? 'rail-overlays' : ''} ${app.railOpen ? 'rail-open' : ''}">
-    ${renderRail()}
-    <section class="page active desktop ${model.isChangingSession ? 'changing' : ''}" data-key="page-${esc(path)}" data-path="${esc(path)}">${toolbar}<div class="page-content">${content}${page.overlay ?? ''}</div></section>
-    <div class="global-search-slot" data-key="global-search">${globalSearchField()}</div>
+  const refresh = `<button class="icon-btn" data-action="refresh-all" ${model.isRefreshing ? 'disabled' : ''} aria-label="Aggiorna" title="Aggiorna i dati da Classeviva (Alt+R)">${model.isRefreshing ? loadingIndicator({ size: 'small' }) : icon('refresh')}</button>`;
+  const settings = `<button class="icon-btn" data-action="open-settings" aria-label="Impostazioni" title="Impostazioni">${icon('gear')}</button>`;
+  return `<div class="shell desktop ${app.railIsCollapsed ? 'rail-collapsed' : ''} ${app.railOverlays ? 'rail-overlays' : ''} ${app.railOpen ? 'rail-open' : ''} ${model.isChangingSession ? 'changing' : ''}">
+    <header class="top-bar">
+      <div class="top-lead">
+        <button class="icon-btn" data-action="toggle-rail" aria-label="${app.railIsCollapsed ? 'Espandi la barra di navigazione' : 'Riduci la barra di navigazione'}" title="${app.railIsCollapsed ? 'Espandi' : 'Riduci'}">${icon('menuOpen', { cls: app.railIsCollapsed ? 'flipped' : '' })}</button>
+        ${logo('top-logo')}</div>
+      <div class="top-search" data-key="global-search">${globalSearchField()}</div>
+      <div class="top-actions">${refresh}${settings}${accountAvatar('account-menu', 36)}</div>
+    </header>
+    <div class="shell-body">
+      ${renderRail()}
+      <section class="page active desktop" data-key="page-${esc(path)}" data-path="${esc(path)}">${toolbar}<div class="page-content">${content}${pageExtras(page)}</div></section>
+    </div>
   </div>`;
 }
 
@@ -488,24 +643,12 @@ function renderRail() {
       const s = sections[key];
       const badge = sectionBadge(model, key);
       const selected = current === key;
-      return `<button class="rail-item ${selected ? 'selected' : ''}" data-action="select-section" data-key-name="${key}" style="--tint:${s.tint}" title="${s.shortcut ? `${s.title} (Alt+${s.shortcut})` : s.title}" aria-current="${selected ? 'page' : 'false'}">
+      return `<button class="rail-item ${selected ? 'selected' : ''}" data-action="select-section" data-key-name="${key}" title="${s.shortcut ? `${s.title} (Alt+${s.shortcut})` : s.title}" aria-current="${selected ? 'page' : 'false'}">
         <span class="rail-indicator">${icon(selected && s.iconSelected ? s.iconSelected : s.icon)}${badge ? `<span class="badge">${badge}</span>` : ''}</span><span class="rail-label">${esc(s.title)}</span>${badge ? `<span class="rail-count">${badge}</span>` : ''}</button>`;
     }).join('');
-    return `<div class="rail-group">${group.title ? `<h2>${esc(group.title)}</h2>` : (index ? '<hr>' : '')}${rows}</div>`;
+    return `<div class="rail-group">${group.title ? `<h2>${esc(group.title)}</h2>` : ''}${index ? '<hr>' : ''}${rows}</div>`;
   }).join('');
-  const subtitle = model.isDemo ? 'Modalità demo'
-    : (model.classDescription ? model.classDescription.charAt(0) + model.classDescription.slice(1).toLowerCase() : (model.card?.schoolDescription ?? 'Classeviva'));
-  return `<aside class="rail">
-    <div class="rail-header">
-      <button class="icon-btn" data-action="toggle-rail" aria-label="${app.railIsCollapsed ? 'Espandi la barra laterale' : 'Riduci la barra laterale'}" title="${app.railIsCollapsed ? 'Espandi' : 'Riduci'}">${icon(app.railIsCollapsed ? 'sidebar' : 'menuOpen')}</button>
-      ${logo('rail-logo')}
-    </div>
-    <nav class="rail-scroll" data-scroll="rail" aria-label="Sezioni">${groups}</nav>
-    <button class="rail-account" data-action="account-menu" title="Account">
-      ${avatar(model.initials, { size: 40, shapeName: 'cookie9Sided' })}
-      <span class="rail-account-text"><strong>${esc(model.displayName)}</strong><small>${esc(subtitle)}</small></span>
-      ${icon('chevronUpDown', { cls: 'small' })}</button>
-  </aside><div class="rail-scrim" data-action="toggle-rail"></div>`;
+  return `<aside class="rail"><nav class="rail-scroll" data-scroll="rail" aria-label="Sezioni">${groups}</nav></aside><div class="rail-scrim" data-action="toggle-rail"></div>`;
 }
 
 // MARK: Sovrapposizioni
@@ -527,6 +670,7 @@ function renderOverlays() {
       </div></div>`;
   }
   if (app.viewer) html += renderViewer(app.viewer);
+  if (app.datePicker) html += renderDatePicker(app.datePicker);
   if (app.dialog) {
     const d = app.dialog;
     // Dialoghi con più scelte (`actions`) oppure conferma/annulla.
@@ -604,6 +748,29 @@ function applyThemeColor() {
 
 const shellActions = {
   'noop': () => {},
+  'search-open': () => openSearch(),
+  'search-close': () => closeSearch(),
+  'search-key': (ctx, el, event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      closeSearch();
+    } else if (event.key === 'Enter') {
+      el.blur();
+    }
+  },
+  'fab-toggle': () => { app.fabOpen = !app.fabOpen; navigator.vibrate?.(4); },
+  'fab-run': (ctx, el) => {
+    app.fabOpen = false;
+    dispatch(el.dataset.run, el, null);
+  },
+  'open-settings': () => {
+    selectSection('you');
+    if (currentPath() !== 'settings') navigate('settings');
+  },
+  'toggle-section': (ctx, el) => {
+    ctx.prefs.toggleCollapsed(el.dataset.section);
+    navigator.vibrate?.(4);
+  },
   'select-section': (ctx, el) => selectSection(el.dataset.keyName),
   'nav-back': () => back(),
   'navigate': (ctx, el) => navigate(el.dataset.to),
@@ -698,7 +865,6 @@ const shellActions = {
     app.lockError = ok ? null : 'Codice errato.';
     app.update();
   },
-  'cal-expand': () => expandCalendar(),
 };
 
 /** Menu dell'account attivo in fondo alla barra laterale. */
@@ -712,14 +878,14 @@ function accountMenuItems(ctx) {
   items.push({ label: 'Aggiungi account…', icon: 'userPlus', run: () => commonActions['add-account'](ctx) });
   if (!model.isDemo) items.push({ label: 'Prova la demo', icon: 'sparkles', run: () => model.startDemo() });
   items.push({ divider: true });
-  items.push({ label: 'Il tuo profilo', icon: 'userCircle', run: () => selectSection('you') });
-  items.push({ label: 'Impostazioni…', icon: 'gear', run: () => { selectSection('you'); navigate('settings'); } });
+  items.push({ label: 'Gestisci account', icon: 'manageAccounts', run: () => { selectSection('you'); if (currentPath() !== 'account') navigate('account'); } });
+  items.push({ label: 'Impostazioni', icon: 'gear', run: () => shellActions['open-settings']() });
   items.push({ divider: true });
   items.push({ label: model.isDemo ? 'Esci dalla demo…' : 'Esci da questo account…', icon: 'logout', run: () => commonActions['sign-out'](ctx) });
   return items;
 }
 
-const allActions = { ...shellActions, ...viewerActions(app), ...commonActions, ...loginActions };
+const allActions = { ...shellActions, ...viewerActions(app), ...datePickerActions(app), ...commonActions, ...loginActions };
 for (const view of Object.values(routes)) Object.assign(allActions, view.actions ?? {});
 
 function dispatch(name, el, event) {
@@ -739,13 +905,6 @@ root.addEventListener('click', (event) => {
   if (suppressClick) {
     suppressClick = false;
     event.preventDefault();
-    return;
-  }
-  // Toccando il calendario ridotto si riapre (come la striscia della settimana su iPhone).
-  const float = event.target.closest('.cal-float.collapsed');
-  if (float) {
-    event.preventDefault();
-    expandCalendar();
     return;
   }
   const el = event.target.closest('[data-action]');
@@ -854,69 +1013,32 @@ root.addEventListener('touchend', (event) => {
   if (!swipe) return;
   const { el, dx, decided, start } = swipe;
   swipe = null;
-  if (el.dataset.daySwipe) {
-    el.style.transform = '';
-    el.style.transition = '';
-  }
-  if (decided !== 'h') return;
   const velocity = dx / Math.max(1, performance.now() - start) * 1000;
   const width = el.clientWidth || window.innerWidth;
-  const passes = el.dataset.daySwipe ? Math.abs(dx + 0.15 * velocity) > width * 0.3 : Math.abs(dx) >= 50;
+  const passes = decided === 'h' && (el.dataset.daySwipe ? Math.abs(dx + 0.15 * velocity) > width * 0.3 : Math.abs(dx) >= 50);
+  if (el.dataset.daySwipe) {
+    // Se il giorno cambia, la pagina vecchia esce da dove l'ha lasciata il dito (vedi
+    // `animateAxisExits`) e il contenitore torna subito al suo posto; altrimenti ci torna con la molla.
+    el.style.transition = passes ? 'none' : '';
+    el.style.transform = '';
+    if (passes) {
+      void el.offsetWidth;
+      el.style.transition = '';
+      swipeRelease = dx;
+    }
+  }
   if (!passes) return;
   navigator.vibrate?.(6);
   dispatch(el.dataset.daySwipe || el.dataset.swipe, { dataset: { delta: dx < 0 ? '1' : '-1' } }, event);
 }, { passive: true });
 
-// MARK: - Scorrimento: barra superiore, calendario che si riduce e "trascina per aggiornare"
-
-/** Avanzamento della riduzione del calendario galleggiante (0 = intero, 1 = ridotto). */
-function applyCollapse() {
-  const float = root.querySelector('.page.active .cal-float');
-  if (!float) return;
-  const scroller = float.parentElement.querySelector('.page-scroll');
-  const range = float.offsetHeight ? parseFloat(getComputedStyle(float).getPropertyValue('--range')) || 0 : 0;
-  const p = range ? Math.min(1, Math.max(0, scroller.scrollTop / range)) : 0;
-  float.style.setProperty('--p', p.toFixed(4));
-  float.classList.toggle('collapsed', p > 0.5);
-  float.classList.toggle('expanded', p === 0);
-  const passed = p >= 0.5;
-  if (float._passed !== undefined && float._passed !== passed && touching) navigator.vibrate?.(8);
-  float._passed = passed;
-}
-
-export function expandCalendar() {
-  const scroller = pageScroller();
-  scroller?.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-let touching = false;
-root.addEventListener('touchstart', () => { touching = true; }, { passive: true, capture: true });
-root.addEventListener('touchend', () => { touching = false; scheduleSnap(); }, { passive: true, capture: true });
-
-let snapTimer = null;
-/** Il calendario scatta tra intero e ridotto quando lo scorrimento si ferma a metà strada. */
-function scheduleSnap() {
-  clearTimeout(snapTimer);
-  snapTimer = setTimeout(() => {
-    if (touching) return;
-    const float = root.querySelector('.page.active .cal-float');
-    if (!float) return;
-    const scroller = float.parentElement.querySelector('.page-scroll');
-    const range = parseFloat(getComputedStyle(float).getPropertyValue('--range')) || 0;
-    const top = scroller.scrollTop;
-    if (top > 0 && top < range) scroller.scrollTo({ top: top / range < 0.5 ? 0 : range, behavior: 'smooth' });
-  }, 140);
-}
+// MARK: - Scorrimento: barra superiore e "trascina per aggiornare"
 
 root.addEventListener('scroll', (event) => {
   const el = event.target;
   if (!(el instanceof Element) || !el.matches('[data-scroll]')) return;
   const page = el.closest('.page');
   if (!page) return;
-  if (el.matches('.page.mobile .page-scroll')) {
-    applyCollapse();
-    if (page.querySelector('.cal-float')) scheduleSnap();
-  }
   // Uno scorrimento fatto dall'app (es. l'Orario che va alla prima ora) non cambia la barra.
   if (quietScrollers.delete(el)) return;
   updateBarState(page, { canTint: true });
@@ -992,10 +1114,13 @@ const shortcutSections = Object.entries(sections).filter(([, s]) => s.shortcut);
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     if (app.menu) app.menu = null;
+    else if (app.datePicker) app.datePicker = null;
     else if (app.dialog) app.dialog = null;
     else if (app.viewer) app.viewer = null;
     else if (app.sheet) closeSheet();
     else if (app.railOpen) app.railOpen = false;
+    else if (app.fabOpen) app.fabOpen = false;
+    else if (app.searching) closeSearch();
     app.update();
     return;
   }
@@ -1003,17 +1128,13 @@ document.addEventListener('keydown', (event) => {
     app.update();
     return;
   }
-  if (model.phase !== 'signedIn' || Lock.isLocked || app.sheet || app.dialog) return;
+  if (model.phase !== 'signedIn' || Lock.isLocked || app.sheet || app.dialog || app.datePicker) return;
   const typing = event.target.closest?.('input, textarea, select');
   if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.code === 'KeyF') {
-    // Come il comando Cerca del Mac (⌘F): mette il cursore nel campo di ricerca.
+    // Ctrl+F (⌘F): mette il cursore nel campo di ricerca.
     event.preventDefault();
-    if (app.wide) {
-      root.querySelector('.global-search input')?.focus();
-    } else {
-      selectSection('search');
-      requestAnimationFrame(() => root.querySelector('.page-search input')?.focus());
-    }
+    if (app.wide) root.querySelector('.global-search input')?.focus();
+    else openSearch();
     return;
   }
   const route = parsePath(currentPath()).name;
@@ -1092,6 +1213,10 @@ async function start() {
   if (model.preferences.get('useLock') && model.phase === 'signedIn') Lock.lock();
   Reminders.start();
   render();
+  // La lezione in corso e la linea dell'ora nell'Orario seguono l'orologio.
+  setInterval(() => {
+    if (model.phase === 'signedIn' && document.visibilityState === 'visible' && !app.sheet) app.update();
+  }, 30_000);
   if (Lock.isLocked && Lock.method === 'passkey') shellActions['lock-unlock']();
 }
 
