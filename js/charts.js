@@ -68,10 +68,11 @@ function render(spec, width) {
   const y = (v) => top + (1 - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * plotH;
 
   let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${spec.label ?? 'Grafico'}">`;
-  svg += `<defs><linearGradient id="g-${spec.id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".25"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`;
+  // Fascia dell'insufficienza, nel contenitore rosso.
+  if (spec.band) svg += `<rect x="0" y="${y(6)}" width="${plotW}" height="${y(lo) - y(6)}" class="chart-band"/>`;
   for (const tick of ticks) {
     svg += `<line x1="0" x2="${plotW}" y1="${y(tick)}" y2="${y(tick)}" class="chart-grid"/>`;
-    svg += `<text x="${plotW + 6}" y="${y(tick) + 3.5}" class="chart-label">${tick}</text>`;
+    svg += `<text x="${plotW + 8}" y="${y(tick) + 3.5}" class="chart-label">${tick}</text>`;
   }
   if (spec.monthAxis) {
     for (let m = addMonths(startOfMonth(new Date(t0)), 1); m.getTime() <= t1; m = addMonths(m, 1)) {
@@ -80,19 +81,24 @@ function render(spec, width) {
       svg += `<text x="${mx}" y="${height - 4}" class="chart-label" text-anchor="middle">${fmt.monthShort(m)}</text>`;
     }
   }
-  // Linea della sufficienza.
-  svg += `<line x1="0" x2="${plotW}" y1="${y(6)}" y2="${y(6)}" class="chart-rule"/>`;
+  // Linea della sufficienza (con la fascia non serve).
+  if (!spec.band) svg += `<line x1="0" x2="${plotW}" y1="${y(6)}" y2="${y(6)}" class="chart-rule"/>`;
   if (line.length) {
     const pts = line.map((p) => ({ x: x(p.date), y: y(p.value) }));
     const path = monotonePath(pts);
     if (area) {
       const base = y(lo);
-      svg += `<path d="${path} L${pts[pts.length - 1].x.toFixed(1)},${base} L${pts[0].x.toFixed(1)},${base} Z" fill="url(#g-${spec.id})"/>`;
+      svg += `<path d="${path} L${pts[pts.length - 1].x.toFixed(1)},${base} L${pts[0].x.toFixed(1)},${base} Z" fill="${color}" fill-opacity=".1"/>`;
     }
     svg += `<path d="${path}" fill="none" stroke="${color}" stroke-width="${spec.lineWidth ?? 2.5}" stroke-linecap="round" stroke-linejoin="round"/>`;
   }
   for (const dot of dots) {
-    svg += `<circle cx="${x(dot.date)}" cy="${y(dot.value)}" r="4.4" fill="${dot.color}"><title>${dot.title ?? ''}</title></circle>`;
+    svg += `<circle cx="${x(dot.date)}" cy="${y(dot.value)}" r="6" fill="${dot.color}" class="chart-dot"><title>${dot.title ?? ''}</title></circle>`;
+  }
+  // L'ultimo valore: un punto grande con l'anello del colore della card.
+  if (spec.lastDot && line.length) {
+    const p = line[line.length - 1];
+    svg += `<circle cx="${x(p.date)}" cy="${y(p.value)}" r="7" fill="${color}" class="chart-dot"/>`;
   }
   return svg + '</svg>';
 }

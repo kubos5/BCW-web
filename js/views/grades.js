@@ -2,14 +2,14 @@
 // filtrabili per materia e periodo), elenco delle materie e dettaglio di ogni materia.
 
 import {
-  card, cardGrid, chipRow, chipDivider, filterChip, averageRing, eyebrow, gradeBadge, subjectTag, detailRow,
-  collapsible, chevron, statusBanner, emptyState, segmented, sectionHeader, gradeColor, gradeColorValue,
-  subjectColor, stepper,
+  chipRow, filterChip, averageRing, gradeBadge, subjectTag, detailRow, collapsible, chevron, statusBanner, emptyState,
+  sectionHeader, gradeColor, gradeColorValue, subjectColor, stepper, listGroup, statusChip, connectedGroup, primaryTabs, axisPage,
 } from '../components.js';
 import { chartPlaceholder } from '../charts.js';
 import { icon } from '../icons.js';
+import { shape } from '../shapes.js';
 import { GradeBook } from '../gradebook.js';
-import { esc, fmt, GradeFormat, byName } from '../util.js';
+import { esc, fmt, GradeFormat, byName, groupBy, startOfMonth } from '../util.js';
 
 function bookState(ctx, key) {
   return ctx.state(key, () => ({ section: 'recent', period: null, subject: null, expanded: new Set() }));
@@ -45,28 +45,29 @@ export const grades = {
       };
     }
 
-    const picker = segmented([['recent', 'Ultimi voti'], ['subjects', 'Materie']], s.section, 'grades-section', { compact: ctx.wide });
-    const list = s.section === 'recent' ? recentList(ctx, book, s, 'grades') : subjectList(ctx, book, s);
-    const hero = averageHero(book, s.period);
+    const tabs = primaryTabs([['recent', 'Ultimi voti'], ['subjects', 'Materie']], s.section, 'grades-section');
+    // Asse condiviso orizzontale tra le schede: gli ultimi voti a sinistra, le materie a destra.
+    const list = axisPage('grades-tab', s.tabDir ?? 0, `tab-${s.section}`,
+      s.section === 'recent' ? recentList(ctx, book, s, 'grades') : subjectList(ctx, book, s));
+    const hero = averageHero(book, s.period, { size: ctx.wide ? 168 : 188 });
     const trend = trendCard(book, s.period, s.subject);
+    const lists = `<div class="stack gap-16">${tabs}${filters(book, s)}${list}</div>`;
     if (ctx.wide) {
-      return {
-        title: 'Voti', actions, refresh,
-        split: { sideWidth: 350, side: hero + trend, main: banner + picker + filters(book, s) + list },
-      };
+      return { title: 'Voti', actions, refresh, split: { sideWidth: 380, side: hero + trend, main: banner + lists } };
     }
-    return {
-      title: 'Voti', actions, refresh,
-      body: `<div class="stack gap-20">${banner}${hero}${trend}${picker}${filters(book, s)}${list}</div>`,
-    };
+    return { title: 'Voti', actions, refresh, body: `<div class="stack gap-24">${banner}${hero}${trend}${lists}</div>` };
   },
 
   actions: {
-    'grades-section': (ctx, el) => { bookState(ctx, 'grades').section = el.dataset.value; },
+    'grades-section': (ctx, el) => {
+      const s = bookState(ctx, 'grades');
+      if (s.section === el.dataset.value) return;
+      s.tabDir = el.dataset.value === 'subjects' ? 1 : -1;
+      s.section = el.dataset.value;
+    },
     'grades-period': (ctx, el) => {
       const s = bookState(ctx, el.dataset.scope ?? 'grades');
-      const value = numberOrNull(el.dataset.value);
-      s.period = el.dataset.toggle && s.period === value ? null : value;
+      s.period = numberOrNull(el.dataset.value);
     },
     'grades-subject-menu': (ctx, el) => {
       const s = bookState(ctx, 'grades');
@@ -76,6 +77,7 @@ export const grades = {
       }
       ctx.openMenu(el, items, { align: 'start' });
     },
+    'grades-subject-clear': (ctx) => { bookState(ctx, 'grades').subject = null; },
     'grades-filter-menu': (ctx, el) => {
       const s = bookState(ctx, 'grades');
       const book = ctx.model.gradeBook;
@@ -106,72 +108,87 @@ export const grades = {
   },
 };
 
+/** Filtro per materia (il periodo si sceglie con il gruppo di pulsanti della media). */
 function filters(book, s) {
-  const periods = book.activePeriods.map((p) => filterChip(p.name, {
-    selected: s.period === p.position, action: 'grades-period', params: { value: p.position, toggle: 1 },
-  })).join('');
   const subject = allSubjects(book).find((x) => x.id === s.subject);
-  return chipRow(filterChip("Tutto l'anno", { selected: s.period == null, action: 'grades-period', params: { value: '' } }) +
-    periods + chipDivider() +
-    filterChip(subject?.name ?? 'Materia', { iconName: 'library', trailingIcon: 'chevronDown', selected: s.subject != null, action: 'grades-subject-menu' }));
+  return chipRow(filterChip(subject?.name ?? 'Tutte le materie', { iconName: subject ? 'check' : 'library', trailingIcon: 'chevronDown', selected: s.subject != null, action: 'grades-subject-menu' }) +
+    (subject ? filterChip('Rimuovi filtro', { iconName: 'x', action: 'grades-subject-clear' }) : ''));
 }
 
+/** Ultimi voti divisi per mese, ognuno in una lista segmentata. */
 function recentList(ctx, book, s, scope) {
   const list = book.gradesIn(s.period)
     .filter((g) => s.subject == null || g.subjectId === s.subject)
     .sort((a, b) => b.date - a.date);
   if (!list.length) return emptyState('Nessun voto', 'filter', 'Nessun voto corrisponde ai filtri selezionati.');
-  return cardGrid(list.map((g) => gradeCard(g, book, s.expanded.has(g.id), scope)).join(''), 340);
+  const months = [...groupBy(list, (g) => startOfMonth(g.date).getTime()).entries()].sort(([a], [b]) => b - a);
+  return `<div class="stack gap-20">${months.map(([time, items]) => listGroup(items.map((g) => gradeCard(g, book, s.expanded.has(g.id), scope)),
+    { header: fmt.monthYear(new Date(time)), attrs: ` data-key="gm-${time}"` })).join('')}</div>`;
 }
 
 function subjectList(ctx, book, s) {
   const target = ctx.prefs.targetAverage;
   const subjects = book.subjects(s.period).filter((x) => s.subject == null || x.subjectId === s.subject);
-  return cardGrid(subjects.map((summary) => subjectRow(summary, target)).join(''), 300);
+  return listGroup(subjects.map((summary) => subjectRow(summary, target)));
 }
 
 // MARK: - Media generale
 
-function averageHero(book, period) {
+/**
+ * La media in primo piano: un grande indicatore circolare ondulato al centro, sotto il periodo e
+ * lo stato delle insufficienze; poi i periodi in un gruppo di pulsanti collegati, ognuno con la
+ * sua media (quello scelto cambia la media mostrata e i voti sotto).
+ */
+function averageHero(book, period, { size = 188 } = {}) {
   const average = book.average(period);
-  const periodName = period == null ? "Tutto l'anno" : (book.activePeriods.find((p) => p.position === period)?.name ?? "Tutto l'anno");
+  const periodName = period == null ? null : book.activePeriods.find((p) => p.position === period)?.name;
   const count = book.gradesIn(period).filter((g) => g.countsTowardAverage).length;
   const insufficient = book.subjects(period).filter((x) => (x.average ?? 10) < 6).length;
   const status = insufficient
-    ? `<span class="status-line" style="color:var(--poor)">${icon('alertTriangleFill')}${insufficient === 1 ? '1 insufficienza' : `${insufficient} insufficienze`}</span>`
-    : `<span class="status-line" style="color:var(--good)">${icon('checkSealFill')}Nessuna insufficienza</span>`;
-  const tiles = book.activePeriods.map((p) => {
-    const avg = book.average(p.position);
-    const selected = period === p.position;
-    return `<button class="period-tile ${selected ? 'selected' : ''}" data-action="grades-period" data-value="${p.position}" data-toggle="1" aria-pressed="${selected}">
-      ${averageRing(avg, { size: 30, lineWidth: 4, showsLabel: false })}
-      <span><small>${esc(p.name)}</small><strong class="numeral">${GradeFormat.average(avg)}</strong></span></button>`;
-  }).join('');
-  return card(`<div class="hero">${averageRing(average, { size: 118, lineWidth: 9 })}
-      <div class="hero-text">${eyebrow(period == null ? 'Media generale' : 'Media del periodo')}
-        <h2>${esc(periodName)}</h2><p>${count} voti che fanno media</p>${status}</div></div>
-    ${tiles ? `<div class="period-tiles">${tiles}</div>` : ''}`, { padding: 18 });
+    ? statusChip(insufficient === 1 ? '1 insufficienza' : `${insufficient} insufficienze`, 'alertTriangleFill', 'poor')
+    : statusChip('Nessuna insufficienza', 'checkSealFill', 'good');
+  const periods = book.activePeriods.length
+    ? connectedGroup([[null, 'Anno'], ...book.activePeriods.map((p) => [p.position, p.name])].map(([value, name]) =>
+      [value, `<span class="cg-stack"><small>${esc(name)}</small><strong class="numeral">${GradeFormat.average(book.average(value))}</strong></span>`]),
+    period, 'grades-period', { height: 64 })
+    : '';
+  return `<div class="average-hero">
+    <div class="ah-main">${averageRing(average, { size, lineWidth: size >= 180 ? 14 : 12 })}
+      <div class="ah-text"><h2>${esc(periodName ? `Media del ${periodName.toLowerCase()}` : 'Media generale')}</h2>
+      <p>${count === 1 ? '1 voto che fa media' : `${count} voti che fanno media`}</p></div>${status}</div>
+    ${periods}</div>`;
 }
 
 // MARK: - Andamento
 
+/**
+ * Andamento della media in stile Material 3 Expressive: linea spessa e arrotondata nel colore
+ * primario con l'area tonale sotto, la fascia dell'insufficienza nel contenitore rosso e
+ * l'ultimo valore segnato da un punto grande; in alto la media in grande e la variazione.
+ */
 function trendCard(book, period, subjectId) {
   const points = book.runningAverage(subjectId, period);
   if (points.length < 2) return '';
-  const delta = points[points.length - 1].value - points[0].value;
+  const last = points[points.length - 1];
+  const delta = last.value - points[0].value;
   const chart = chartPlaceholder('trend', {
     id: 'trend',
-    height: 150,
+    height: 160,
     domain: [3, 10],
     ticks: [4, 6, 8, 10],
     line: points,
+    lineWidth: 4,
+    color: 'var(--primary)',
     area: true,
+    band: true,
+    lastDot: true,
     monthAxis: true,
     label: 'Andamento della media',
-    signature: `${period}|${subjectId}|${points.length}|${points[points.length - 1].value}|${book.weighted}|${book.mode}`,
+    signature: `${period}|${subjectId}|${points.length}|${last.value}|${book.weighted}|${book.mode}`,
   });
-  return card(`<div class="row-between">${eyebrow('Andamento della media')}
-    <span class="delta" style="color:${delta >= 0 ? 'var(--good)' : 'var(--poor)'}">${icon(delta >= 0 ? 'arrowUpRight' : 'arrowDownRight')}${GradeFormat.average(Math.abs(delta))}</span></div>${chart}`);
+  return `<div class="card trend-card"><div class="trend-head"><div><span class="trend-label">Andamento della media</span>
+    <div class="trend-value"><strong class="numeral">${GradeFormat.average(last.value)}</strong><span>ultimo voto</span></div></div>
+    ${statusChip(`${delta >= 0 ? '+' : '−'}${GradeFormat.average(Math.abs(delta))}`, delta >= 0 ? 'trendingUp' : 'trendingDown', delta >= 0 ? 'good' : 'poor')}</div>${chart}</div>`;
 }
 
 // MARK: - Righe
@@ -186,6 +203,7 @@ function impact(grade, book) {
   return avgAfter - avgBefore;
 }
 
+/** Voto in una lista segmentata: si apre per i dettagli e l'effetto sulla media. */
 export function gradeCard(grade, book, expanded, scope) {
   let details = '';
   if (grade.notes) details += `<div class="note-box">${esc(grade.notes)}</div>`;
@@ -204,20 +222,19 @@ export function gradeCard(grade, book, expanded, scope) {
         <strong style="color:${delta >= 0 ? 'var(--good)' : 'var(--poor)'}" class="delta">${icon(delta >= 0 ? 'arrowUp' : 'arrowDown')}${GradeFormat.average(Math.abs(delta))}</strong></div>`;
     }
   }
-  return card(`<button class="grade-head" data-action="grade-expand" data-id="${grade.id}" data-scope="${scope}" aria-expanded="${expanded}">
+  return `<div class="grade-cell ${expanded ? 'expanded' : ''}" data-key="g-${grade.id}"><button class="grade-head" data-action="grade-expand" data-id="${grade.id}" data-scope="${scope}" aria-expanded="${expanded}">
       ${gradeBadge(grade, 50)}
       <span class="grow">${subjectTag(grade.subjectName, grade.subjectId)}
         <span class="row-sub">${esc(grade.kind)} · ${esc(fmt.shortDay(grade.date))}</span>
         ${grade.notes && !expanded ? `<span class="row-note">${esc(grade.notes)}</span>` : ''}</span>
       ${chevron(!expanded, { rotateUp: true })}</button>
-    ${collapsible(expanded, `<div class="stack gap-10">${details}</div>`, { spacing: 14 })}`,
-  { padding: 14, cls: 'grade-card', attrs: ` data-key="g-${grade.id}"` });
+    ${collapsible(expanded, `<div class="stack gap-10">${details}</div>`, { spacing: 14 })}</div>`;
 }
 
-function subjectRow(summary, target) {
+function subjectRow(summary) {
   const chips = summary.grades.slice(0, 6).map((g) =>
     `<span class="mini-grade" style="--tint:${gradeColor(g)}">${esc(g.displayValue)}</span>`).join('');
-  return `<button class="card subject-row" style="--pad:14px" data-action="open-subject" data-id="${summary.subjectId}" data-key="s-${summary.subjectId}">
+  return `<button class="list-item subject-row" data-action="open-subject" data-id="${summary.subjectId}" data-key="s-${summary.subjectId}">
     ${averageRing(summary.average, { size: 52, lineWidth: 5 })}
     <span class="grow"><strong>${esc(summary.name)}</strong><span class="mini-grades">${chips}</span></span>
     ${icon('chevronRight', { cls: 'chev-right' })}</button>`;
@@ -235,47 +252,41 @@ export function subjectDetail(ctx, subjectId) {
   let teachers = model.subjects.find((x) => x.id === subjectId)?.teachers ?? [];
   if (!teachers.length) teachers = [...new Set(list.map((g) => g.teacherName).filter(Boolean))].sort(byName);
 
+  // La media della materia in primo piano, al centro, con docenti e voto migliore e peggiore.
   const values = list.filter((g) => g.countsTowardAverage).map((g) => g.value);
-  const header = card(`<div class="hero">${averageRing(GradeBook.average(list, book.weighted), { size: 96, lineWidth: 8 })}
-    <div class="hero-text">${eyebrow('Media di materia', subjectColor(subjectId))}<h2>${esc(name)}</h2>
-      ${teachers.length ? `<p>${esc(teachers.join(', '))}</p>` : ''}
-      ${values.length ? `<span class="best-worst"><span style="color:var(--good)">${icon('arrowUp')}${GradeFormat.short(Math.max(...values))}</span>
-        <span style="color:var(--poor)">${icon('arrowDown')}${GradeFormat.short(Math.min(...values))}</span></span>` : ''}</div></div>`, { padding: 18 });
+  const header = `<div class="average-hero subject"><div class="ah-main">${averageRing(GradeBook.average(list, book.weighted), { size: 156, lineWidth: 12 })}
+    <div class="ah-text"><h2>${esc(name)}</h2>${teachers.length ? `<p>${esc(teachers.join(', '))}</p>` : ''}</div>
+    ${values.length ? `<div class="chip-flow center">${statusChip(`Migliore ${GradeFormat.short(Math.max(...values))}`, 'arrowUp', 'good')}${statusChip(`Peggiore ${GradeFormat.short(Math.min(...values))}`, 'arrowDown', 'poor')}</div>` : ''}</div></div>`;
 
   const periodPicker = book.activePeriods.length > 1
-    ? segmentedPeriods(book, s.period, `subject-${subjectId}`) : '';
+    ? connectedGroup([[null, 'Anno'], ...book.activePeriods.map((p) => [p.position, p.name])].map(([value, label]) => [value, `<span>${esc(label)}</span>`]),
+      s.period, 'grades-period', { height: 48, params: { scope: `subject-${subjectId}` } })
+    : '';
 
   const sorted = list.filter((g) => g.countsTowardAverage).sort((a, b) => a.date - b.date);
   const running = book.runningAverage(subjectId, s.period);
-  const chart = sorted.length >= 2 ? card(eyebrow('Voti e media') + chartPlaceholder(`subject-${subjectId}`, {
+  const chart = sorted.length >= 2 ? `<div class="card trend-card"><span class="card-title">Voti e media</span>${chartPlaceholder(`subject-${subjectId}`, {
     id: `subject-${subjectId}`,
     height: 170,
     domain: [2, 10],
     ticks: [2, 4, 6, 8, 10],
     line: running,
-    lineWidth: 2,
+    lineWidth: 4,
+    band: true,
     color: subjectColor(subjectId),
     dots: sorted.map((g) => ({ date: g.date, value: g.value, color: gradeColor(g), title: `${g.displayValue} · ${fmt.shortDay(g.date)}` })),
     label: `Voti di ${name}`,
     signature: `${s.period}|${sorted.length}|${running.at(-1)?.value}|${book.weighted}`,
-  }), { cls: 'stack gap-12' }) : '';
+  })}</div>` : '';
 
   const goal = goalCalculator(ctx, list, book.weighted);
-  const gradesHeader = sectionHeader('Voti', { subtitle: `${list.length} valutazioni` });
-  const gradeList = cardGrid(list.map((g) => gradeCard(g, book, s.expanded.has(g.id), `subject-${subjectId}`)).join(''), 340);
+  const gradesHeader = sectionHeader('Voti', { subtitle: list.length === 1 ? '1 valutazione' : `${list.length} valutazioni` });
+  const gradeList = listGroup(list.map((g) => gradeCard(g, book, s.expanded.has(g.id), `subject-${subjectId}`)));
 
   if (ctx.wide) {
-    return { title: name, inline: true, split: { sideWidth: 350, side: header + periodPicker + chart + goal, main: gradesHeader + gradeList } };
+    return { title: name, split: { sideWidth: 380, side: header + periodPicker + chart + goal, main: gradesHeader + gradeList } };
   }
-  return { title: name, inline: true, body: `<div class="stack gap-20">${header}${periodPicker}${chart}${goal}${gradesHeader}${gradeList}</div>` };
-}
-
-function segmentedPeriods(book, selected, scope) {
-  const options = [['', 'Anno'], ...book.activePeriods.map((p) => [p.position, p.name])];
-  return `<div class="segmented" role="tablist">${options.map(([value, label]) => {
-    const isSelected = String(selected ?? '') === String(value);
-    return `<button role="tab" class="${isSelected ? 'selected' : ''}" aria-selected="${isSelected}" data-action="grades-period" data-scope="${scope}" data-value="${value}">${esc(label)}</button>`;
-  }).join('')}</div>`;
+  return { title: name, body: `<div class="stack gap-20">${header}${periodPicker}${chart}${goal}<div class="stack gap-12">${gradesHeader}${gradeList}</div></div>` };
 }
 
 /** "Quanto devo prendere?": voto necessario per raggiungere una media obiettivo. */
@@ -292,8 +303,9 @@ function goalCalculator(ctx, list, weighted) {
     result = `<div class="row-between baseline"><span class="secondary">${s.upcoming === 1 ? 'Ti serve almeno' : 'Ti serve in media almeno'}</span>
       <span class="numeral big" style="color:${gradeColorValue(needed)}">${GradeFormat.average(needed)}</span></div>`;
   }
-  return card(`<div class="row-between">${eyebrow('Obiettivo')}<span style="color:var(--accent)">${icon('target')}</span></div>
+  return `<div class="card goal stack gap-14"><div class="goal-head"><span class="goal-art shaped">${shape('cookie9Sided')}${icon('target')}</span>
+      <span><strong>Obiettivo</strong><small>Quanto ti serve per arrivarci</small></span></div>
     <div class="row-between"><span>Media desiderata</span>${stepper(target, { action: 'goal-target', min: 4, max: 10, step: 0.25, format: GradeFormat.short })}</div>
     <div class="row-between"><span>Prossime prove</span>${stepper(s.upcoming, { action: 'goal-count', min: 1, max: 5, step: 1 })}</div>
-    <hr class="divider">${result}`, { cls: 'goal stack gap-14' });
+    <hr class="divider">${result}</div>`;
 }

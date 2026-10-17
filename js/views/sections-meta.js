@@ -1,6 +1,7 @@
 // Sezioni dell'app: le destinazioni principali (Dashboard, Orario, Voti, Tu) più le pagine che
-// su schermi stretti stanno dentro "Tu", con titolo, icona, colore e scorciatoia (come la barra
-// laterale del Mac). Su schermi larghi la ricerca non è una sezione: è il campo nella barra.
+// su schermi stretti stanno dentro "Tu", con titolo, icona, colore e scorciatoia (la barra di
+// navigazione espansa degli schermi larghi). La ricerca non è una sezione: è la barra in cima
+// alla Dashboard sui telefoni e il campo nella barra in alto sugli schermi larghi.
 
 export const sections = {
   dashboard: { title: 'Dashboard', icon: 'dashboard', iconSelected: 'dashboardFill', tint: 'var(--primary)', shortcut: '1' },

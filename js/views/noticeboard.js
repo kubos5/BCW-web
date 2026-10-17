@@ -2,7 +2,7 @@
 // risposta e anteprima degli allegati. Su schermi larghi elenco e dettaglio sono affiancati.
 
 import {
-  localSearchField, card, chipRow, filterChip, pill, eyebrow, iconBadge, loadingCard, statusBanner, emptyState, spinner, button,
+  localSearchField, card, chipRow, filterChip, pill, eyebrow, iconBadge, loadingCard, statusBanner, emptyState, spinner, button, listGroup,
 } from '../components.js';
 import { icon } from '../icons.js';
 import { contains, esc, fmt, uniqueSorted } from '../util.js';
@@ -28,7 +28,7 @@ export const noticeboard = {
     const model = ctx.model;
     if (ctx.route.param) {
       const notice = model.notices.find((n) => String(n.id) === ctx.route.param);
-      return { title: ctx.wide ? 'Comunicazione' : '', inline: true, body: notice ? noticeDetail(ctx, notice) : emptyState('Comunicazione non trovata', 'megaphone') };
+      return { title: ctx.wide ? 'Comunicazione' : '', body: notice ? noticeDetail(ctx, notice) : emptyState('Comunicazione non trovata', 'megaphone') };
     }
     const s = listState(ctx);
     const unread = model.unreadNoticesCount;
@@ -132,13 +132,13 @@ function list(ctx, isSplit) {
       ? emptyState('Nessun risultato', 'megaphone', 'Prova a cambiare i filtri.')
       : emptyState('Bacheca vuota', 'megaphone', 'Le comunicazioni della scuola appariranno qui.')}</div>`;
   }
-  return `<div class="stack gap-16">${chips}<div class="stack gap-10">${items.map((n) => noticeRow(n, isSplit && s.selection === n.id)).join('')}</div></div>`;
+  return `<div class="stack gap-16">${chips}<div class="list-group">${items.map((n) => noticeRow(n, isSplit && s.selection === n.id)).join('')}</div></div>`;
 }
 
 function noticeRow(notice, selected) {
   const action = notice.requiresAction
     ? pill(notice.needsSign ? 'Da firmare' : (notice.needsJoin ? 'Adesione' : 'Risposta'), { color: 'var(--fair)', cls: 'small' }) : '';
-  return `<button class="card notice-row ${notice.isRead ? '' : 'unread'} ${selected ? 'selected' : ''}" style="--pad:14px" data-action="notice-open" data-id="${notice.id}" data-key="n-${notice.id}">
+  return `<button class="list-item notice-row ${notice.isRead ? '' : 'unread'} ${selected ? 'selected' : ''}" data-action="notice-open" data-id="${notice.id}" data-key="n-${notice.id}">
     <span class="unread-dot"></span>
     <span class="grow"><span class="notice-title">${esc(notice.title)}</span>
       <span class="notice-meta"><span class="category">${esc(notice.category)}</span>
@@ -173,9 +173,9 @@ export function noticeDetail(ctx, notice) {
 
   let attachments = '';
   if (notice.attachments.length) {
-    attachments = `<div class="stack gap-10">${eyebrow('Allegati')}${notice.attachments.map((a) => `<button class="card attachment" style="--pad:12px" data-action="notice-attachment" data-id="${notice.id}" data-number="${a.number}">
-      ${iconBadge('fileText', 'var(--neutral)', 34)}<span class="grow">${esc(a.fileName)}</span>
-      ${s.downloading === a.number ? spinner() : `<span style="color:var(--accent)">${icon('download')}</span>`}</button>`).join('')}</div>`;
+    attachments = listGroup(notice.attachments.map((a) => `<button class="list-item attachment" data-action="notice-attachment" data-id="${notice.id}" data-number="${a.number}">
+      ${iconBadge('fileText', 'var(--neutral)', 40)}<span class="li-text"><strong>${esc(a.fileName)}</strong></span>
+      ${s.downloading === a.number ? spinner() : `<span style="color:var(--primary)">${icon('download')}</span>`}</button>`), { header: 'Allegati' });
   }
 
   let actions = '';

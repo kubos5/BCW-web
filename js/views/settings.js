@@ -1,11 +1,11 @@
 // Impostazioni (Generale, Aspetto, Voti, Dashboard, Orario, Notifiche, Account) e pagina Account.
-// Sugli schermi stretti sono un elenco di sottopagine, su quelli larghi schede (come la
-// finestra Impostazioni del Mac).
+// Sugli schermi stretti sono un elenco di sottopagine, su quelli larghi elenco e dettaglio
+// affiancati.
 
-import { avatar, toggle, select, stepper, segmented, listGroup, listItem, iconBadge, pill } from '../components.js';
+import { avatar, toggle, select, stepper, listGroup, listItem, iconBadge, pill } from '../components.js';
 import { icon } from '../icons.js';
 import { AverageMode } from '../gradebook.js';
-import { AppearanceMode, DashboardMode, TitleAbbreviation, NewsKind } from '../prefs.js';
+import { AppearanceMode, DashboardMode, NewsKind } from '../prefs.js';
 import { Reminders } from '../reminders.js';
 import { Lock } from '../lock.js';
 import { AccentPresets, ColorStyle, Contrast, Corners, Motion, RoundedText, DEFAULT_ACCENT, normalizeHex, loadColorLibrary, swatchColors, Theme } from '../theme.js';
@@ -19,7 +19,7 @@ import { requestAlignment } from './timetable.js';
 import { esc, fmt, GradeFormat, sentenceCased, nameCased, startOfDay } from '../util.js';
 import { proxySheet } from './login.js';
 
-export const VERSION = '2.1';
+export const VERSION = '3.0';
 
 // MARK: - Mattoni del modulo
 
@@ -158,12 +158,9 @@ function dashboardPane(ctx) {
   return section([
     row('Vista', select(Object.entries(DashboardMode).map(([k, v]) => [k, v.title]), p.dashboardMode, 'pref-dashboard-mode', { label: 'Vista' })),
     toggleRow('Mostra "Nei prossimi giorni"', p.showUpcomingDays, 'pref-upcoming'),
-    ctx.wide ? '' : row('Abbrevia il titolo', select(Object.entries(TitleAbbreviation), p.get('titleAbbreviation'), 'pref-abbreviation', { label: 'Abbrevia il titolo' })),
   ], {
     header: 'Dashboard',
-    footer: ctx.wide
-      ? 'La vista Calendario mostra il mese intero accanto al giorno scelto; la vista Lista la sola settimana.'
-      : 'Il titolo abbreviato mostra la data in forma breve (es. "Gio 1 ott"). In automatico si abbrevia solo se il nome completo non entra.',
+    footer: 'La vista Lista mostra in alto la settimana, la vista Calendario il mese intero. "Nei prossimi giorni" sui telefoni c\'è nella vista Lista.',
   });
 }
 
@@ -176,14 +173,14 @@ function timetablePane(ctx) {
     toggleRow('Mostra le verifiche nella lista', p.timetableShowsTests, 'pref-tt-tests', { iconName: 'test' }),
   ], {
     header: 'Vista e allineamento',
-    footer: 'Con "Mostra le verifiche" la vista Lista segna le verifiche di Classeviva e quelle segnate a mano; si vedono sempre nel dettaglio dell\'evento e nella vista Giorno. Quelle nascoste, e le regole per nasconderle in automatico, sono in Verifiche nascoste (menu dell\'orario). L\'allineamento vale per tutto l\'orario e per la modalità di modifica (menu dell\'orario › Modifica orario). Automatico: gli eventi iniziano all\'ora o alla mezz\'ora e durano 30 minuti o un\'ora; passando all\'automatico gli eventi non allineati vengono allineati, dopo una conferma. Libero: qualsiasi orario e durata. Gli intervalli si posizionano sempre liberamente.',
+    footer: 'Con "Mostra le verifiche" la vista Lista segna le verifiche di Classeviva e quelle segnate a mano; si vedono sempre nel dettaglio dell\'evento e nella vista Giorno. Quelle nascoste, e le regole per nasconderle in automatico, sono in Verifiche nascoste (menu dell\'orario). L\'allineamento vale per tutto l\'orario e per la modalità di modifica (pulsante + dell\'orario › Modifica orario). Automatico: gli eventi iniziano all\'ora o alla mezz\'ora e durano 30 minuti o un\'ora; passando all\'automatico gli eventi non allineati vengono allineati, dopo una conferma. Libero: qualsiasi orario e durata. Gli intervalli si posizionano sempre liberamente.',
   }) + section([
     buttonRow("Esporta un backup dell'orario", 'tt-export', 'upload', { disabled: !hasOwner }),
     buttonRow('Importa un backup…', 'tt-import', 'download', { disabled: !hasOwner }),
     buttonRow("Elimina l'orario", 'tt-delete-all', 'trash', { destructive: true, disabled: store.isEmpty }),
   ], {
     header: "Backup dell'orario",
-    footer: "L'orario è salvato solo in questo browser, separato per ogni account. Il backup contiene eventi, colori, palette, note, verifiche segnate e file allegati; importandolo sostituisce l'orario attuale. È compatibile con l'app BCW per iPhone, iPad e Mac.",
+    footer: "L'orario è salvato solo in questo browser, separato per ogni account. Il backup contiene eventi, colori, palette, note, verifiche segnate e file allegati; importandolo sostituisce l'orario attuale. È compatibile con l'app BCW per iPhone e iPad.",
   }) + `<input type="file" id="tt-import-input" accept=".json,application/json" hidden data-change="tt-import-file">` + section([
     toggleRow('Sincronizza tra i dispositivi', false, 'noop', { iconName: 'cloud', disabled: true, extra: ` ${pill('Work in progress', { short: 'WIP', color: 'var(--fair)', cls: 'small' })}` }),
   ], {
@@ -257,21 +254,23 @@ export const settings = {
   render(ctx) {
     const param = ctx.route.param;
     if (ctx.wide) {
-      // Come la finestra Impostazioni del Mac: le stesse sezioni, divise in schede.
       const s = ctx.state('settings', { pane: 'general' });
       if (param && panes[param] && s.routedPane !== param) {
         s.pane = param;
         s.routedPane = param;
       }
       const pane = panes[s.pane] ?? panes.general;
+      // Elenco e dettaglio affiancati (layout elenco-dettaglio di Material 3).
+      const list = listGroup(Object.entries(panes).map(([key, p]) => listItem({
+        title: p.title, action: 'settings-pane', params: { value: key }, cls: key === s.pane ? 'selected' : '', leading: iconBadge(p.icon, p.tint, 40),
+      })));
       return {
         title: 'Impostazioni',
-        narrow: true,
-        body: `<div class="settings-panes">${segmented(Object.entries(panes).map(([key, p]) => [key, p.title]), s.pane, 'settings-pane', { compact: true })}</div><div class="form">${pane.render(ctx)}</div>`,
+        split: { sideWidth: 320, side: list, main: `<div class="form readable" data-key="pane-${s.pane}">${pane.render(ctx)}</div>` },
       };
     }
     if (param && panes[param]) {
-      return { title: panes[param].title, inline: true, body: `<div class="form">${panes[param].render(ctx)}</div>`, bottomInset: true };
+      return { title: panes[param].title, body: `<div class="form">${panes[param].render(ctx)}</div>`, bottomInset: true };
     }
     // Su schermi stretti: elenco delle sottopagine.
     const nav = (key) => {
@@ -293,7 +292,6 @@ export const settings = {
     'pref-weighted': (ctx, el) => ctx.prefs.set('weightedAverage', el.checked),
     'pref-dashboard-mode': (ctx, el) => ctx.prefs.set('dashboardMode', el.value),
     'pref-upcoming': (ctx, el) => ctx.prefs.set('showUpcomingDays', el.checked),
-    'pref-abbreviation': (ctx, el) => ctx.prefs.set('titleAbbreviation', el.value),
     'pref-appearance': (ctx, el) => ctx.prefs.set('appearance', el.value),
     'pref-accent': (ctx, el) => ctx.prefs.set('accentColor', el.dataset.value),
     'pref-accent-pick': (ctx, el) => {
@@ -535,6 +533,6 @@ export const account = {
         ? 'Le credenziali di questo account verranno rimosse e passerai a un altro account salvato.'
         : 'Uscendo, le credenziali verranno rimosse da questo browser.';
     html += section([buttonRow(model.isDemo ? 'Esci dalla demo' : 'Esci da questo account', 'sign-out', 'logout', { destructive: true })], { footer });
-    return { title: 'Account', inline: true, narrow: true, body: `<div class="form">${html}</div>`, bottomInset: true };
+    return { title: 'Account', narrow: true, body: `<div class="form">${html}</div>`, bottomInset: true };
   },
 };

@@ -4,11 +4,11 @@
 import {
   localSearchField, card, cardGrid, chipRow, filterChip, pill, eyebrow, iconBadge, loadingCard, statusBanner, emptyState, spinner,
   statTile, absenceRow, agendaEventRow, lessonRow, subjectTag, segmented, sectionHeader, collapsible, chevron,
-  joinRows, button, gradeColorValue, subjectColor, circleButton, wavyProgress,
+  button, gradeColorValue, subjectColor, circleButton, wavyProgress, listGroup, segCell,
 } from '../components.js';
 import { icon } from '../icons.js';
 import { data } from '../dom.js';
-import { monthCalendar } from './dashboard.js';
+import { calendarBar } from '../calendar-bar.js';
 import { subjectDetail } from './grades.js';
 import { NoteCategory, AgendaKind, AbsenceKind } from '../models.js';
 import { ArchiveModel } from '../store.js';
@@ -28,17 +28,18 @@ export const notes = {
     const model = ctx.model;
     const s = ctx.state('notes', { category: null });
     const list = model.notes.filter((n) => s.category == null || n.category === s.category);
-    const summary = `<div class="stat-grid two">${['NTTE', 'NTCL'].map((c) => statTile(NoteCategory[c].title,
-      String(model.notes.filter((n) => n.category === c).length), NoteCategory[c].icon, c === 'NTTE' ? 'var(--neutral)' : 'var(--poor)')).join('')}</div>`;
+    const summary = `<div class="stat-grid connected two">${['NTTE', 'NTCL'].map((c, i) => statTile(NoteCategory[c].title,
+      String(model.notes.filter((n) => n.category === c).length), NoteCategory[c].icon, c === 'NTTE' ? 'var(--neutral)' : 'var(--poor)',
+      c === 'NTTE' ? 'cookie4Sided' : 'clover4Leaf', { corners: i ? 'r' : 'l', vertical: true })).join('')}</div>`;
     const chips = chipRow(filterChip('Tutte', { selected: s.category == null, action: 'notes-category', params: { value: '' } }) +
       Object.values(NoteCategory).map((c) => filterChip(c.title, { iconName: c.icon, selected: s.category === c.id, action: 'notes-category', params: { value: c.id } })).join(''));
     // Le note si segnano come lette quando compaiono, come in Classeviva.
     for (const note of list) if (!note.isRead) ctx.task(`note-${note.category}-${note.id}`, () => model.readNote(note));
     const content = list.length
-      ? cardGrid(list.map((note) => card(`<div class="row-between"><span class="label-line" style="color:${noteTint[note.category]}">${icon(NoteCategory[note.category].icon)}${esc(NoteCategory[note.category].singular)}</span>
+      ? listGroup(list.map((note) => segCell(`<div class="stack gap-10"><div class="row-between"><span class="label-line" style="color:${noteTint[note.category]}">${icon(NoteCategory[note.category].icon)}${esc(NoteCategory[note.category].singular)}</span>
           ${note.isRead ? '' : pill('Nuova', { filled: true, cls: 'small' })}</div>
           <p class="note-text">${esc(note.text || 'Tocca per leggere il contenuto.')}</p>
-          <p class="row-caption">${esc(note.authorName)} · ${esc(fmt.longDay(note.date))}</p>`, { padding: 14, cls: 'stack gap-10', attrs: ` data-key="note-${note.category}-${note.id}"` })).join(''), 360)
+          <p class="row-caption">${esc(note.authorName)} · ${esc(fmt.longDay(note.date))}</p></div>`, { attrs: ` data-key="note-${note.category}-${note.id}"` })), { cls: 'readable' })
       : emptyState('Nessuna nota', 'thumbsUp', 'Continua così!');
     return { title: 'Note', body: `<div class="stack gap-16">${summary}${chips}${content}</div>`, refresh: () => model.loadNotes() };
   },
@@ -63,10 +64,10 @@ export const absences = {
     const list = model.absences.filter((a) => (s.kind == null || a.kind === s.kind || (s.kind === 'late' && a.kind === 'shortLate')) &&
       (!s.onlyPending || !a.isJustified));
     const count = (kind) => model.absences.filter((a) => a.kind === kind).length;
-    const counters = `<div class="stat-grid three">
-      ${statTile('Assenze', String(count('absence')), AbsenceKind.absence.icon, 'var(--poor)')}
-      ${statTile('Ritardi', String(count('late') + count('shortLate')), AbsenceKind.late.icon, 'var(--fair)')}
-      ${statTile('Uscite', String(count('earlyExit')), AbsenceKind.earlyExit.icon, 'var(--neutral)')}</div>`;
+    const counters = `<div class="stat-grid connected three">
+      ${statTile('Assenze', String(count('absence')), AbsenceKind.absence.icon, 'var(--poor)', 'clover4Leaf', { corners: 'l', vertical: true })}
+      ${statTile('Ritardi', String(count('late') + count('shortLate')), AbsenceKind.late.icon, 'var(--fair)', 'sunny', { corners: 'c', vertical: true })}
+      ${statTile('Uscite', String(count('earlyExit')), AbsenceKind.earlyExit.icon, 'var(--neutral)', 'cookie6Sided', { corners: 'r', vertical: true })}</div>`;
     const pending = model.unjustifiedAbsences.length;
     const warning = pending ? `<div class="warning-box">${icon('alertCircleFill')}${pending === 1 ? 'Hai un evento da giustificare' : `Hai ${pending} eventi da giustificare`}</div>` : '';
     const chips = chipRow(filterChip('Da giustificare', { iconName: 'alertCircle', selected: s.onlyPending, action: 'absences-pending' }) +
@@ -77,8 +78,9 @@ export const absences = {
       content = emptyState('Nessun evento', 'checkCircle', 'Nessuna assenza, ritardo o uscita registrati.');
     } else {
       const months = [...groupBy(list, (a) => startOfMonth(a.date).getTime()).entries()].sort(([a], [b]) => b - a);
-      content = cardGrid(months.map(([time, events]) => `<div class="stack gap-10" data-key="am-${time}">${eyebrow(fmt.monthYear(new Date(time)))}
-        ${card(joinRows([...events].sort((a, b) => b.date - a.date), (e) => `<div class="absence-day"><div class="date-box"><span class="numeral">${e.date.getDate()}</span><small>${esc(fmt.weekdayShort(e.date))}</small></div>${absenceRow(e, { showsReason: true })}</div>`), { padding: 14, cls: 'rows' })}</div>`).join(''), 440);
+      content = `<div class="list-columns">${months.map(([time, events]) => listGroup([...events].sort((a, b) => b.date - a.date).map((e) =>
+        segCell(`<div class="absence-day"><div class="date-box"><span class="numeral">${e.date.getDate()}</span><small>${esc(fmt.weekdayShort(e.date))}</small></div>${absenceRow(e, { showsReason: true })}</div>`)),
+      { header: fmt.monthYear(new Date(time)), attrs: ` data-key="am-${time}"` })).join('')}</div>`;
     }
     return { title: 'Assenze e ritardi', body: `<div class="stack gap-18">${counters}${warning}${chips}${content}</div>`, refresh: () => model.loadAbsences() };
   },
@@ -117,9 +119,9 @@ export const agenda = {
       Object.values(AgendaKind).map((k) => filterChip(k.title, { iconName: k.icon, selected: s.kind === k.id, action: 'agenda-kind', params: { value: k.id } })).join(''));
     const expanded = ctx.app.viewState.get('expanded');
     const content = days.length
-      ? cardGrid(days.slice(0, 120).map(([time, events]) => card(`${eyebrow(fmt.relativeDayName(new Date(time)), 'var(--accent)')}
-        <div class="rows">${joinRows(events, (e) => agendaEventRow(e, { done: prefs.isCompleted(e), scope: 'ag', expanded: expanded?.has(`ag${e.id}`) }))}</div>`,
-      { cls: 'stack gap-12', attrs: ` data-key="ad-${time}"` })).join(''), 380)
+      ? `<div class="list-columns">${days.slice(0, 120).map(([time, events]) => listGroup(events.map((e) =>
+        segCell(agendaEventRow(e, { done: prefs.isCompleted(e), scope: 'ag', expanded: expanded?.has(`ag${e.id}`) }))),
+      { header: fmt.relativeDayName(new Date(time)), attrs: ` data-key="ad-${time}"` })).join('')}</div>`
       : emptyState('Niente da mostrare', 'checklist', 'Nessun elemento corrisponde ai filtri.');
     return {
       title: 'Agenda',
@@ -158,8 +160,10 @@ function nextSchoolDay(date) {
 
 function lessonsState(ctx) {
   return ctx.state('lessons', () => {
-    const today = startOfDay(new Date());
-    return { mode: 'day', day: today, month: startOfMonth(today), all: null, loadingAll: false, subject: null };
+    // Si apre su oggi o, nel fine settimana, sull'ultimo giorno di scuola.
+    let day = startOfDay(new Date());
+    while (isWeekend(day)) day = addDays(day, -1);
+    return { mode: 'day', day, monthDir: 0, all: null, loadingAll: false, subject: null };
   });
 }
 
@@ -183,11 +187,11 @@ export const lessons = {
 
     if (ctx.wide) {
       const side = s.mode === 'day'
-        ? monthCalendar(ctx, { selected: s.day, month: s.month, monthDir: s.monthDir }, { action: 'lessons-day', shiftAction: 'lessons-month' })
+        ? calendarBar(ctx, { selected: s.day, month: true, action: 'lessons-day', shiftAction: 'lessons-month', pickAction: 'lessons-pick', dir: s.monthDir, dots: () => [] })
         : (s.loadingAll ? '' : subjectChips(s));
       return {
         title: 'Lezioni',
-        split: { sideWidth: 320, side: picker + side, main: s.mode === 'day' ? dayLessons(ctx, s) : subjectCards(s) },
+        split: { sideWidth: 320, side: picker + side, main: s.mode === 'day' ? `<h2 class="day-title">${esc(fmt.longDay(s.day))}</h2>${dayLessons(ctx, s)}` : subjectCards(s) },
       };
     }
     const body = s.mode === 'day'
@@ -198,24 +202,15 @@ export const lessons = {
 
   actions: {
     'lessons-mode': (ctx, el) => { lessonsState(ctx).mode = el.dataset.value; },
-    'lessons-day': (ctx, el) => {
-      const s = lessonsState(ctx);
-      const day = startOfDay(new Date(Number(el.dataset.time)));
-      if (startOfMonth(day).getTime() !== s.month.getTime()) s.monthDir = Math.sign(day - s.month);
-      s.day = day;
-      s.month = startOfMonth(day);
-    },
-    'lessons-date': (ctx, el) => {
-      const [y, m, d] = el.value.split('-').map(Number);
-      if (!y) return;
-      const s = lessonsState(ctx);
-      s.day = new Date(y, m - 1, d);
-      s.month = startOfMonth(s.day);
-    },
+    'lessons-day': (ctx, el) => setLessonsDay(ctx, new Date(Number(el.dataset.time))),
+    'lessons-pick': (ctx) => ctx.openDatePicker({
+      selection: lessonsState(ctx).day, min: schoolYear().start, max: new Date(), onPick: (day) => setLessonsDay(ctx, day),
+    }),
     'lessons-month': (ctx, el) => {
       const s = lessonsState(ctx);
-      s.monthDir = Number(el.dataset.delta);
-      s.month = addMonths(s.month, Number(el.dataset.delta));
+      const target = addMonths(s.day, Number(el.dataset.delta));
+      const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+      setLessonsDay(ctx, new Date(target.getFullYear(), target.getMonth(), Math.min(s.day.getDate(), last)));
     },
     'lessons-prev': (ctx) => { const s = lessonsState(ctx); s.day = previousSchoolDay(s.day); },
     'lessons-next': (ctx) => {
@@ -232,12 +227,18 @@ export const lessons = {
   },
 };
 
+function setLessonsDay(ctx, day) {
+  const s = lessonsState(ctx);
+  const target = startOfDay(day);
+  if (startOfMonth(target).getTime() !== startOfMonth(s.day).getTime()) s.monthDir = Math.sign(target - s.day);
+  s.day = target;
+}
+
+/** Giorno precedente e successivo ai lati di un campo con la data (apre il selettore della data). */
 function dayNavigator(s) {
-  const min = dayKey(schoolYear().start);
-  const max = dayKey(new Date());
   return `<div class="day-navigator">
     ${circleButton('chevronLeft', { action: 'lessons-prev', label: 'Giorno precedente' })}
-    <input type="date" class="date-input" value="${dayKey(s.day)}" min="${min}" max="${max}" data-change="lessons-date" aria-label="Giorno">
+    <button class="date-field" data-action="lessons-pick">${icon('calendarMonth', { cls: 'small' })}<span>${esc(fmt.longDay(s.day))}</span></button>
     ${circleButton('chevronRight', { action: 'lessons-next', label: 'Giorno successivo', disabled: isToday(s.day) })}</div>`;
 }
 
@@ -254,9 +255,9 @@ function dayLessons(ctx, s) {
       content = loadingCard();
     }
   } else {
-    content = card(`<div class="rows">${joinRows(list, lessonRow)}</div>`);
+    content = listGroup(list.map((l) => segCell(lessonRow(l))));
   }
-  return `<h2 class="day-title">${esc(fmt.longDay(s.day))}</h2>${content}`;
+  return content;
 }
 
 function subjectGroups(s) {
@@ -320,7 +321,7 @@ export const didactics = {
         .sort((a, b) => (b.lastShare ?? 0) - (a.lastShare ?? 0));
       if (!folders.length) continue;
       body += `<div class="stack gap-10" data-key="t-${esc(teacher.id)}"><div class="teacher-head"><span class="teacher-initial numeral" style="background:${subjectColor(StableID.make(teacher.id))}">${esc(teacher.name.charAt(0))}</span><h3>${esc(teacher.name)}</h3></div>
-        ${cardGrid(folders.map((f) => folderCard(s, teacher, f)).join(''), 360)}</div>`;
+        ${listGroup(folders.map((f) => folderCard(s, teacher, f)))}</div>`;
     }
     return {
       title: 'Materiale didattico',
@@ -382,11 +383,11 @@ function folderCard(s, teacher, folder) {
   const expanded = s.expanded.has(key) || !!s.search;
   const contents = folder.contents.filter((c) => !s.search || contains(c.name, s.search) || contains(folder.name, s.search));
   const rows = contents.map((c) => `<hr class="divider inset">
-    <button class="file-row" data-action="didactics-open" data-id="${c.id}">
+    <button class="file-row" data-action="didactics-open" data-id="${c.id}" data-key="fc-${c.id}">
       <span class="file-icon">${icon(c.icon)}</span>
       <span class="grow"><span>${esc(c.name)}</span>${c.sharedAt ? `<small>${esc(fmt.shortDayWithYear(c.sharedAt))}</small>` : ''}</span>
       ${s.opening === c.id ? spinner() : `<span style="color:var(--accent)">${icon(c.kind === 'link' ? 'externalLink' : 'download')}</span>`}</button>`).join('');
-  return `<div class="card folder-card" style="--pad:0px" data-key="f-${esc(key)}">
+  return `<div class="folder-card" data-key="f-${esc(key)}">
     <button class="folder-head" data-action="didactics-folder" data-folder="${esc(key)}" aria-expanded="${expanded}">
       <span class="folder-icon">${icon(expanded ? 'folderFill' : 'folder')}</span>
       <span class="grow"><strong>${esc(folder.name)}</strong><small>${folder.contents.length} elementi${folder.lastShare ? ` · ${esc(fmt.shortDayWithYear(folder.lastShare))}` : ''}</small></span>
@@ -397,8 +398,8 @@ function folderCard(s, teacher, folder) {
 // MARK: - Scrutini e pagelle
 
 export function documentButton(title, { action, params, iconName = 'fileText', loading = false }) {
-  return `<button class="card document-button" style="--pad:14px" data-action="${action}"${data(params)}${loading ? ' disabled' : ''}>
-    ${iconBadge(iconName, 'var(--neutral)')}<span class="grow">${esc(title)}</span>${loading ? spinner() : icon('chevronRight', { cls: 'chev-right' })}</button>`;
+  return `<button class="list-item document-button" data-action="${action}"${data(params)}${loading ? ' disabled' : ''}>
+    ${iconBadge(iconName, 'var(--neutral)')}<span class="li-text"><strong>${esc(title)}</strong></span>${loading ? spinner() : icon('chevronRight', { cls: 'chev-right' })}</button>`;
 }
 
 export const reports = {
@@ -433,17 +434,18 @@ export const reports = {
         docs = emptyState('Nessun documento', 'fileText', 'Pagelle e documenti di valutazione appariranno qui dopo gli scrutini.');
       }
       if (documents.documents.length) {
-        docs += `<div class="stack gap-10">${sectionHeader('Documenti')}${cardGrid(documents.documents.map((d) =>
-          documentButton(d.title, { action: 'report-open', params: { hash: d.documentHash }, loading: s.downloading === d.documentHash })).join(''), 320)}</div>`;
+        docs += listGroup(documents.documents.map((d) =>
+          documentButton(d.title, { action: 'report-open', params: { hash: d.documentHash }, loading: s.downloading === d.documentHash })), { header: 'Documenti' });
       }
       if (documents.schoolReports.length) {
-        docs += `<div class="stack gap-10">${sectionHeader('Pagelle online', { subtitle: 'Si aprono sul sito di Classeviva' })}${cardGrid(documents.schoolReports.map((r) =>
-          `<a class="card document-button" style="--pad:14px" href="${esc(r.viewLink ?? '#')}" target="_blank" rel="noopener">${iconBadge('compass', 'var(--neutral)')}<span class="grow">${esc(r.title)}</span>${icon('externalLink', { cls: 'chev-right' })}</a>`).join(''), 320)}</div>`;
+        docs += listGroup(documents.schoolReports.map((r) =>
+          `<a class="list-item document-button" href="${esc(r.viewLink ?? '#')}" target="_blank" rel="noopener">${iconBadge('compass', 'var(--neutral)')}<span class="li-text"><strong>${esc(r.title)}</strong></span>${icon('externalLink', { cls: 'chev-right' })}</a>`),
+        { header: 'Pagelle online', footer: 'Si aprono sul sito di Classeviva.' });
       }
     }
     const refresh = async () => { s.error = await model.loadDocuments(); };
-    if (ctx.wide) return { title: 'Scrutini', split: { sideWidth: 360, side: summary, main: banner + docs }, refresh };
-    return { title: 'Scrutini', body: `<div class="stack gap-18">${banner}${summary}${docs}</div>`, refresh };
+    if (ctx.wide) return { title: 'Scrutini', split: { sideWidth: 380, side: summary, main: banner + `<div class="stack gap-20">${docs}</div>` }, refresh };
+    return { title: 'Scrutini', body: `<div class="stack gap-20">${banner}${summary}${docs}</div>`, refresh };
   },
 
   actions: {
@@ -488,14 +490,14 @@ export const previous = {
       case 'failed': docs += unavailable(archive.failure); break;
       default:
         docs += archive.documents.length
-          ? cardGrid(archive.documents.map((d) => documentButton(d.title, { action: 'previous-open', params: { hash: d.documentHash }, loading: s.downloading === d.documentHash })).join(''), 320)
+          ? listGroup(archive.documents.map((d) => documentButton(d.title, { action: 'previous-open', params: { hash: d.documentHash }, loading: s.downloading === d.documentHash })))
           : unavailable(archive.documentsError ? `Classeviva ha risposto: ${archive.documentsError}` : 'La scuola non ha pubblicato documenti per questo anno.');
     }
     docs = `<div class="stack gap-10">${docs}</div>`;
     const actions = [{ icon: 'calendarClock', label: "Scegli l'anno", action: 'previous-year-menu' }];
     const title = `Anno ${archive.title}`;
-    if (ctx.wide) return { title, inline: true, actions, split: { sideWidth: 360, side: webCard, main: docs } };
-    return { title, inline: true, actions, body: `<div class="stack gap-20">${webCard}${docs}</div>` };
+    if (ctx.wide) return { title, actions, split: { sideWidth: 380, side: webCard, main: docs } };
+    return { title, actions, body: `<div class="stack gap-20">${webCard}${docs}</div>` };
   },
 
   actions: {
@@ -541,7 +543,7 @@ export const subjects = {
     const summaries = model.gradeBook.subjects();
     const rows = sorted.map((subject) => {
       const average = summaries.find((x) => x.subjectId === subject.id)?.average ?? null;
-      return `<button class="${ctx.wide ? 'card ' : 'list-item '}list-row" style="--pad:14px" data-action="open-subject" data-id="${subject.id}" data-key="sub-${subject.id}">
+      return `<button class="list-item list-row" data-action="open-subject" data-id="${subject.id}" data-key="sub-${subject.id}">
         <span class="dot big" style="background:${subjectColor(subject.id)}"></span>
         <span class="grow"><strong>${esc(subject.name)}</strong>${subject.teachers.length ? `<small>${esc(subject.teachers.join(', '))}</small>` : ''}</span>
         <span class="numeral list-average" style="color:${gradeColorValue(average)}">${GradeFormat.average(average)}</span>
@@ -549,8 +551,7 @@ export const subjects = {
     });
     const body = !sorted.length
       ? emptyState('Nessuna materia', 'library')
-      // Le card della stessa riga hanno l'altezza della più alta (es. una materia con molti docenti).
-      : ctx.wide ? cardGrid(rows.join(''), 320, 'equal-rows') : `<div class="list-group">${rows.join('')}</div>`;
+      : `<div class="list-group readable">${rows.join('')}</div>`;
     return { title: 'Materie', body, bottomInset: true, refresh: () => model.loadGrades() };
   },
 };
@@ -574,8 +575,7 @@ export const schoolbooks = {
       body = s.loading ? loadingCard() : emptyState('Nessun libro', 'library', 'La scuola non ha pubblicato le adozioni.');
     } else {
       body = model.schoolbooks.map((course) => `<div class="stack gap-10">${sectionHeader(course.name)}
-        ${ctx.wide ? cardGrid(course.books.map((b) => card(bookRow(b), { padding: 14 })).join(''), 380, 'equal-rows')
-    : `<div class="list-group">${course.books.map((b) => `<div class="list-item list-row">${bookRow(b)}</div>`).join('')}</div>`}</div>`).join('');
+        <div class="list-group readable">${course.books.map((b) => `<div class="list-item list-row">${bookRow(b)}</div>`).join('')}</div></div>`).join('');
     }
     return { title: 'Libri di testo', body: `<div class="stack gap-22">${body}</div>`, bottomInset: true };
   },
@@ -629,10 +629,10 @@ export const calendar = {
     const list = holidays.map((h) => {
       const past = h.end < today;
       const count = daysBetween(h.start, h.end) + 1;
-      return `<div class="holiday-row ${past ? 'past' : ''}"><span style="color:${past ? 'var(--ink2)' : 'var(--fair)'}">${icon(past ? 'checkCircle' : 'sun')}</span>
+      return `<div class="list-item holiday-row ${past ? 'past' : ''}"><span style="color:${past ? 'var(--ink2)' : 'var(--fair)'}">${icon(past ? 'checkCircle' : 'sun')}</span>
         <span class="grow">${esc(range(h))}</span><span class="caption secondary">${count === 1 ? '1 giorno' : `${count} giorni`}</span></div>`;
     });
-    const listCard = card(list.length ? `<div class="rows">${list.join('<hr class="divider">')}</div>` : '<p class="secondary">Il calendario non è ancora disponibile.</p>');
+    const listCard = list.length ? listGroup(list, { cls: 'readable' }) : card('<p class="secondary">Il calendario non è ancora disponibile.</p>');
     // Su schermi larghi i due riepiloghi stanno affiancati; la prossima vacanza ha meno
     // contenuto, quindi la sua card è più stretta, con data e giorni al centro.
     const top = ctx.wide && progress && nextCard ? `<div class="year-summary">${progress}${nextCard}</div>` : progress + nextCard;

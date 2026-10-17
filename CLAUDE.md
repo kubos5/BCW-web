@@ -7,7 +7,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
 - `server.js` serve i file pubblici e fa da proxy (`/api/v1/*` → `web.spaggiari.eu/rest/v1/*`,
   `/api/archive/YY/*` → `webYY.spaggiari.eu`), aggiungendo User-Agent e Z-Dev-Apikey. Variante: `proxy/cloudflare-worker.js`.
 - Le viste (`js/views/*`) restituiscono un descrittore di pagina (`title`, `subtitle`, `actions`, `body` o `split` o `full`,
-  `search`, `refresh`, `floating`, `fab`, `reselect`); `js/app.js` costruisce la shell e applica l'HTML con `dom.js` (morph).
+  `search`, `refresh`, `fixed` (parte ferma sopra l'area che scorre, sui telefoni), `searchBar` (barra di ricerca al posto
+  della barra superiore), `fabMenu`, `fab`, `toolbar` + `hidesNav`, `reselect`); `js/app.js` costruisce la shell e applica
+  l'HTML con `dom.js` (morph).
   Azioni delegate via `data-action` / `data-input` / `data-change` / `data-context` / `data-longpress` / `data-dblclick`;
   ogni vista esporta `actions`. `ctx.afterRender(fn)` esegue codice dopo il disegno (es. scorrere a un'ora).
 - Stato locale delle viste con `ctx.state(key, init)`; operazioni asincrone una tantum con `ctx.task(key, fn)`.
@@ -15,24 +17,37 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   stato in `sheet:<id>` e lo cancellano in `onClose`. `confirm({ actions })` per dialoghi con più scelte.
 - Proxy predefinito in `config.json` (`{"proxy": "https://…"}`); `Proxy.init()` all'avvio: indirizzo dell'utente
   (localStorage) > proxy del sito stesso (`/api/ping` con `X-BCW-Proxy`) > `config.json`.
+- Design dell'app iOS 3.0 (Material 3 Expressive, senza Liquid Glass) e solo componenti di https://m3.material.io. Il Mac non
+  c'è più: il layout degli schermi larghi è un adattamento libero di quello dell'app.
 - Design Material 3 Expressive: colori come variabili CSS (`--primary`, `--surface-container…`, `--good/--fair/--poor/
   --neutral` con `-container`, `--subject-N`); alias brevi `--bg`, `--card`, `--ink`, `--ink2`, `--accent`. Font Google
   Sans Flex in `fonts/` (asse ROND per i titoli). Icone Material Symbols Rounded incorporate in `js/icons.js` (varianti
   `…Fill`); forme in `js/shapes.js` (`shape(name)` dentro un `.shaped`); logo come testo (`js/logo.js`: "BCW" in Google
   Sans Flex e la linea in `--brand`), così segue il tema scelto nell'app; il favicon si ridisegna con `--brand`
   (`Theme.updateFavicon()`). Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
-- Larghezze: sotto 600 px barra di navigazione in basso (Dashboard, Orario, Voti, Tu, Cerca); 600–839 le stesse schede in
-  una barra laterale compatta; da 840 barra laterale espansa con tutte le sezioni (riducibile; tra 840 e 1000 si apre
-  sopra il contenuto) e pagina in un pannello con angoli ampi.
-- Su schermi larghi segue l'app Mac: ricerca generale nella barra (fuori dalla `.page`, così non perde il fuoco),
-  niente sezione Cerca nella barra laterale, ricerche di pagina nel contenuto (`localSearchField`); nella Dashboard il
-  giorno scelto è il titolo, con "Domani" (Alt+Maiusc+T) e il menu della vista (con "Vai a oggi").
-- Calendario galleggiante sui telefoni (`page.floating`, Dashboard e Orario): `.cal-float` sopra `.page-scroll`, che
-  ha il margine superiore dell'altezza intera; l'avanzamento `--p` (0 intero, 1 striscia) segue `scrollTop` e lo
-  imposta `applyCollapse()` dopo ogni disegno; a metà strada scatta. Il giorno accanto si raggiunge con `data-day-swipe`.
+- Larghezze: sotto 600 px barra di navigazione in basso con quattro schede (Dashboard, Orario, Voti, Tu); la ricerca è la
+  barra in cima alla Dashboard (`page.searchBar`; `openSearch()` / `app.searching`: i risultati di `views/search.js`
+  prendono il posto della pagina e la barra di navigazione si nasconde). 600–839 le stesse schede in una barra laterale.
+  Le pagine principali delle schede hanno il titolo grande (34 px) nella riga dei pulsanti; quelle aperte da un'altra il
+  titolo piccolo e la freccia. Le Impostazioni si aprono dall'ingranaggio di Tu.
+- Da 840 px (come le app Google sul web): barra superiore con logo, ricerca generale (fuori dalla `.page`, così non perde il
+  fuoco), Aggiorna, Impostazioni e avatar (menu degli account); barra di navigazione espansa con tutte le sezioni
+  (riducibile; tra 840 e 1000 si apre sopra il contenuto); pagina in un pannello con angoli ampi; ricerche di pagina nel
+  contenuto (`localSearchField`); Impostazioni e Bacheca con elenco e dettaglio affiancati.
+- Settimana e mese di Dashboard e Orario: `calendarBar()` (`js/calendar-bar.js`), gruppo di pulsanti fermo sopra l'area che
+  scorre (`page.fixed`; sugli schermi larghi nella colonna laterale). Il giorno scelto è pieno e più largo; il titolo
+  del periodo apre il selettore della data (`ctx.openDatePicker`, `js/date-picker.js`). Vista Lista = settimana, vista
+  Calendario della Dashboard = mese; l'Orario ha solo Lista e Giorno.
+- Giorni e schede cambiano con la transizione ad asse condiviso: `axisPage(nome, verso, chiave, html)`; la pagina nuova
+  entra con `.axis-in`, quella vecchia la ridisegna `animateAxisExits()` dopo il morph. Il giorno accanto si raggiunge
+  scorrendo di lato (`data-day-swipe`).
+- Componenti dell'app: `dayHero` (giorno in grande e chip), `statusChip`, `segmentedSection` + `segCell`, `listGroup`
+  (anche con `background`), `dateBadge`, `connectedGroup`, `primaryTabs`, `statTile` con `corners`, menu del FAB
+  (`page.fabMenu`, voci con un'azione) e barra degli strumenti flottante (`floatingToolbar`, vivace nella modifica
+  dell'orario, che nasconde la barra di navigazione).
 - Barra superiore colorata (`.app-bar.scrolled`) solo quando l'utente scorre il contenuto: gli scorrimenti fatti
-  dall'app passano da `ctx.scrollQuietly(el, top)`, le aree con `data-bar-ignore` non contano e dopo ogni disegno il
-  colore si toglie se il contenuto non è più scorso.
+  dall'app passano da `ctx.scrollQuietly(el, top)`, le aree con `data-bar-ignore` non contano (anche le pagine con una
+  parte ferma in alto e la ricerca) e dopo ogni disegno il colore si toglie se il contenuto non è più scorso.
 - Orario: logica in `js/timetable.js` (stesso JSON dell'app iOS: minuti dalla mezzanotte, giorni 1 = lunedì, UUID
   maiuscoli, date senza millisecondi, backup `com.bcw.timetable-backup`), viste in `views/timetable.js` e fogli in
   `views/timetable-sheets.js`. Un documento per account in `localStorage` (`bcw.timetable.<account>`), file in IndexedDB
@@ -40,8 +55,7 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
 - Cambi di sessione (account, demo) con `model.changeSession(fn)`: dissolvenza, cambio dei dati e ritorno quando ci
   sono (al massimo 3 s). La demo non è un account: si apre anche con un account collegato e uscendo si torna a quello.
 - `dom.js`: i nodi con `data-key` scomparsi vanno tolti prima di quelli nuovi; spostare un nodo gli toglie il fuoco.
-  Niente stato negli attributi aggiunti a mano (il morph li toglie), tranne `data-signature` dei grafici e lo stile
-  `--p` del calendario galleggiante, reimpostato dopo ogni disegno.
+  Niente stato negli attributi aggiunti a mano (il morph li toglie), tranne `data-signature` dei grafici.
 - Aree scorrevoli: niente scorrimento orizzontale; nelle pagine a più aree (colonne, bacheca, barra laterale,
   settimana dell'orario) le barre di scorrimento sono nascoste.
 - Colori solo dalle variabili CSS, mai nero/bianco puri come sfondo (i colori scelti dall'utente nell'orario passano

@@ -1,6 +1,6 @@
 # BCW: Better ClasseViVa per il web
 
-La versione web di [BCW](https://github.com/kubos5/BCW), il client per il registro elettronico [Classeviva](https://web.spaggiari.eu) di Gruppo Spaggiari Parma. Stesse funzioni dell'app per iPhone, iPad e Mac, con un design Material 3 Expressive, in HTML e JavaScript senza dipendenze né passaggi di compilazione.
+La versione web di [BCW](https://github.com/kubos5/BCW), il client per il registro elettronico [Classeviva](https://web.spaggiari.eu) di Gruppo Spaggiari Parma. Stesse funzioni e stesso design dell'app per iPhone e iPad, in Material 3 Expressive, in HTML e JavaScript senza dipendenze né passaggi di compilazione.
 
 > BCW non è affiliato a Gruppo Spaggiari Parma S.p.A.
 
@@ -61,16 +61,17 @@ BCW è una Progressive Web App: in Safari su iPhone e iPad usa Condividi › Agg
 
 Le stesse dell'app nativa:
 
-- Dashboard con lista settimanale o calendario mensile, aperta di default sul giorno dopo; per ogni giorno compiti, verifiche, eventi, presenze e, per i giorni passati, le lezioni in una sezione separata; prossimi giorni e sezioni comprimibili
-- sui telefoni il calendario della Dashboard (settimana o mese) galleggia sopra i giorni e si riduce a una striscia scorrendo, scattando tra intero e ridotto; toccando la striscia si riapre e scorrendo di lato si passa al giorno prima o dopo
-- in "Nei prossimi giorni" ogni giorno si comprime toccandone il titolo; toccando il resto si va a quel giorno
+- Dashboard con la settimana (vista Lista) o il mese (vista Calendario) come fila di pulsanti, aperta di default sul giorno dopo; il giorno in grande con i chip di stato e, sotto, compiti, verifiche, eventi, presenze e, per i giorni passati, le lezioni, ognuno in una sezione segmentata comprimibile
+- toccando il periodo sopra la settimana si sceglie una data qualsiasi dal selettore della data; frecce e scorrimento di lato sulla settimana cambiano settimana (o mese), scorrendo di lato sul giorno si passa al giorno prima o dopo, con la transizione ad asse condiviso
+- "Nei prossimi giorni" come la vista Programma di Google Calendar: la data in un riquadro (tocco = vai al giorno), il nome del giorno che comprime gli elementi e gli elementi in una lista segmentata
+- ricerca dalla barra in cima alla Dashboard, con la vista e l'avatar dell'account (che apre gli account): toccandola diventa il campo e i risultati prendono il posto della pagina
 - toccando di nuovo la scheda Dashboard si torna in cima alla pagina e, se si è già in cima, alla giornata di domani
 - puoi segnare i compiti come fatti e, opzionalmente, nasconderli
-- Voti con media generale e medie dei periodi, grafico dell'andamento, ultimi voti espandibili e filtrabili per materia e periodo, elenco delle materie
+- Voti con la media in primo piano e i periodi in un gruppo di pulsanti collegati, grafico dell'andamento, schede Ultimi voti (divisi per mese, espandibili e filtrabili per materia) e Materie
 - effetto di ogni voto sulla media della materia (▲/▼) e grafico dei voti di ogni materia
 - dato un obiettivo di media, il voto necessario nelle prossime 1-5 prove
 - media di tutti i voti o media delle medie, con o senza pesi
-- Tu con profilo, statistiche e tutte le altre sezioni
+- Tu con il profilo al centro (Gestisci account, Cambia o Aggiungi), statistiche collegate, "Da vedere" (comunicazioni e note da leggere, assenze da giustificare) e tutte le altre sezioni in liste segmentate; le Impostazioni si aprono dall'ingranaggio
 - bacheca con filtri e ricerca, adesione, firma e risposta alle comunicazioni e anteprima degli allegati: immagini da ingrandire (pulsanti, pizzico, doppio tocco, Ctrl + rotellina, tasti + − 0) e scorrere, adatte alla finestra o alla larghezza, anteprima a schermo intero con i controlli in alto, apertura in una nuova scheda senza scaricare e Scarica
 - note disciplinari e annotazioni, assenze e ritardi con quelli da giustificare
 - scrutini e pagelle con riepilogo per periodo e insufficienze
@@ -91,30 +92,32 @@ Le stesse dell'app nativa:
 
 La scheda Orario contiene l'orario settimanale, che si compila a mano o si genera dalle lezioni registrate:
 
-- tre viste: Lista (la settimana in alto e gli eventi del giorno sotto), Calendario (il mese e gli eventi del giorno, su schermi larghi) e Giorno (le ore della giornata; su schermi larghi l'intera settimana)
-- sui telefoni la settimana galleggia sopra gli eventi e si riduce a una striscia scorrendo, come nella Dashboard; scorrendo di lato si passa al giorno prima o dopo
+- due viste: Lista (la settimana in alto e il giorno in grande con le lezioni in una lista segmentata) e Giorno (le ore della giornata, a blocchi pieni nella tinta; su schermi larghi l'intera settimana)
+- in cima la settimana è una fila di pulsanti, come nella Dashboard; scorrendo di lato si passa al giorno prima o dopo
+- oggi una scheda in cima mostra la lezione in corso (quanto manca, con l'avanzamento) e quella dopo, oppure la prossima lezione
 - toccando un evento si vedono i dettagli e si aggiungono note, file e foto, per un solo giorno o per ogni settimana
 - le verifiche segnate dai docenti su Classeviva compaiono da sole sulla lezione della materia e si possono nascondere; altre verifiche si segnano a mano, per un giorno o per ogni settimana
 - Verifiche nascoste (dal menu dell'orario): l'elenco delle verifiche nascoste, con il motivo, da cui si possono mostrare di nuovo, e le regole per nasconderle in automatico (per docente, materia, giorno della settimana, periodo, parole nel testo o materie che quel giorno non sono in orario)
 - modificando un evento si può applicare la modifica a tutti quelli con lo stesso nome
 - gli eventi uguali di seguito (es. due ore di matematica) sono uniti in un gruppo, quelli contemporanei sono affiancati
-- intervalli che nella vista Giorno stanno sopra le lezioni senza cambiarne la durata e nella vista Lista sono un separatore ondulato con l'orario
+- intervalli che nella vista Giorno stanno sopra le lezioni senza cambiarne la durata e nella vista Lista sono una pillola con l'orario tra due linee ondulate
 - le verifiche nella vista Lista si mostrano solo attivando "Mostra le verifiche" (Impostazioni o menu dell'orario)
-- modalità Modifica orario (dal menu dell'orario), nella vista Giorno: gli eventi si spostano trascinandoli (sul telefono dopo averli tenuti premuti; su schermi larghi anche da un giorno all'altro), si allungano dal bordo inferiore, se ne crea uno nuovo con un doppio tocco su un'ora vuota e toccandoli si modificano gli orari a mano
+- il pulsante + apre un menu con nuovo evento, nuovo intervallo, Modifica orario e generazione dalle lezioni
+- modalità Modifica orario, nella vista Giorno, con una barra degli strumenti flottante in basso (allineamento, intervalli, colori, Fine) al posto della barra di navigazione: gli eventi si spostano trascinandoli (sul telefono dopo averli tenuti premuti; su schermi larghi anche da un giorno all'altro), si allungano dal bordo inferiore, se ne crea uno nuovo con un doppio tocco su un'ora vuota e toccandoli si modificano gli orari a mano
 - allineamento dell'orario: automatico (eventi da 30 minuti o un'ora, alla mezz'ora) o libero (qualsiasi orario e durata); passando all'automatico gli eventi non allineati vengono allineati dopo una conferma; gli intervalli si posizionano sempre liberamente
 - colori: quelli delle lezioni, colori personalizzati salvati, colori presi dalle palette (anche personalizzate) oppure una palette a sfumatura applicata a una serie di eventi di una giornata
 - generazione automatica di una bozza dell'orario dalle lezioni registrate, mostrata in anteprima con i bordi tratteggiati prima di applicarla
-- backup dell'orario da esportare e reimportare dalle Impostazioni (con i file allegati), compatibile con l'app BCW per iPhone, iPad e Mac
+- backup dell'orario da esportare e reimportare dalle Impostazioni (con i file allegati), compatibile con l'app BCW per iPhone e iPad
 
 L'orario è salvato solo nel browser, separato per ogni account (il documento in `localStorage`, i file in IndexedDB).
 
 ### Su schermi larghi
 
-Come su Mac: barra laterale con tutte le sezioni e i contatori delle cose da leggere o giustificare (si riduce alle sole icone con il pulsante in alto), account in fondo alla barra, ricerca sempre a portata di mano nel campo in alto a destra, pagine a due colonne (Dashboard, Orario, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca con elenco e comunicazione affiancati, griglie di card, impostazioni a schede. Nella Dashboard il giorno scelto è il titolo della pagina, con "Domani" e il menu della vista accanto. In Bacheca, Agenda e Materiale la ricerca della pagina sta nel contenuto. Nelle pagine a più colonne le barre di scorrimento non compaiono, così le colonne mantengono la loro larghezza.
+Il layout dell'app adattato a uno schermo largo, come le app Google sul web: in alto la barra con il logo, la barra di ricerca, Aggiorna, Impostazioni e l'avatar dell'account (che apre il menu degli account); a sinistra la barra di navigazione espansa con tutte le sezioni e i contatori delle cose da leggere o giustificare (si riduce alle sole icone con il pulsante in alto); la pagina in un pannello con gli angoli ampi. Pagine a due colonne (Dashboard con la settimana o il mese e i prossimi giorni accanto al giorno, Orario, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca e impostazioni con elenco e dettaglio affiancati, elenchi in più colonne. In Bacheca, Agenda e Materiale la ricerca della pagina sta nel contenuto. Nelle pagine a più colonne le barre di scorrimento non compaiono, così le colonne mantengono la loro larghezza.
 
 Scorciatoie: ⌘F (Ctrl+F) per cercare; con Alt (⌥ su Mac) Alt+1…9 per le sezioni (1 Dashboard, 2 Orario, 3 Voti, 4 Tu, 5 Bacheca, 6 Note, 7 Assenze, 8 Agenda, 9 Materiale), Alt+R per aggiornare, Alt+Maiusc+T per andare a domani nella Dashboard, Alt+T per tornare a oggi e Alt+N per un nuovo evento nell'Orario, Invio per uscire da Modifica orario.
 
-Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, con la barra di navigazione in basso (tra 600 e 840 pixel le schede stanno in una barra laterale compatta).
+Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, uguale a quello dell'app per iPhone, con la barra di navigazione in basso e quattro schede (tra 600 e 840 pixel le schede stanno in una barra laterale).
 
 ### Differenze dovute al web
 
@@ -130,7 +133,8 @@ Il sito segue [Material 3 Expressive](https://m3.material.io/):
 - font Google Sans Flex (incluso nel sito), con l'asse ROND per titoli e numeri arrotondati; anche il logo è scritto con questo font
 - favicon con la linea di BCW nel colore del tema scelto nell'app (chiaro, scuro e colore d'accento)
 - icone Material Symbols Rounded
-- angoli ampi, liste segmentate, gruppi di pulsanti collegati, barra di navigazione corta e barra laterale (navigation rail), fogli dal basso e dialoghi
+- angoli ampi, liste segmentate, sezioni segmentate comprimibili, chip di stato, gruppi di pulsanti collegati, schede, barra di ricerca in alto, menu del pulsante d'azione flottante, barra degli strumenti flottante, selettore della data, barra di navigazione corta e barra di navigazione laterale, fogli dal basso e dialoghi
+- transizioni di Material 3: asse condiviso tra i giorni e tra le schede dei Voti, dissolvenza incrociata verso la ricerca
 - forme espressive (MaterialShapes): i voti in un "biscotto" a nove lobi, l'indicatore di caricamento che cambia forma ruotando, avatar e stati vuoti nelle forme di Material
 - medie in anelli con la parte piena ondulata e barre di avanzamento ondulate
 - animazioni a molla (pulsanti che stringono gli angoli alla pressione, selezioni che diventano pillole)
@@ -159,7 +163,9 @@ js/
 ├── theme-boot.js     Applica l'aspetto salvato prima del primo disegno
 ├── vendor/           material-color-utilities (licenza Apache 2.0), raccolta in un file
 ├── demo.js, pdf.js   Server demo e PDF di esempio
-├── components.js     Componenti (card, liste, badge voto, anelli ondulati, righe agenda…)
+├── components.js     Componenti (liste e sezioni segmentate, chip, badge voto, anelli ondulati, righe agenda…)
+├── calendar-bar.js   Settimana e mese come gruppo di pulsanti
+├── date-picker.js    Selettore della data di Material 3
 ├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo (testo e linea)
 ├── viewer.js         Anteprima dei file con zoom e schermo intero
 ├── charts.js         Grafici SVG

@@ -19,7 +19,6 @@ const defaults = {
   roundedText: 'titles',
   hideCompletedHomework: false,
   showUpcomingDays: true,
-  titleAbbreviation: 'automatic',
   collapsedSections: [],
   completedHomework: [],
   timetableMode: 'list',
@@ -27,8 +26,7 @@ const defaults = {
   newsNotifications: [],
 };
 
-export const DashboardMode = { list: { title: 'Lista', icon: 'list' }, calendar: { title: 'Calendario', icon: 'calendar' } };
-export const TitleAbbreviation = { automatic: 'Automatica', always: 'Sempre', never: 'Mai' };
+export const DashboardMode = { list: { title: 'Lista', icon: 'viewAgenda' }, calendar: { title: 'Calendario', icon: 'calendarMonth' } };
 export const AppearanceMode = { system: 'Automatico', light: 'Chiaro', dark: 'Scuro' };
 
 /** Tipi di novità che si possono notificare (Impostazioni › Notifiche › Novità). */

@@ -1,77 +1,41 @@
 // Dashboard: compiti, verifiche ed eventi del giorno scelto (di default domani), con la
 // settimana o il mese, le presenze e, per i giorni passati, le lezioni in una sezione separata.
-// Sui telefoni il calendario galleggia sopra i giorni e si riduce a una striscia scorrendo;
-// scorrendo di lato si passa al giorno prima o dopo.
+// In alto la barra di ricerca (sui telefoni) e la settimana come gruppo di pulsanti; sotto il
+// giorno in grande con i chip di stato e le sezioni segmentate. Scorrendo di lato si passa al
+// giorno prima o dopo, con la transizione ad asse condiviso.
 
 import {
-  card, collapsible, chevron, agendaEventRow, absenceRow, lessonRow, loadingCard, statusBanner, eyebrow,
-  sectionHeader, iconButton, divider, joinRows,
+  agendaEventRow, absenceRow, lessonRow, loadingCard, statusBanner, sectionHeader, collapsible, chevron,
+  segmentedSection, segCell, statusChip, dateBadge, axisPage, dayHero,
 } from '../components.js';
+import { calendarBar } from '../calendar-bar.js';
 import { icon } from '../icons.js';
 import { shape } from '../shapes.js';
 import {
-  addDays, addMonths, daysBetween, esc, fmt, isSameDay, isToday, isTomorrow, isWeekend, startOfDay,
-  startOfMonth, startOfWeek, groupBy, dayKey,
+  addDays, addMonths, esc, fmt, isToday, isTomorrow, isWeekend, startOfDay, startOfMonth, startOfWeek, groupBy, dayKey,
 } from '../util.js';
 import { DashboardMode } from '../prefs.js';
-
-const weekdaySymbols = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+import { AbsenceKind } from '../models.js';
 
 function dashState(ctx) {
   return ctx.state('dashboard', () => {
     const selected = addDays(startOfDay(new Date()), 1);
-    return { selected, month: startOfMonth(selected), dir: 0, collapsedDays: new Set() };
+    return { selected, dir: 0, weekDir: 0, monthDir: 0, collapsedDays: new Set() };
   });
 }
 
-/**
- * Cambia il giorno scelto. Insieme può cambiare anche l'identità di "Nei prossimi giorni",
- * così la sezione vecchia esce e quella nuova entra con il giorno: su schermi stretti sempre,
- * su quelli larghi solo se la sezione è espansa e il suo contenuto cambia davvero.
- */
+/** Cambia il giorno scelto, nel verso giusto per la transizione. */
 function select(ctx, day) {
   const s = dashState(ctx);
   const target = startOfDay(day);
   if (target.getTime() === s.selected.getTime()) return;
   navigator.vibrate?.(4);
-  const replacesUpcoming = !ctx.wide ||
-    (!ctx.prefs.isCollapsed('upcoming') && upcomingKey(ctx, s.selected) !== upcomingKey(ctx, target));
-  if (replacesUpcoming) s.upcomingGeneration = (s.upcomingGeneration ?? 0) + 1;
   s.dir = Math.sign(target - s.selected);
-  // La direzione dell'animazione cambia solo quando cambia la settimana o il mese.
+  // La settimana (o il mese) scorre solo quando cambia.
   if (startOfWeek(target).getTime() !== startOfWeek(s.selected).getTime()) s.weekDir = s.dir;
-  if (startOfMonth(target).getTime() !== s.month.getTime()) s.monthDir = Math.sign(startOfMonth(target) - s.month);
+  if (startOfMonth(target).getTime() !== startOfMonth(s.selected).getTime()) s.monthDir = s.dir;
   s.selected = target;
-  s.month = startOfMonth(target);
-}
-
-// MARK: - Titolo
-
-let measureCanvas = null;
-export function textWidth(text, font) {
-  measureCanvas ??= document.createElement('canvas');
-  const c = measureCanvas.getContext('2d');
-  c.font = font;
-  return c.measureText(text).width;
-}
-
-const fontFamily = () => getComputedStyle(document.documentElement).getPropertyValue('--font') || 'sans-serif';
-
-/** "Giovedì 1 ottobre" oppure, se non entra (o se l'utente lo preferisce), "Gio 1 ott". */
-function title(ctx, day) {
-  const full = fmt.relativeDayName(day);
-  const short = fmt.relativeShortDayName(day);
-  switch (ctx.prefs.get('titleAbbreviation')) {
-    case 'never': return full;
-    case 'always': return short;
-    default: {
-      // Sugli schermi larghi il titolo non si abbrevia mai in automatico (come sul Mac).
-      if (ctx.wide) return full;
-      let reserved = 16 + 48 + 8;
-      if (!isTomorrow(day)) reserved += textWidth('Domani', `600 14px ${fontFamily()}`) + 24 + 8;
-      return textWidth(full, `500 22px ${fontFamily()}`) <= ctx.mainWidth - reserved ? full : short;
-    }
-  }
+  s.collapsedDays.clear();
 }
 
 // MARK: - Pagina
@@ -85,39 +49,40 @@ export const dashboard = {
     const mode = ctx.prefs.dashboardMode;
     const model = ctx.model;
     const banner = model.lastError ? statusBanner(model.lastError, model.isOffline ? 'wifiOff' : 'alertTriangle') : '';
-    const detail = `<div class="day-transition dir-${s.dir}" data-key="day-${dayKey(day)}">${dayDetail(ctx, day)}</div>`;
-    const showUpcoming = ctx.prefs.showUpcomingDays;
-    // Cambia identità (e quindi si anima) solo quando lo decide `select`.
-    const upcoming = showUpcoming ? `<div class="day-transition dir-${s.dir}" data-key="up-${s.upcomingGeneration ?? 0}">${upcomingDays(ctx, day)}</div>` : '';
-    const menu = { icon: DashboardMode[mode].icon, label: 'Vista e filtri', action: 'dashboard-menu' };
-    const actions = [];
-    if (!isTomorrow(day)) actions.push({ text: 'Domani', action: 'day-tomorrow', help: 'Vai a domani (Alt+Maiusc+T)' });
-    actions.push(menu);
+    const month = mode === 'calendar';
+    const bar = calendarBar(ctx, {
+      selected: day, month, action: 'day-select', shiftAction: month ? 'month-shift' : 'week-shift', pickAction: 'day-pick',
+      dir: month ? s.monthDir : s.weekDir,
+    });
+    const jump = isTomorrow(day) ? null : { title: 'Domani', action: 'day-tomorrow', help: 'Vai a domani (Alt+Maiusc+T)' };
+    const detail = dayDetail(ctx, day, { jump });
+    // "Nei prossimi giorni" come la vista Programma di Google Calendar (solo nella vista Lista
+    // sui telefoni; sugli schermi larghi c'è spazio accanto al giorno anche con il mese).
+    const showsUpcoming = ctx.prefs.showUpcomingDays && (mode === 'list' || ctx.wide);
+    const upcoming = showsUpcoming ? upcomingDays(ctx, day) : '';
+    const actions = [{ icon: DashboardMode[mode].icon, label: 'Vista e filtri', action: 'dashboard-menu' }];
 
     if (ctx.wide) {
-      // Come sul Mac: il giorno scelto è il titolo; a destra "Domani" e il menu della vista.
-      const calendar = mode === 'calendar' ? monthCalendar(ctx, s) : weekStrip(ctx, s);
       return {
-        title: title(ctx, day),
+        title: 'Dashboard',
         actions,
         split: ctx.splitWide
-          ? { sideWidth: 360, side: calendar + upcoming, main: banner + detail }
-          : { side: calendar, main: banner + detail + upcoming },
+          ? { sideWidth: 380, side: bar + upcoming, main: banner + axisPage('dashboard-day', s.dir, `day-${dayKey(day)}`, detail) }
+          : { side: bar, main: banner + axisPage('dashboard-day', s.dir, `day-${dayKey(day)}`, detail + upcoming) },
         refresh: () => model.refreshAll(),
       };
     }
-
-    const header = mode === 'calendar' ? monthCalendar(ctx, s, { floating: true }) : weekStrip(ctx, s, { floating: true });
     return {
-      title: title(ctx, day),
+      title: 'Dashboard',
+      searchBar: { prompt: 'Cerca nel registro' },
       actions,
-      floating: header.floating,
-      body: `${banner ? `<div class="banner-slot">${banner}</div>` : ''}<div class="day-swipe" data-day-swipe="day-shift"><div class="stack gap-16">${detail}${mode === 'list' ? upcoming : ''}</div></div>`,
+      fixed: bar,
+      body: `${banner ? `<div class="banner-slot">${banner}</div>` : ''}<div class="day-swipe" data-day-swipe="day-shift">${axisPage('dashboard-day', s.dir, `day-${dayKey(day)}`, `<div class="stack gap-20">${detail}${upcoming}</div>`)}</div>`,
       refresh: () => model.refreshAll(),
     };
   },
 
-  /** Nuovo tocco sulla scheda: in cima (con il calendario intero), poi a domani. */
+  /** Nuovo tocco sulla scheda: in cima, poi a domani. */
   reselect(ctx) {
     const scroller = ctx.pageScroller();
     if (scroller && scroller.scrollTop > 2) {
@@ -128,27 +93,25 @@ export const dashboard = {
   },
 
   actions: {
-    'day-prev': (ctx) => select(ctx, addDays(dashState(ctx).selected, -1)),
-    'day-next': (ctx) => select(ctx, addDays(dashState(ctx).selected, 1)),
     'day-shift': (ctx, el) => select(ctx, addDays(dashState(ctx).selected, Number(el.dataset.delta))),
     'day-today': (ctx) => select(ctx, new Date()),
     'day-tomorrow': (ctx) => select(ctx, addDays(new Date(), 1)),
     'day-select': (ctx, el) => select(ctx, new Date(Number(el.dataset.time))),
+    'day-pick': (ctx) => ctx.openDatePicker({ selection: dashState(ctx).selected, onPick: (day) => select(ctx, day) }),
     'week-shift': (ctx, el) => select(ctx, addDays(dashState(ctx).selected, 7 * Number(el.dataset.delta))),
     'month-shift': (ctx, el) => {
       const s = dashState(ctx);
-      s.month = addMonths(s.month, Number(el.dataset.delta));
-      s.monthDir = Number(el.dataset.delta);
+      const target = addMonths(s.selected, Number(el.dataset.delta));
+      // Stesso numero del giorno, se il mese ce l'ha.
+      const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+      select(ctx, new Date(target.getFullYear(), target.getMonth(), Math.min(s.selected.getDate(), last)));
     },
     'dashboard-menu': (ctx, el) => {
       const prefs = ctx.prefs;
       const mode = prefs.dashboardMode;
       const items = [{ section: 'Vista' }];
       for (const [key, value] of Object.entries(DashboardMode)) {
-        items.push({ label: value.title, icon: value.icon, checked: mode === key, run: () => {
-          prefs.set('dashboardMode', key);
-          ctx.pageScroller()?.scrollTo({ top: 0 });
-        } });
+        items.push({ label: value.title, icon: value.icon, checked: mode === key, run: () => prefs.set('dashboardMode', key) });
       }
       items.push({ divider: true });
       items.push({ label: 'Vai a oggi', icon: 'sun', run: () => { select(ctx, new Date()); ctx.update(); } });
@@ -160,7 +123,6 @@ export const dashboard = {
       }
       ctx.openMenu(el, items);
     },
-    'toggle-section': (ctx, el) => ctx.prefs.toggleCollapsed(el.dataset.section),
     'upcoming-day-toggle': (ctx, el) => {
       const s = dashState(ctx);
       const time = Number(el.dataset.time);
@@ -170,103 +132,35 @@ export const dashboard = {
   },
 };
 
-// MARK: - Settimana
-
-function dots(ctx, day, selected) {
-  const events = ctx.model.events(day);
-  const result = [];
-  if (events.some((e) => e.kind === 'homework')) result.push('var(--neutral)');
-  if (events.some((e) => e.kind === 'test')) result.push(selected ? 'var(--on-primary)' : 'var(--primary)');
-  if (events.some((e) => e.kind === 'event')) result.push('var(--fair)');
-  if (ctx.model.absencesOn(day).length) result.push('var(--poor)');
-  return result.map((c) => `<i style="background:${c}"></i>`).join('');
-}
-
-function dayNumberClass(ctx, day, selected) {
-  const cls = [];
-  if (selected) cls.push('selected');
-  if (isToday(day)) cls.push('today');
-  if (isWeekend(day) || ctx.model.calendarStatus(day)?.isHoliday) cls.push('muted');
-  return cls.join(' ');
-}
-
-export const WEEK_FULL = 140;
-export const STRIP = 56;
-
-/**
- * Striscia della settimana. Con `floating` la card galleggia sopra il contenuto e si riduce
- * a una striscia di numeri scorrendo (l'avanzamento arriva da `--p`).
- */
-export function weekStrip(ctx, s, { action = 'day-select', shiftAction = 'week-shift', floating = false, extra = '', dotsFor = dots } = {}) {
-  const week = startOfWeek(s.selected);
-  const cells = [0, 1, 2, 3, 4, 5, 6].map((offset) => {
-    const day = addDays(week, offset);
-    const selected = isSameDay(day, s.selected);
-    return `<button class="day-cell ${dayNumberClass(ctx, day, selected)}" data-action="${action}" data-time="${day.getTime()}" aria-label="${esc(fmt.longDay(day))}" aria-pressed="${selected}">
-      <span class="sel-bg"></span><span class="wd">${fmt.weekdayNarrow(day)}</span>
-      <span class="num numeral">${day.getDate()}</span>
-      <span class="dots">${dotsFor(ctx, day, selected)}</span></button>`;
-  }).join('');
-  const html = `<div class="cal-card week ${floating ? 'floating' : ''}" data-swipe="${shiftAction}">
-    <div class="cal-head"><h3>${esc(fmt.monthYear(s.selected))}</h3><div class="cal-nav">
-      ${iconButton('chevronLeft', { action: shiftAction, params: { delta: -1 }, label: 'Settimana precedente', cls: 'small' })}
-      ${iconButton('chevronRight', { action: shiftAction, params: { delta: 1 }, label: 'Settimana successiva', cls: 'small' })}</div></div>
-    <div class="week-strip"><div class="week-row slide-${s.weekDir ?? 0}" data-key="w-${dayKey(week)}">${cells}</div></div></div>`;
-  if (floating) return { floating: { html: html + extra, full: WEEK_FULL, collapsed: STRIP, cls: 'week' } };
-  return html;
-}
-
-// MARK: - Mese
-
-/** Settimane del mese, da lunedì a domenica (con i giorni dei mesi accanto). */
-function monthRows(month) {
-  const first = startOfMonth(month);
-  const rows = [];
-  for (let week = startOfWeek(first); rows.length < 6; week = addDays(week, 7)) {
-    if (rows.length && week.getMonth() !== month.getMonth()) break;
-    rows.push([0, 1, 2, 3, 4, 5, 6].map((i) => addDays(week, i)));
-  }
-  return rows;
-}
-
-export function monthCalendar(ctx, s, { action = 'day-select', shiftAction = 'month-shift', legend = true, floating = false, extra = '', dotsFor = dots } = {}) {
-  const month = s.month;
-  const rows = monthRows(month);
-  const selectedRow = Math.max(0, rows.findIndex((row) => row.some((d) => isSameDay(d, s.selected) && d.getMonth() === month.getMonth())));
-  const html = `<div class="cal-card month ${floating ? 'floating' : ''}" style="--rows:${rows.length};--sel-row:${selectedRow}">
-    <div class="cal-head"><h3>${esc(fmt.monthYear(month))}</h3><div class="cal-nav">
-      ${iconButton('chevronLeft', { action: shiftAction, params: { delta: -1 }, label: 'Mese precedente', cls: 'small' })}
-      ${iconButton('chevronRight', { action: shiftAction, params: { delta: 1 }, label: 'Mese successivo', cls: 'small' })}</div></div>
-    <div class="weekday-row">${weekdaySymbols.map((w) => `<span>${w}</span>`).join('')}</div>
-    <div class="month-grid" data-swipe="${shiftAction}"><div class="month-page slide-${Math.sign(s.monthDir ?? 0)}" data-key="m-${dayKey(month)}">
-      ${rows.map((row, index) => `<div class="month-row ${index === selectedRow ? 'sel-row' : ''}">${row.map((day) => {
-    const outside = day.getMonth() !== month.getMonth();
-    const selected = !outside && isSameDay(day, s.selected);
-    const holiday = !outside && ctx.model.calendarStatus(day)?.isHoliday;
-    return `<button class="month-cell ${outside ? 'outside' : ''} ${dayNumberClass(ctx, day, selected)} ${holiday && !selected ? 'holiday' : ''}" data-action="${action}" data-time="${day.getTime()}" aria-label="${esc(fmt.longDay(day))}" aria-pressed="${selected}"${outside ? ' tabindex="-1"' : ''}>
-        <span class="num numeral">${day.getDate()}</span><span class="dots">${outside ? '' : dotsFor(ctx, day, selected)}</span></button>`;
-  }).join('')}</div>`).join('')}
-    </div></div>
-    ${legend ? `<div class="legend">${[['var(--neutral)', 'Compiti'], ['var(--primary)', 'Verifiche'], ['var(--fair)', 'Eventi'], ['var(--poor)', 'Assenze']]
-    .map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join('')}</div>` : ''}</div>`;
-  if (floating) {
-    const full = 12 + 44 + 20 + rows.length * 44 + (rows.length - 1) * 2 + 8 + (legend ? 24 : 0) + 12;
-    return { floating: { html: html + extra, full, collapsed: STRIP, cls: 'month' } };
-  }
-  return html;
-}
-
 // MARK: - Giorno
 
-function collapsibleCard(ctx, section, title, iconName, content, trailing = '') {
-  const collapsed = ctx.prefs.isCollapsed(section);
-  return card(`<button class="collapsible-header" data-action="toggle-section" data-section="${section}" aria-expanded="${!collapsed}">
-      <span class="label">${icon(iconName)}${esc(title)}</span><span class="flex"></span>
-      ${trailing ? `<span class="trailing">${esc(trailing)}</span>` : ''}${chevron(collapsed)}</button>
-    ${collapsible(!collapsed, `<div class="rows">${content}</div>`, { spacing: 14 })}`, { cls: 'day-card' });
+/** Chip di stato del giorno: verifiche, compiti, assenze, vacanza o fine settimana, ore di lezione. */
+function statusChips(ctx, day, { tests, homework, completed, absences, lessons, isPastOrToday }) {
+  const chips = [];
+  if (tests) chips.push(statusChip(tests === 1 ? '1 verifica' : `${tests} verifiche`, 'test', 'tertiary'));
+  if (homework) {
+    const done = completed === homework;
+    chips.push(statusChip(done ? 'Compiti fatti' : (homework === 1 ? '1 compito' : `${homework} compiti`), done ? 'checkCircle' : 'book'));
+  }
+  const kinds = [...new Set(absences.map((a) => a.kind))];
+  for (const kind of kinds.sort()) chips.push(statusChip(AbsenceKind[kind]?.title ?? 'Assenza', 'userClock', 'poor'));
+  if (!chips.length) {
+    if (ctx.model.calendarStatus(day)?.isHoliday) chips.push(statusChip('Vacanza', 'beach', 'good'));
+    else if (isWeekend(day)) chips.push(statusChip('Fine settimana', 'sun', 'good'));
+  }
+  if (isPastOrToday && lessons.length) {
+    const hours = lessons.reduce((sum, l) => sum + Math.trunc(l.duration), 0);
+    chips.push(statusChip(hours === 1 ? '1 ora di lezione' : `${hours} ore di lezione`, 'bookText', 'surface'));
+  }
+  return chips;
 }
 
-export function dayDetail(ctx, day) {
+/**
+ * Tutto ciò che riguarda un giorno: in cima il giorno in grande con i chip di stato, sotto
+ * verifiche ed eventi, compiti, presenze e (per i giorni passati) le lezioni svolte, ognuno in
+ * una sezione segmentata.
+ */
+export function dayDetail(ctx, day, { jump = null } = {}) {
   const model = ctx.model;
   const prefs = ctx.prefs;
   const events = model.events(day).filter((e) => !(prefs.hideCompletedHomework && prefs.isCompleted(e)));
@@ -277,7 +171,7 @@ export function dayDetail(ctx, day) {
   const lessons = model.lessons(day);
   const isPastOrToday = startOfDay(day) <= startOfDay(new Date());
   const hasAgenda = homework.length || testsAndEvents.length || absences.length;
-  const loaded = model.hasLoadedLessons(day);
+  const completed = homework.filter((e) => prefs.isCompleted(e)).length;
 
   if (isPastOrToday) {
     // Anche dopo ogni aggiornamento completo, che azzera le lezioni già scaricate.
@@ -285,54 +179,37 @@ export function dayDetail(ctx, day) {
     ctx.task(`lessons-${dayKey(week)}-${model.lastUpdated?.getTime() ?? 0}`, () => model.ensureLessons(week, addDays(week, 6)));
   }
 
-  const agendaRow = (e) => agendaEventRow(e, { done: prefs.isCompleted(e), expanded: ctx.app.viewState.get('expanded')?.has(`${e.id}`) });
-  let agenda = '';
+  const expanded = ctx.app.viewState.get('expanded');
+  const agendaCell = (e) => segCell(agendaEventRow(e, { done: prefs.isCompleted(e), expanded: expanded?.has(`${e.id}`) }));
+  const parts = [];
   if (testsAndEvents.length) {
-    agenda += collapsibleCard(ctx, 'testsAndEvents', 'Verifiche ed eventi', 'test', joinRows(testsAndEvents, agendaRow));
+    parts.push(segmentedSection(ctx, { section: 'testsAndEvents', title: 'Verifiche ed eventi', iconName: 'test', color: 'var(--tertiary)',
+      trailing: String(testsAndEvents.length), cells: testsAndEvents.map(agendaCell) }));
   }
   if (homework.length) {
-    const done = homework.filter((e) => prefs.isCompleted(e)).length;
-    agenda += collapsibleCard(ctx, 'homework', 'Compiti', 'book', joinRows(homework, agendaRow), `${done}/${homework.length}`);
+    parts.push(segmentedSection(ctx, { section: 'homework', title: 'Compiti', iconName: 'book',
+      trailing: `${completed}/${homework.length}`, progress: completed / homework.length, cells: homework.map(agendaCell) }));
   }
   if (absences.length) {
-    agenda += collapsibleCard(ctx, 'attendance', 'Presenze', 'userClock', joinRows(absences, (a) => absenceRow(a)));
+    parts.push(segmentedSection(ctx, { section: 'attendance', title: 'Presenze', iconName: 'userClock', color: 'var(--poor)',
+      cells: absences.map((a) => segCell(absenceRow(a))) }));
   }
-
-  let lessonsSection = '';
-  if (lessons.length) {
-    const hours = lessons.reduce((s, l) => s + Math.trunc(l.duration), 0);
-    lessonsSection = collapsibleCard(ctx, 'lessons', 'Lezioni', 'bookText', joinRows(lessons, lessonRow), `${hours} ore`);
-  } else if (!loaded && !isWeekend(day)) {
-    lessonsSection = loadingCard('Carico le lezioni…');
+  if (isPastOrToday) {
+    if (lessons.length) {
+      const hours = lessons.reduce((sum, l) => sum + Math.trunc(l.duration), 0);
+      parts.push(segmentedSection(ctx, { section: 'lessons', title: 'Lezioni', iconName: 'bookText', color: 'var(--secondary)',
+        trailing: `${hours} ore`, cells: lessons.map((l) => segCell(lessonRow(l))) }));
+    } else if (!model.hasLoadedLessons(day) && !isWeekend(day)) {
+      parts.push(loadingCard('Carico le lezioni…'));
+    }
   }
 
   const weekend = isWeekend(day);
-  const empty = card(`<div class="empty-day"><span class="empty-day-art shaped">${shape(weekend ? 'sunny' : 'cookie9Sided')}${icon(weekend ? 'sun' : 'checkSeal')}</span>
-    <div><h3>${weekend ? 'Goditi il weekend' : 'Niente in programma'}</h3>
-    <p>Nessun compito, verifica o evento per questo giorno.</p></div></div>`, { cls: 'empty-card' });
-  const noLessons = card(`<div class="no-lessons">${icon('bookText')}<span>Nessuna lezione registrata</span></div>`);
-
-  const tests = events.filter((e) => e.kind === 'test').length;
-  const parts = [];
-  if (tests) parts.push(tests === 1 ? '1 verifica' : `${tests} verifiche`);
-  if (homework.length) parts.push(homework.length === 1 ? '1 compito' : `${homework.length} compiti`);
-  let status = parts.join(' · ');
-  if (!status) {
-    if (model.calendarStatus(day)?.isHoliday) status = 'Giorno di vacanza';
-    else if (weekend) status = 'Fine settimana';
-  }
-  const header = `<div class="day-header"><h2>${esc(fmt.longDay(day))}</h2>${status ? `<p>${esc(status)}</p>` : ''}</div>`;
-
-  // Su schermi larghi, se c'è spazio, le lezioni vanno in una colonna a parte.
-  const columnWidth = ctx.splitWide ? ctx.mainWidth - 360 - 40 - 44 : ctx.mainWidth - 56;
-  const splitsLessons = ctx.wide && isPastOrToday && columnWidth >= 580 && !(weekend && !lessons.length);
-  if (splitsLessons) {
-    return `<div class="stack gap-16">${header}<div class="two-columns">
-      <div class="stack gap-12">${hasAgenda ? '' : empty}${agenda}</div>
-      <div class="stack gap-12">${lessonsSection}${!lessons.length && loaded ? noLessons : ''}</div></div></div>`;
-  }
+  const empty = `<div class="empty-day"><span class="empty-day-art shaped">${shape(weekend ? 'sunny' : 'cookie9Sided')}${icon(weekend ? 'sun' : 'checkSeal')}</span>
+    <h3>${weekend ? 'Goditi il weekend' : 'Niente in programma'}</h3><p>Nessun compito, verifica o evento per questo giorno.</p></div>`;
   const showEmpty = !hasAgenda && (!lessons.length || !isPastOrToday);
-  return `<div class="stack gap-12">${header}${showEmpty ? empty : ''}${agenda}${isPastOrToday ? lessonsSection : ''}</div>`;
+  const chips = statusChips(ctx, day, { tests: events.filter((e) => e.kind === 'test').length, homework: homework.length, completed, absences, lessons, isPastOrToday });
+  return `<div class="stack gap-20">${dayHero(day, { jump, chips })}${showEmpty ? empty : ''}${parts.join('')}</div>`;
 }
 
 // MARK: - Giorni successivi
@@ -347,13 +224,22 @@ function upcomingList(ctx, after) {
   return [...groupBy(upcoming, (e) => e.day.getTime()).entries()].sort(([a], [b]) => a - b);
 }
 
-function upcomingKey(ctx, after) {
-  return upcomingList(ctx, after).map(([time, events]) => `${time}:${events.map((e) => e.id).join(',')}`).join('|');
+function summary(events) {
+  const tests = events.filter((e) => e.kind === 'test').length;
+  const homework = events.filter((e) => e.kind === 'homework').length;
+  const other = events.length - tests - homework;
+  const parts = [];
+  if (tests) parts.push(tests === 1 ? '1 verifica' : `${tests} verifiche`);
+  if (homework) parts.push(homework === 1 ? '1 compito' : `${homework} compiti`);
+  if (other) parts.push(other === 1 ? '1 evento' : `${other} eventi`);
+  return parts.join(' · ');
 }
 
 /**
- * "Nei prossimi giorni": una card comprimibile per giorno. Il titolo comprime il giorno;
- * toccando il resto della card (o una riga con il testo intero) si va a quel giorno.
+ * "Nei prossimi giorni", come la vista Programma di Google Calendar: a sinistra la data in un
+ * riquadro (toccandola si va a quel giorno), a destra il nome del giorno, che comprime gli
+ * elementi, e gli elementi in una lista segmentata. Toccando un elemento che non fa già
+ * qualcosa (la casella del compito, il testo tagliato che si apre) si va al giorno.
  */
 function upcomingDays(ctx, after) {
   const prefs = ctx.prefs;
@@ -366,18 +252,19 @@ function upcomingDays(ctx, after) {
     const day = new Date(time);
     const closed = s.collapsedDays.has(time);
     const sorted = [...events].sort((a, b) => (a.kind === 'test' ? 0 : 1) - (b.kind === 'test' ? 0 : 1));
-    const count = events.length === 1 ? '1 elemento' : `${events.length} elementi`;
-    return `<div class="card upcoming-card" data-action="day-select" data-time="${time}" data-key="upd-${time}" title="Vai a ${esc(fmt.relativeDayName(day))}">
-      <button class="upcoming-head" data-action="upcoming-day-toggle" data-time="${time}" aria-expanded="${!closed}" aria-label="${closed ? 'Mostra gli elementi' : 'Nasconde gli elementi'}">
-        ${eyebrow(fmt.relativeDayName(day), 'var(--primary)')}<span class="flex"></span>
-        <span class="upcoming-count ${closed ? 'shown' : ''}">${count}</span>${chevron(closed)}</button>
-      ${collapsible(!closed, `<div class="rows">${joinRows(sorted, (e) => agendaEventRow(e, {
-    done: prefs.isCompleted(e), scope: 'up', expanded: expanded?.has(`up${e.id}`), plainTap: time,
-  }))}</div>`, { spacing: 12 })}</div>`;
+    const cells = sorted.map((e) => segCell(agendaEventRow(e, {
+      done: prefs.isCompleted(e), scope: 'up', expanded: expanded?.has(`up${e.id}`), plainTap: time,
+    }), { cls: 'tap-day', attrs: ` data-action="day-select" data-time="${time}"` }));
+    return `<div class="upcoming-day" data-key="upd-${time}">
+      <button class="date-badge-btn" data-action="day-select" data-time="${time}" aria-label="Vai a ${esc(fmt.relativeDayName(day))}" title="Vai a ${esc(fmt.relativeDayName(day))}">${dateBadge(day, { highlighted: events.some((e) => e.kind === 'test'), today: isToday(day) })}</button>
+      <div class="upcoming-body">
+        <button class="upcoming-head" data-action="upcoming-day-toggle" data-time="${time}" aria-expanded="${!closed}">
+          <span class="grow"><strong>${esc(fmt.relativeDayName(day))}</strong><small>${esc(summary(events))}</small></span>${chevron(closed)}</button>
+        ${collapsible(!closed, `<div class="list-group">${cells.join('')}</div>`)}</div></div>`;
   }).join('');
   return `<div class="upcoming"><button class="section-toggle" data-action="toggle-section" data-section="upcoming" aria-expanded="${!collapsed}">
     ${sectionHeader('Nei prossimi giorni', { trailing: chevron(collapsed) })}</button>
-    ${collapsible(!collapsed, `<div class="stack gap-12">${list}</div>`, { spacing: 12 })}</div>`;
+    ${collapsible(!collapsed, `<div class="stack gap-16">${list}</div>`, { spacing: 12 })}</div>`;
 }
 
-export { daysBetween, divider, select as selectDashboardDay };
+export { select as selectDashboardDay };
