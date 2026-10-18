@@ -819,6 +819,28 @@ export class TimetableStore {
     BlobStore.removeAll(fileSpace(owner));
   }
 
+  /** Il JSON salvato dell'orario di un proprietario (`null` se non c'è). */
+  static storedText(owner) {
+    try { return localStorage.getItem(storageKey(owner)); } catch { return null; }
+  }
+
+  /** Chiave di un file allegato in `BlobStore`. */
+  static fileKey(owner, storedName) { return `${fileSpace(owner)}/${storedName}`; }
+
+  /**
+   * Copia orario e file da un proprietario a un altro che non ha ancora un orario (es. un
+   * account del browser abbinato a un account BCW, che sul server ha un altro id).
+   */
+  static async copyData(from, to) {
+    const text = TimetableStore.storedText(from);
+    if (!text || TimetableStore.storedText(to)) return;
+    for (const key of await BlobStore.keys(fileSpace(from))) {
+      const blob = await BlobStore.get(key);
+      if (blob) await BlobStore.put(`${fileSpace(to)}/${key.slice(fileSpace(from).length + 1)}`, blob);
+    }
+    try { localStorage.setItem(storageKey(to), text); } catch { /* archiviazione piena */ }
+  }
+
   save() {
     if (this.owner == null) return;
     try {
@@ -826,7 +848,31 @@ export class TimetableStore {
       this.saveError = null;
     } catch (error) {
       this.saveError = error.message;
+      return;
     }
+    this.onSaved?.(this.owner);
+  }
+
+  /**
+   * Sostituisce l'orario di un proprietario con quello arrivato dal server (senza avvisare
+   * `onSaved`). Restituisce il JSON salvato.
+   */
+  applyRemote(owner, data) {
+    let timetable;
+    try {
+      timetable = decodeTimetable(data);
+    } catch {
+      return TimetableStore.storedText(owner);
+    }
+    const text = JSON.stringify(encodeTimetable(timetable));
+    try { localStorage.setItem(storageKey(owner), text); } catch { /* archiviazione piena */ }
+    if (owner === this.owner) {
+      this.timetable = timetable;
+      this.reindex();
+      this.removeUnreferencedFiles();
+      this.onChange?.();
+    }
+    return text;
   }
 
   reindex() {
@@ -1049,7 +1095,11 @@ export class TimetableStore {
 
   /** Il file di un allegato, pronto per l'anteprima (come Quick Look). */
   async openAttachment(attachment) {
-    const blob = this.owner != null ? await BlobStore.get(`${fileSpace(this.owner)}/${attachment.storedName}`) : null;
+    let blob = this.owner != null ? await BlobStore.get(`${fileSpace(this.owner)}/${attachment.storedName}`) : null;
+    // Con un account BCW il file può essere solo sul server (aggiunto da un altro dispositivo).
+    if (!blob && this.owner != null && this.remoteFile) {
+      try { blob = await this.remoteFile(this.owner, attachment.storedName); } catch { /* non disponibile */ }
+    }
     if (!blob) throw new Error(`Il file «${attachment.name}» non è più disponibile.`);
     const type = blob.type || fileTypes[fileExtension(attachment.name).toLowerCase()] || 'application/octet-stream';
     const typed = blob.type ? blob : new Blob([blob], { type });

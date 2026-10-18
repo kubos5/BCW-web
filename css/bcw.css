@@ -1592,6 +1592,11 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .login-error { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--r-l); background: var(--poor-container); color: var(--on-poor-container); font-size: 14px; }
 .login-error .icon { width: 20px; height: 20px; }
 .login-footer { display: flex; flex-direction: column; gap: 8px; text-align: center; font-size: 12px; line-height: 16px; color: var(--on-surface-variant); }
+.login-mode .segmented > button { height: 48px; font-size: 15px; }
+.login-intro { margin: 0; text-align: center; font-size: 15px; line-height: 22px; color: var(--on-surface-variant); }
+.login-hint { margin: -4px 4px 2px; font-size: 12px; line-height: 16px; color: var(--on-surface-variant); }
+.login-notice { display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 16px; border-radius: var(--r-l); background: var(--secondary-container); color: var(--on-secondary-container); font-size: 14px; }
+.login-notice .icon { width: 20px; height: 20px; flex: none; }
 .proxy-line { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .proxy-line .icon { width: 16px; height: 16px; }
 .proxy-warning { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--r-li); background: var(--fair-container); color: var(--on-fair-container); font-size: 14px; }

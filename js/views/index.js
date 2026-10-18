@@ -86,8 +86,9 @@ export const commonActions = {
     ctx.openMenu({ x: event?.clientX ?? 0, y: event?.clientY ?? 0 }, items, { align: 'start' });
   },
   'context-account': (ctx, el, event) => {
+    const cloud = ctx.model.isCloud;
     ctx.openMenu({ x: event?.clientX ?? 0, y: event?.clientY ?? 0 }, [
-      { label: 'Rimuovi', icon: 'trash', destructive: true, run: () => ctx.run('account-remove', el) },
+      { label: cloud ? 'Scollega da BCW' : 'Rimuovi', icon: cloud ? 'minusCircle' : 'trash', destructive: true, run: () => ctx.run('account-remove', el) },
     ], { align: 'start' });
   },
   'add-account': (ctx) => (ctx.app.sheet ? ctx.pushSheet(addAccountSheet()) : ctx.openSheet(addAccountSheet())),
@@ -95,6 +96,11 @@ export const commonActions = {
   'account-switcher': (ctx) => ctx.openSheet(accountSwitcherSheet()),
   'sign-out': (ctx) => {
     const model = ctx.model;
+    // Con un account BCW si esce dall'account BCW (gli account abbinati restano sul server).
+    if (model.isCloud && !model.isDemo) {
+      ctx.run('cloud-sign-out');
+      return;
+    }
     ctx.confirm({
       title: model.isDemo ? 'Vuoi uscire dalla demo?' : `Vuoi uscire da ${model.displayName}?`,
       message: model.isDemo ? model.demoExitMessage : 'Le credenziali di questo account verranno rimosse da questo browser.',

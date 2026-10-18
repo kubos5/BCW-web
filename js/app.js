@@ -14,6 +14,7 @@ import { viewerState, renderViewer, viewerActions, viewerKey, installViewerGestu
 import { datePickerState, renderDatePicker, datePickerActions } from './date-picker.js';
 import { Reminders } from './reminders.js';
 import { Proxy } from './api.js';
+import { BCWServer } from './cloud.js';
 import { esc } from './util.js';
 import { avatar, loadingIndicator, subjectColor } from './components.js';
 import { shape } from './shapes.js';
@@ -869,19 +870,22 @@ const shellActions = {
 
 /** Menu dell'account attivo in fondo alla barra laterale. */
 function accountMenuItems(ctx) {
-  const items = [{ section: 'Account' }];
+  const items = [{ section: model.isCloud ? `Account BCW · ${model.cloudUser?.username ?? ''}` : 'Account' }];
   for (const account of model.accounts) {
     const active = !model.isDemo && account.id === model.activeAccountID;
     items.push({ label: account.name, checked: active, disabled: active, run: () => model.switchAccount(account.id) });
   }
   if (model.isDemo) items.push({ label: 'Demo', checked: true, disabled: true });
-  items.push({ label: 'Aggiungi account…', icon: 'userPlus', run: () => commonActions['add-account'](ctx) });
+  items.push({ label: model.isCloud ? 'Abbina un account…' : 'Aggiungi account…', icon: 'userPlus', run: () => commonActions['add-account'](ctx) });
   if (!model.isDemo) items.push({ label: 'Prova la demo', icon: 'sparkles', run: () => model.startDemo() });
   items.push({ divider: true });
   items.push({ label: 'Gestisci account', icon: 'manageAccounts', run: () => { selectSection('you'); if (currentPath() !== 'account') navigate('account'); } });
   items.push({ label: 'Impostazioni', icon: 'gear', run: () => shellActions['open-settings']() });
   items.push({ divider: true });
-  items.push({ label: model.isDemo ? 'Esci dalla demo…' : 'Esci da questo account…', icon: 'logout', run: () => commonActions['sign-out'](ctx) });
+  let signOutLabel = 'Esci da questo account…';
+  if (model.isDemo) signOutLabel = 'Esci dalla demo…';
+  else if (model.isCloud) signOutLabel = 'Esci da BCW…';
+  items.push({ label: signOutLabel, icon: 'logout', run: () => commonActions['sign-out'](ctx) });
   return items;
 }
 
@@ -1194,7 +1198,13 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => app.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     hiddenAt = Date.now();
-  } else if (model.preferences.get('useLock') && model.phase === 'signedIn' && hiddenAt && Date.now() - hiddenAt > 30_000) {
+    // Le modifiche in attesa per l'account BCW partono subito.
+    if (model.isCloud) model.sync.flush();
+    return;
+  }
+  // Tornando su BCW si prendono le modifiche fatte sugli altri dispositivi.
+  if (model.isCloud) model.refreshCloud();
+  if (model.preferences.get('useLock') && model.phase === 'signedIn' && hiddenAt && Date.now() - hiddenAt > 30_000) {
     Lock.lock();
     app.update();
   }
@@ -1202,7 +1212,7 @@ document.addEventListener('visibilitychange', () => {
 let hiddenAt = null;
 
 async function start() {
-  await Promise.all([Lock.detect(), Proxy.init()]);
+  await Promise.all([Lock.detect(), Proxy.init(), BCWServer.init()]);
   const initial = location.hash ? parsePath(location.hash).path : null;
   let saved = null;
   try { saved = localStorage.getItem('bcw.section'); } catch { /* ignorato */ }

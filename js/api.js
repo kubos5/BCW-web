@@ -42,7 +42,7 @@ export function normalizeProxyURL(value) {
 
 const sameSiteProxy = () => new URL('api', document.baseURI).href.replace(/\/+$/, '');
 
-async function fetchWithTimeout(url, ms, options = {}) {
+export async function fetchWithTimeout(url, ms, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
@@ -50,6 +50,16 @@ async function fetchWithTimeout(url, ms, options = {}) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+let configPromise = null;
+
+/** `config.json` nella radice del sito (proxy e server BCW predefiniti), letto una volta. */
+export function loadConfig() {
+  configPromise ??= fetchWithTimeout(new URL('config.json', document.baseURI), 4000, { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+  return configPromise;
 }
 
 export const Proxy = {
@@ -67,10 +77,7 @@ export const Proxy = {
   async init() {
     const local = sameSiteProxy();
     const [configured, hasLocal] = await Promise.all([
-      fetchWithTimeout(new URL('config.json', document.baseURI), 4000, { cache: 'no-cache' })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((config) => normalizeProxyURL(config?.proxy))
-        .catch(() => ''),
+      loadConfig().then((config) => normalizeProxyURL(config?.proxy)),
       fetchWithTimeout(`${local}/ping`, 3000, { cache: 'no-store' })
         .then((r) => !!r.headers.get('X-BCW-Proxy'))
         .catch(() => false),
