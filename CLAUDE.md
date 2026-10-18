@@ -26,7 +26,8 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   abbina sul server (`POST /accounts`); il cestino diventa "Scollega" (`unlinkAccount`). `refreshCloud` (all'avvio, con
   Aggiorna, tornando sulla pagina, al massimo ogni 30 s) allinea gli account; un 401 fa uscire con `cloudNotice`.
   Lato Classeviva: `classevivaLinks()`/`removeClassevivaLink()` con il token di Classeviva (`linksSection` in
-  Impostazioni). Sincronizzazione (`CloudSync`): impostazioni di `SYNCED_PREFERENCES` con unione a tre vie (validate prima
+  Impostazioni; senza account BCW l'elenco si carica solo con "Mostra gli account BCW abbinati", perché il server
+  riceve il token). Sincronizzazione (`CloudSync`): impostazioni di `SYNCED_PREFERENCES` con unione a tre vie (validate prima
   di applicarle), orario per account (vince il lato cambiato, entrambi = questo dispositivo, la prima volta il server) con
   i file caricati prima dell'orario; `Preferences.onPersist` e `TimetableStore.onSaved` avvisano, `applyRemote` non
   avvisa. Per provarla in locale: BCW-api con `npm start` e il suo indirizzo in Server BCW.

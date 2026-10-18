@@ -312,11 +312,20 @@ export function cloudSection(ctx) {
 /**
  * Account BCW a cui è abbinato il profilo Classeviva attivo, con lo scollegamento: funziona
  * anche entrando con l'account Classeviva, senza conoscere la password di quegli account BCW.
+ * Senza account BCW l'elenco si carica solo a richiesta, perché il server BCW riceve il token
+ * della sessione di Classeviva per verificare l'accesso.
  */
 export function linksSection(ctx) {
   const model = ctx.model;
   if (model.isDemo || !model.client || !model.activeAccountID || !BCWServer.isConfigured) return '';
-  const s = ctx.state(`cvv-links-${model.activeAccountID}`, { links: null, error: null, round: 0 });
+  const s = ctx.state(`cvv-links-${model.activeAccountID}`, { links: null, error: null, round: 0, requested: false });
+  const name = model.activeAccount?.name ?? 'questo account Classeviva';
+  if (!model.isCloud && !s.requested) {
+    return section([buttonRow('Mostra gli account BCW abbinati', 'cvv-links-show', 'cloud')], {
+      header: 'Account BCW abbinati',
+      footer: `Puoi vedere a quali account BCW è abbinato ${name} e scollegarlo da ognuno. Per verificare l'accesso, il server BCW riceve il token della sessione di Classeviva (non la password).`,
+    });
+  }
   ctx.task(`cvv-links-${model.activeAccountID}-${s.round}`, async () => {
     try {
       s.links = await model.classevivaLinks();
@@ -597,6 +606,9 @@ export const settings = {
           }
         },
       });
+    },
+    'cvv-links-show': (ctx) => {
+      ctx.state(`cvv-links-${ctx.model.activeAccountID}`, { links: null, error: null, round: 0, requested: false }).requested = true;
     },
     'cvv-links-reload': (ctx) => {
       const s = ctx.state(`cvv-links-${ctx.model.activeAccountID}`, { links: null, error: null, round: 0 });
