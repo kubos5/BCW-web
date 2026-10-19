@@ -56,7 +56,7 @@ Anche `server.js` accetta richieste da altri siti se imposti `ALLOWED_ORIGINS`.
 
 ### Account BCW
 
-Con un account BCW (nome utente e password) si abbinano uno o più account Classeviva e si entra in tutti con un solo accesso, su ogni dispositivo e anche nell'app per iPhone e iPad. Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, legati al browser), l'aspetto e l'orario di ogni account abbinato con i file allegati. Nella schermata di accesso un gruppo di pulsanti sceglie tra Classeviva e Account BCW; da Impostazioni › Account si accede o si crea un account anche con un account Classeviva già aperto, e gli account salvati nel browser si possono abbinare subito.
+Con un account BCW (nome utente e password) si abbinano uno o più account Classeviva e si entra in tutti con un solo accesso, su ogni dispositivo e anche nell'app per iPhone e iPad. Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, legati al browser), l'aspetto e l'orario di ogni account abbinato con i file allegati. Nella schermata di accesso (sui computer un pannello in due colonne, sui telefoni come nell'app, compatta con la tastiera aperta) un gruppo di pulsanti sceglie tra Classeviva e Account BCW; da Impostazioni › Account si accede o si crea un account anche con un account Classeviva già aperto, e gli account salvati nel browser si possono abbinare subito.
 
 Chi entra con un account Classeviva vede in Impostazioni › Account a quali account BCW è abbinato e può scollegarsi da ognuno: basta l'accesso a Classeviva.
 

@@ -29,6 +29,11 @@ function hostOf(base) {
   }
 }
 
+/** Telefono con la tastiera aperta (un campo del login attivo): disposizione compatta. */
+function keyboardOpen(ctx, s) {
+  return s.focused && !ctx.wide && matchMedia('(pointer: coarse)').matches;
+}
+
 export function renderLogin(ctx, { adding }) {
   const s = loginState(ctx);
   const model = ctx.model;
@@ -36,47 +41,111 @@ export function renderLogin(ctx, { adding }) {
   const linkingFirst = !adding && model.isCloud;
   const mode = adding || linkingFirst ? 'classeviva' : s.mode;
   if (mode === 'classeviva') ctx.task(`proxy-check-${Proxy.base}`, () => Proxy.check());
+  const options = { adding, linkingFirst };
+  if (ctx.wide && !adding) return wideLogin(ctx, s, mode, options);
 
+  // Tastiera aperta (come nell'app): logo piccolo e titolo su una riga in alto, il gruppo
+  // Classeviva/Account BCW, campi e "Accedi" subito sotto; il resto torna chiudendo la tastiera.
+  const compact = !adding && keyboardOpen(ctx, s);
   let subtitle = 'Better ClasseViVa';
   if (adding) subtitle = model.isCloud ? 'Abbina un account Classeviva' : 'Aggiungi un account';
   else if (linkingFirst) subtitle = `Ciao, ${model.cloudUser?.username ?? ''}`;
 
-  const header = `<div class="login-header">
-      ${adding ? '' : `<span class="login-art" aria-hidden="true">${shape('softBurst', 'a')}${shape('cookie9Sided', 'b')}${shape('pill', 'c')}</span>`}
+  const header = compact
+    ? `<div class="login-header compact">${logo('logo')}<span class="logo-subtitle">${esc(subtitle)}</span></div>`
+    : `<div class="login-header">
+      ${adding ? '' : loginArt()}
       ${logo('logo')}
       <span class="logo-subtitle">${esc(subtitle)}</span>
     </div>`;
-  const toggle = adding || linkingFirst ? '' : `<div class="login-mode">${segmented([['classeviva', 'Classeviva'], ['bcw', 'Account BCW']], mode, 'login-mode')}</div>`;
-  const intro = linkingFirst
+  const intro = linkingFirst && !compact
     ? '<p class="login-intro">Abbina il tuo primo account Classeviva: con il tuo account BCW entrerai in tutti gli account abbinati, su ogni dispositivo.</p>'
     : '';
-  const form = mode === 'bcw' ? bcwForm(ctx, s) : classevivaForm(ctx, s, { adding, linkingFirst });
-  return `<div class="login ${adding ? 'adding' : ''}">${header}${toggle}${intro}${form}${footer(ctx, mode, { adding, linkingFirst })}</div>`;
+  const form = mode === 'bcw' ? bcwForm(ctx, s, { compact }) : classevivaForm(ctx, s, { ...options, compact });
+  return `<div class="login ${adding ? 'adding' : ''} ${compact ? 'compact' : ''}" data-blank-blur>${header}${modeToggle(mode, options)}${intro}${form}${compact ? '' : footerArea(ctx, mode, options)}</div>`;
 }
+
+/** Forme di Material 3 Expressive che ruotano lentamente dietro al logo. */
+function loginArt() {
+  return `<span class="login-art" aria-hidden="true">${shape('softBurst', 'a')}${shape('cookie9Sided', 'b')}${shape('pill', 'c')}</span>`;
+}
+
+/**
+ * Gruppo Classeviva/Account BCW. Toccarlo non toglie il fuoco al campo attivo: la tastiera
+ * resta e il cursore passa al campo corrispondente dell'altro modulo.
+ */
+function modeToggle(mode, { adding, linkingFirst }) {
+  if (adding || linkingFirst) return '';
+  return `<div class="login-mode" data-keep-focus>${segmented([['classeviva', 'Classeviva'], ['bcw', 'Account BCW']], mode, 'login-mode')}</div>`;
+}
+
+/**
+ * Schermi larghi: un pannello in due colonne (come l'accesso degli account Google), con logo,
+ * titolo e spiegazione a sinistra e il modulo a destra; sotto, le note e il server.
+ */
+function wideLogin(ctx, s, mode, options) {
+  const model = ctx.model;
+  const copy = (key, title, text, extra = '') => `<div class="login-copy ${key === mode ? '' : 'inactive'}"${key === mode ? '' : ' aria-hidden="true"'}>
+      <h1>${esc(title)}</h1><p>${esc(text)}</p>${extra}</div>`;
+  let copies;
+  if (options.linkingFirst) {
+    copies = copy('classeviva', `Ciao, ${model.cloudUser?.username ?? ''}`,
+      'Abbina il tuo primo account Classeviva: con il tuo account BCW entrerai in tutti gli account abbinati, su ogni dispositivo.',
+      `<p class="login-copy-note">${esc(footerText(ctx, 'classeviva'))}</p>`);
+  } else {
+    // Entrambi i testi occupano lo stesso spazio: cambiando scelta il pannello non si sposta.
+    copies = copy('classeviva', 'Accedi con Classeviva', footerText(ctx, 'classeviva'))
+      + copy('bcw', s.register ? 'Crea un account BCW' : 'Accedi con un account BCW', footerText(ctx, 'bcw'));
+  }
+  const form = mode === 'bcw' ? bcwForm(ctx, s, {}) : classevivaForm(ctx, s, options);
+  return `<div class="login wide">
+    <div class="login-card">
+      <div class="login-aside">
+        <div class="login-brand">${logo('logo')}<span class="logo-subtitle">Better ClasseViVa</span></div>
+        <div class="login-copies">${copies}</div>
+        ${loginArt()}
+      </div>
+      <div class="login-main">${modeToggle(mode, options)}${form}</div>
+    </div>
+    <div class="login-legal">
+      <span>BCW non è affiliata a Gruppo Spaggiari Parma.</span>
+      ${options.linkingFirst ? `<span>Account BCW: ${esc(model.cloudUser?.username ?? '')}</span>` : ''}
+      ${serverLine(mode)}
+    </div>
+  </div>`;
+}
+
+/** Inviando il modulo dal telefono la tastiera si chiude (come nell'app). */
+function closeKeyboard() {
+  if (matchMedia('(pointer: coarse)').matches) document.activeElement?.blur();
+}
+
+/** Il fuoco nei campi decide la disposizione compatta dei telefoni (tastiera aperta). */
+const focusAttrs = ' data-focus="login-focus" data-blur="login-blur"';
 
 function errorLine(s) {
   return s.error ? `<p class="login-error">${icon('alertTriangleFill')}<span>${esc(s.error)}</span></p>` : '';
 }
 
-function classevivaForm(ctx, s, { adding, linkingFirst }) {
+function classevivaForm(ctx, s, { adding, linkingFirst, compact = false }) {
   const disabled = !s.username || !s.password || s.loading;
   const label = ctx.model.isCloud ? 'Abbina' : 'Accedi';
   return `${proxyWarning()}
-    <form class="login-form" data-submit="login-submit" autocomplete="on">
+    <form class="login-form" data-key="login-form" data-submit="login-submit" autocomplete="on">
       <div class="login-fields">
-        <label class="login-field">${icon('person')}<input name="username" type="text" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
-          placeholder="Codice utente o email" value="${esc(s.username)}" data-input="login-username" aria-label="Codice utente o email"></label>
-        <label class="login-field">${icon('key')}<input name="password" type="password" autocomplete="current-password"
-          placeholder="Password" value="${esc(s.password)}" data-input="login-password" aria-label="Password"></label>
+        <label class="login-field" data-key="f-user">${icon('person')}<input name="username" type="text" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
+          placeholder="Codice utente o email" value="${esc(s.username)}" data-input="login-username" aria-label="Codice utente o email"${focusAttrs}></label>
+        <label class="login-field" data-key="f-pass">${icon('key')}<input name="password" type="password" autocomplete="current-password"
+          placeholder="Password" value="${esc(s.password)}" data-input="login-password" aria-label="Password"${focusAttrs}></label>
       </div>
       ${errorLine(s)}
       <button class="btn filled m wide login-submit" type="submit"${disabled ? ' disabled' : ''}>${s.loading ? spinner() : `<span>${label}</span>`}</button>
-      ${adding ? '' : button('Prova la demo', { action: 'login-demo', iconName: 'sparkles', style: 'tonal', cls: 'm wide' })}
-      ${linkingFirst ? button('Esci da BCW', { action: 'cloud-sign-out', iconName: 'logout', style: 'text', cls: 'm wide' }) : ''}
+      ${adding || compact ? '' : button('Prova la demo', { action: 'login-demo', iconName: 'sparkles', style: 'tonal', cls: 'm wide' })}
+      ${linkingFirst && !compact ? button('Esci da BCW', { action: 'cloud-sign-out', iconName: 'logout', style: 'text', cls: 'm wide' }) : ''}
     </form>`;
 }
 
-function bcwForm(ctx, s) {
+function bcwForm(ctx, s, { compact = false } = {}) {
   const register = s.register;
   const disabled = !s.bcwUsername || !s.bcwPassword || (register && !s.bcwConfirm) || s.loading;
   const notice = ctx.model.cloudNotice && !s.error
@@ -87,39 +156,55 @@ function bcwForm(ctx, s) {
       <div class="row gap-8"><button class="btn filled xs" type="button" data-action="cloud-server-sheet">Imposta il server</button></div></div>`
     : '';
   return `${serverMissing}${notice}
-    <form class="login-form" data-submit="bcw-submit" autocomplete="on">
+    <form class="login-form" data-key="login-form" data-submit="bcw-submit" autocomplete="on">
       <div class="login-fields">
-        <label class="login-field">${icon('person')}<input name="bcw-username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
-          placeholder="Nome utente BCW" value="${esc(s.bcwUsername)}" data-input="bcw-username" aria-label="Nome utente BCW"></label>
-        <label class="login-field">${icon('key')}<input name="bcw-password" type="password" autocomplete="${register ? 'new-password' : 'current-password'}"
-          placeholder="Password" value="${esc(s.bcwPassword)}" data-input="bcw-password" aria-label="Password"></label>
-        ${register ? `<label class="login-field">${icon('key')}<input name="bcw-confirm" type="password" autocomplete="new-password"
-          placeholder="Ripeti la password" value="${esc(s.bcwConfirm)}" data-input="bcw-confirm" aria-label="Ripeti la password"></label>` : ''}
+        <label class="login-field" data-key="f-user">${icon('person')}<input name="bcw-username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
+          placeholder="Nome utente BCW" value="${esc(s.bcwUsername)}" data-input="bcw-username" aria-label="Nome utente BCW"${focusAttrs}></label>
+        <label class="login-field" data-key="f-pass">${icon('key')}<input name="bcw-password" type="password" autocomplete="${register ? 'new-password' : 'current-password'}"
+          placeholder="Password" value="${esc(s.bcwPassword)}" data-input="bcw-password" aria-label="Password"${focusAttrs}></label>
+        ${register ? `<label class="login-field" data-key="f-confirm">${icon('key')}<input name="bcw-confirm" type="password" autocomplete="new-password"
+          placeholder="Ripeti la password" value="${esc(s.bcwConfirm)}" data-input="bcw-confirm" aria-label="Ripeti la password"${focusAttrs}></label>` : ''}
       </div>
-      ${register ? '<p class="login-hint">Da 3 a 32 caratteri tra lettere, cifre, punto, trattino e trattino basso. La password deve avere almeno 8 caratteri.</p>' : ''}
+      ${register && !compact ? '<p class="login-hint">Da 3 a 32 caratteri tra lettere, cifre, punto, trattino e trattino basso. La password deve avere almeno 8 caratteri.</p>' : ''}
       ${errorLine(s)}
       <button class="btn filled m wide login-submit" type="submit"${disabled ? ' disabled' : ''}>${s.loading ? spinner() : `<span>${register ? 'Crea account' : 'Accedi'}</span>`}</button>
-      ${button(register ? 'Hai già un account? Accedi' : 'Crea un account BCW', { action: 'bcw-register-toggle', iconName: register ? null : 'userPlus', style: 'tonal', cls: 'm wide' })}
+      ${compact ? '' : button(register ? 'Hai già un account? Accedi' : 'Crea un account BCW', { action: 'bcw-register-toggle', iconName: register ? null : 'userPlus', style: 'tonal', cls: 'm wide' })}
     </form>`;
 }
 
-function footer(ctx, mode, { adding, linkingFirst }) {
+function footerText(ctx, mode) {
   if (mode === 'bcw') {
-    return `<div class="login-footer">
-      <p>Con un account BCW entri in tutti i tuoi account Classeviva abbinati e ritrovi impostazioni e orario su ogni dispositivo. Le credenziali di Classeviva sono salvate cifrate sul server di BCW.</p>
-      <p>BCW non è affiliata a Gruppo Spaggiari Parma.</p>
-      <p class="proxy-line">${icon('cloud')}<span>Server BCW: ${esc(BCWServer.isConfigured ? hostOf(BCWServer.base) : 'non impostato')}</span> · <button class="link-button" data-action="cloud-server-sheet">Modifica</button></p>
-    </div>`;
+    return 'Con un account BCW entri in tutti i tuoi account Classeviva abbinati e ritrovi impostazioni e orario su ogni dispositivo. Le credenziali di Classeviva sono salvate cifrate sul server di BCW.';
   }
-  const text = ctx.model.isCloud
+  return ctx.model.isCloud
     ? 'Usa le credenziali di Classeviva. Il server di BCW le verifica e le salva cifrate nel tuo account BCW; il browser le invia anche ai server di Classeviva per accedere.'
     : 'Usa le stesse credenziali di Classeviva. Restano solo in questo browser e vengono inviate esclusivamente ai server di Classeviva.';
-  return `<div class="login-footer">
-      <p>${esc(text)}</p>
+}
+
+/** Server a cui va l'accesso: il server BCW per gli account BCW, il proxy per Classeviva. */
+function serverLine(mode) {
+  if (mode === 'bcw') {
+    return `<p class="proxy-line">${icon('cloud')}<span>Server BCW: ${esc(BCWServer.isConfigured ? hostOf(BCWServer.base) : 'non impostato')}</span> · <button class="link-button" data-action="cloud-server-sheet">Modifica</button></p>`;
+  }
+  return `<p class="proxy-line">${icon('server')}<span>Server: ${esc(hostOf(Proxy.base))}</span> · <button class="link-button" data-action="proxy-sheet">Modifica</button></p>`;
+}
+
+function footer(ctx, mode, { adding, linkingFirst }, { hidden = false } = {}) {
+  return `<div class="login-footer ${hidden ? 'inactive' : ''}"${hidden ? ' aria-hidden="true"' : ''}>
+      <p>${esc(footerText(ctx, mode))}</p>
       ${adding ? '' : '<p>BCW non è affiliata a Gruppo Spaggiari Parma.</p>'}
-      <p class="proxy-line">${icon('server')}<span>Server: ${esc(hostOf(Proxy.base))}</span> · <button class="link-button" data-action="proxy-sheet">Modifica</button></p>
+      ${serverLine(mode)}
       ${linkingFirst ? `<p>Account BCW: ${esc(ctx.model.cloudUser?.username ?? '')}</p>` : ''}
     </div>`;
+}
+
+/**
+ * Note in basso. Con il gruppo Classeviva/Account BCW occupano sempre l'altezza delle più lunghe
+ * e sono allineate in alto: cambiando scelta il resto della pagina (centrato) non si sposta.
+ */
+function footerArea(ctx, mode, options) {
+  if (options.adding || options.linkingFirst) return footer(ctx, mode, options);
+  return `<div class="login-footer-area">${['classeviva', 'bcw'].map((m) => footer(ctx, m, options, { hidden: m !== mode })).join('')}</div>`;
 }
 
 /** Avviso mostrato quando all'indirizzo del proxy non risponde il proxy di BCW. */
@@ -305,6 +390,7 @@ export const loginActions = {
   'login-username': (ctx, el) => { loginState(ctx).username = el.value; },
   'login-password': (ctx, el) => { loginState(ctx).password = el.value; },
   'login-submit': (ctx, form) => {
+    closeKeyboard();
     // I gestori di password a volte compilano i campi senza generare l'evento "input".
     const s = loginState(ctx);
     s.username = form.querySelector('[name="username"]').value;
@@ -313,9 +399,21 @@ export const loginActions = {
   },
   'login-mode': (ctx, el) => {
     const s = loginState(ctx);
+    if (s.mode === el.dataset.value) return;
     s.mode = el.dataset.value;
     s.error = null;
+    // Con un campo attivo il cursore passa al campo corrispondente dell'altro modulo: è lo
+    // stesso elemento (stessa chiave), a cui va dato il valore dell'altro modulo.
+    const active = document.activeElement;
+    if (!active?.matches('.login-field input')) return;
+    const confirming = active.name === 'bcw-confirm';
+    ctx.afterRender((root) => {
+      if (confirming) root.querySelector('.login-form input[type="password"]')?.focus();
+      else if (active.isConnected) active.value = active.getAttribute('value') ?? '';
+    });
   },
+  'login-focus': (ctx) => { loginState(ctx).focused = true; },
+  'login-blur': (ctx) => { loginState(ctx).focused = false; },
   'bcw-username': (ctx, el) => { loginState(ctx).bcwUsername = el.value; },
   'bcw-password': (ctx, el) => { loginState(ctx).bcwPassword = el.value; },
   'bcw-confirm': (ctx, el) => { loginState(ctx).bcwConfirm = el.value; },
@@ -326,6 +424,7 @@ export const loginActions = {
     s.bcwConfirm = '';
   },
   'bcw-submit': (ctx, form) => {
+    closeKeyboard();
     const s = loginState(ctx);
     s.bcwUsername = form.querySelector('[name="bcw-username"]').value;
     s.bcwPassword = form.querySelector('[name="bcw-password"]').value;

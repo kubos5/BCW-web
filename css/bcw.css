@@ -1597,6 +1597,37 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .login-hint { margin: -4px 4px 2px; font-size: 12px; line-height: 16px; color: var(--on-surface-variant); }
 .login-notice { display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 16px; border-radius: var(--r-l); background: var(--secondary-container); color: var(--on-secondary-container); font-size: 14px; }
 .login-notice .icon { width: 20px; height: 20px; flex: none; }
+.login-footer-area { display: grid; align-items: start; }
+.login-footer-area > .login-footer { grid-area: 1 / 1; }
+.login-footer.inactive, .login-copy.inactive { visibility: hidden; }
+.login-header { animation: login-header-in var(--effects-dur) var(--effects); }
+@keyframes login-header-in { from { opacity: 0; } }
+
+/* Telefono con la tastiera aperta: logo piccolo e titolo su una riga, tutto in alto. */
+.login.compact { justify-content: flex-start; gap: 20px; padding-top: calc(16px + var(--safe-top)); }
+.login .login-header.compact { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 14px; min-height: 0; padding-top: 8px; animation-name: fade-in; }
+.login .login-header.compact .logo { font-size: 21px; }
+.login .login-header.compact .logo-subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* Schermi larghi: pannello in due colonne con le note sotto. */
+.login.wide { max-width: none; align-items: center; gap: 16px; padding: 40px; }
+.login-card { width: min(1040px, 100%); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; padding: 48px; border-radius: var(--r-xli); background: var(--surface-container); }
+.login-aside { display: flex; flex-direction: column; gap: 32px; min-width: 0; }
+.login-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.login.wide .login-brand .logo { font-size: 40px; }
+.login-copies { display: grid; }
+.login-copy { grid-area: 1 / 1; display: flex; flex-direction: column; gap: 12px; }
+.login-copy h1 { margin: 0; font-size: 36px; line-height: 44px; font-weight: 500; font-variation-settings: "ROND" var(--rond); color: var(--on-surface); }
+.login-copy p { margin: 0; font-size: 16px; line-height: 24px; color: var(--on-surface-variant); max-width: 440px; }
+.login-copy .login-copy-note { font-size: 14px; line-height: 20px; }
+.login.wide .login-art { position: relative; inset: auto; z-index: 0; margin-top: auto; height: 150px; opacity: 1; }
+.login.wide .login-art .shape { position: absolute; }
+.login.wide .login-art .a { width: 128px; height: 128px; left: 0; top: 18px; }
+.login.wide .login-art .b { width: 92px; height: 92px; left: 150px; top: 54px; }
+.login.wide .login-art .c { width: 52px; height: 52px; left: 118px; top: 0; }
+.login-main { display: flex; flex-direction: column; justify-content: center; gap: 24px; min-width: 0; }
+.login-legal { width: min(1040px, 100%); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 24px; padding: 0 24px; font-size: 12px; line-height: 16px; color: var(--on-surface-variant); }
+.login-legal .proxy-line { margin: 0; }
 .proxy-line { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .proxy-line .icon { width: 16px; height: 16px; }
 .proxy-warning { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--r-li); background: var(--fair-container); color: var(--on-fair-container); font-size: 14px; }
