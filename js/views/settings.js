@@ -2,7 +2,7 @@
 // Sugli schermi stretti sono un elenco di sottopagine, su quelli larghi elenco e dettaglio
 // affiancati.
 
-import { avatar, toggle, select, stepper, listGroup, listItem, iconBadge, pill } from '../components.js';
+import { avatar, toggle, select, stepper, listGroup, listItem, iconBadge, spinner } from '../components.js';
 import { icon } from '../icons.js';
 import { AverageMode } from '../gradebook.js';
 import { AppearanceMode, DashboardMode, NewsKind } from '../prefs.js';
@@ -18,6 +18,7 @@ import { readBackup, Alignment } from '../timetable.js';
 import { requestAlignment } from './timetable.js';
 import { esc, fmt, GradeFormat, sentenceCased, nameCased, startOfDay } from '../util.js';
 import { proxySheet } from './login.js';
+import { BCWServer } from '../cloud.js';
 
 export const VERSION = '3.0';
 
@@ -130,18 +131,20 @@ function serverSection() {
   ], { header: 'Server', footer: 'Il browser non può contattare direttamente Classeviva: le richieste passano da un piccolo proxy che le inoltra solo ai server di Spaggiari.' });
 }
 
-function aboutSection() {
+function aboutSection(ctx) {
   return section([
     valueRow('Versione', VERSION),
     listItem({ title: 'Apri Classeviva sul web', href: 'https://web.spaggiari.eu', leading: `<span class="form-icon">${icon('compass')}</span>`, trailing: icon('externalLink', { cls: 'small trailing-icon' }) }),
   ], {
     header: 'Informazioni',
-    footer: 'BCW (Better ClasseViVa) è un client non ufficiale e non è affiliato a Gruppo Spaggiari Parma S.p.A. Le credenziali sono salvate solo in questo browser e inviate esclusivamente ai server di Classeviva.',
+    footer: ctx.model.isCloud
+      ? 'BCW (Better ClasseViVa) è un client non ufficiale e non è affiliato a Gruppo Spaggiari Parma S.p.A. Le credenziali degli account abbinati sono salvate cifrate nel tuo account BCW e inviate ai server di Classeviva per accedere.'
+      : 'BCW (Better ClasseViVa) è un client non ufficiale e non è affiliato a Gruppo Spaggiari Parma S.p.A. Le credenziali sono salvate solo in questo browser e inviate esclusivamente ai server di Classeviva.',
   });
 }
 
 function generalPane(ctx) {
-  return securitySection(ctx) + dataSection() + serverSection() + aboutSection();
+  return securitySection(ctx) + dataSection() + serverSection() + aboutSection(ctx);
 }
 
 function gradesPane(ctx) {
@@ -180,13 +183,40 @@ function timetablePane(ctx) {
     buttonRow("Elimina l'orario", 'tt-delete-all', 'trash', { destructive: true, disabled: store.isEmpty }),
   ], {
     header: "Backup dell'orario",
-    footer: "L'orario è salvato solo in questo browser, separato per ogni account. Il backup contiene eventi, colori, palette, note, verifiche segnate e file allegati; importandolo sostituisce l'orario attuale. È compatibile con l'app BCW per iPhone e iPad.",
-  }) + `<input type="file" id="tt-import-input" accept=".json,application/json" hidden data-change="tt-import-file">` + section([
-    toggleRow('Sincronizza tra i dispositivi', false, 'noop', { iconName: 'cloud', disabled: true, extra: ` ${pill('Work in progress', { short: 'WIP', color: 'var(--fair)', cls: 'small' })}` }),
+    footer: `${ctx.model.isCloud ? "L'orario di ogni account abbinato si sincronizza con il tuo account BCW." : "L'orario è salvato solo in questo browser, separato per ogni account."} Il backup contiene eventi, colori, palette, note, verifiche segnate e file allegati; importandolo sostituisce l'orario attuale. È compatibile con l'app BCW per iPhone e iPad.`,
+  }) + `<input type="file" id="tt-import-input" accept=".json,application/json" hidden data-change="tt-import-file">` + timetableSyncSection(ctx);
+}
+
+function timetableSyncSection(ctx) {
+  const model = ctx.model;
+  if (!model.isCloud) {
+    return section([
+      buttonRow('Accedi con un account BCW…', 'cloud-login', 'cloud'),
+    ], {
+      header: 'Sincronizzazione',
+      footer: "Con un account BCW l'orario di ogni account Classeviva abbinato, con i file allegati, si sincronizza tra i tuoi dispositivi (app per iPhone e iPad compresa).",
+    });
+  }
+  return section([
+    row('Sincronizzazione', `<span class="form-value">${esc(syncStatus(model.sync))}</span>`, { iconName: 'cloud', cls: 'value-row', subtitle: model.sync.fileWarning ?? undefined }),
+    buttonRow('Sincronizza ora', 'cloud-sync-now', 'refresh', { disabled: model.sync.status === 'syncing' || model.isDemo }),
   ], {
     header: 'Sincronizzazione',
-    footer: "Work in progress: la sincronizzazione dell'orario tra i tuoi dispositivi non è ancora disponibile. Nel frattempo puoi spostare l'orario con un backup.",
+    footer: model.isDemo
+      ? "L'orario della demo non si sincronizza."
+      : `L'orario di questo account, con i file allegati, si sincronizza con l'account BCW ${model.cloudUser?.username ?? ''}.`,
   });
+}
+
+/** Stato della sincronizzazione in poche parole. */
+function syncStatus(sync) {
+  switch (sync.status) {
+    case 'syncing': return 'In corso…';
+    case 'ok': return sync.lastSync ? `Aggiornata alle ${fmt.time(sync.lastSync)}` : 'Aggiornata';
+    case 'offline': return 'Offline';
+    case 'error': return 'Non riuscita';
+    default: return 'Attiva';
+  }
 }
 
 function notificationsPane(ctx) {
@@ -212,6 +242,9 @@ function notificationsPane(ctx) {
 /** Righe degli account salvati: tocco = passa a quell'account; il cestino lo rimuove. */
 export function accountsSection(ctx, { showsHeader = true } = {}) {
   const model = ctx.model;
+  const cloud = model.isCloud;
+  const removeLabel = cloud ? 'Scollega' : 'Rimuovi';
+  const removeTitle = cloud ? "Scollega l'account dal tuo account BCW" : "Rimuovi l'account e le sue credenziali da questo browser";
   const rows = model.accounts.map((a) => {
     const active = !model.isDemo && a.id === model.activeAccountID;
     return `<div class="account-row" data-context="account" data-id="${esc(a.id)}">
@@ -219,21 +252,116 @@ export function accountsSection(ctx, { showsHeader = true } = {}) {
     title: a.name, subtitle: a.school ?? a.credentials.username, action: 'account-switch', params: { id: a.id }, cls: active ? 'selected' : '',
     leading: avatar(accountInitials(a), { size: 40, color: subjectColor(accountColorID(a)), shapeName: 'cookie9Sided' }),
     trailing: active ? `<span class="active-check">${icon('check')}</span>` : '',
-  })}<button class="icon-btn account-remove" data-action="account-remove" data-id="${esc(a.id)}" aria-label="Rimuovi" title="Rimuovi l'account e le sue credenziali da questo browser">${icon('trash')}</button></div>`;
+  })}<button class="icon-btn account-remove" data-action="account-remove" data-id="${esc(a.id)}" aria-label="${removeLabel}" title="${removeTitle}">${icon(cloud ? 'minusCircle' : 'trash')}</button></div>`;
   });
-  rows.push(buttonRow('Aggiungi account', 'add-account', 'userPlus'));
+  rows.push(buttonRow(cloud ? 'Abbina un account Classeviva' : 'Aggiungi account', 'add-account', 'userPlus'));
   if (!model.isDemo) rows.push(buttonRow('Prova la demo', 'start-demo', 'sparkles'));
+  const tap = ctx.wide ? 'Fai clic su un account per passare ad esso.' : 'Tocca un account per passare ad esso.';
+  let footer;
+  if (cloud) {
+    footer = `Gli account Classeviva abbinati all'account BCW ${model.cloudUser?.username ?? ''}: li ritrovi accedendo con l'account BCW su qualsiasi dispositivo.${model.accounts.length > 1 ? ` ${tap}` : ''}`;
+  } else {
+    footer = model.accounts.length > 1
+      ? `${tap} Usa il cestino per rimuoverlo.`
+      : "Puoi aggiungere altri account Classeviva (ad esempio quelli di fratelli o sorelle) e passare dall'uno all'altro.";
+  }
+  return section(rows, { header: showsHeader ? (cloud ? 'Account Classeviva abbinati' : 'Account') : null, footer });
+}
+
+/**
+ * Account BCW: chi ha effettuato l'accesso, la sincronizzazione e le azioni sull'account;
+ * con gli account del browser, l'invito ad accedere o a crearne uno.
+ */
+export function cloudSection(ctx) {
+  const model = ctx.model;
+  const serverRow = listItem({
+    title: 'Server BCW', subtitle: BCWServer.isConfigured ? BCWServer.host : 'Non impostato', action: 'cloud-server-sheet',
+    leading: `<span class="form-icon">${icon('server')}</span>`, trailing: icon('chevronRight', { cls: 'trailing-icon' }), cls: 'form-button',
+  });
+  if (!model.isCloud) {
+    return section([
+      buttonRow('Accedi con un account BCW', 'cloud-login', 'cloud'),
+      buttonRow('Crea un account BCW', 'cloud-register', 'userPlus'),
+      serverRow,
+    ], {
+      header: 'Account BCW',
+      footer: "Con un account BCW abbini i tuoi account Classeviva e ritrovi impostazioni, aspetto e orario su ogni dispositivo, anche nell'app per iPhone e iPad. Dopo l'accesso potrai abbinare gli account salvati in questo browser.",
+    });
+  }
+  const sync = model.sync;
+  const user = model.cloudUser;
+  return section([
+    listItem({
+      title: user?.username ?? '', subtitle: 'Account BCW',
+      leading: avatar((user?.username ?? '?').charAt(0).toUpperCase(), { size: 40, color: 'var(--primary)', shapeName: 'cookie9Sided' }),
+    }),
+    row('Sincronizzazione', `<span class="form-value">${sync.status === 'syncing' ? spinner() : ''}${esc(syncStatus(sync))}</span>`, {
+      iconName: 'cloud', cls: 'value-row', subtitle: (sync.status === 'error' || sync.status === 'offline' ? sync.message : sync.fileWarning) ?? undefined,
+    }),
+    buttonRow('Sincronizza ora', 'cloud-sync-now', 'refresh', { disabled: sync.status === 'syncing' }),
+    buttonRow('Cambia password…', 'cloud-password', 'key'),
+    serverRow,
+    buttonRow('Esci da BCW', 'cloud-sign-out', 'logout', { destructive: true }),
+    buttonRow("Elimina l'account BCW…", 'cloud-delete', 'trash', { destructive: true }),
+  ], {
+    header: 'Account BCW',
+    footer: "Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, che valgono solo in questo browser), l'aspetto e l'orario di ogni account abbinato, con i file allegati.",
+  });
+}
+
+/**
+ * Account BCW a cui è abbinato il profilo Classeviva attivo, con lo scollegamento: funziona
+ * anche entrando con l'account Classeviva, senza conoscere la password di quegli account BCW.
+ * Senza account BCW l'elenco si carica solo a richiesta, perché il server BCW riceve il token
+ * della sessione di Classeviva per verificare l'accesso.
+ */
+export function linksSection(ctx) {
+  const model = ctx.model;
+  if (model.isDemo || !model.client || !model.activeAccountID || !BCWServer.isConfigured) return '';
+  const s = ctx.state(`cvv-links-${model.activeAccountID}`, { links: null, error: null, round: 0, requested: false });
+  const name = model.activeAccount?.name ?? 'questo account Classeviva';
+  if (!model.isCloud && !s.requested) {
+    return section([buttonRow('Mostra gli account BCW abbinati', 'cvv-links-show', 'cloud')], {
+      header: 'Account BCW abbinati',
+      footer: `Puoi vedere a quali account BCW è abbinato ${name} e scollegarlo da ognuno. Per verificare l'accesso, il server BCW riceve il token della sessione di Classeviva (non la password).`,
+    });
+  }
+  ctx.task(`cvv-links-${model.activeAccountID}-${s.round}`, async () => {
+    try {
+      s.links = await model.classevivaLinks();
+      s.error = null;
+    } catch (error) {
+      s.error = error.message;
+    }
+  });
+  const rows = [];
+  if (s.error) {
+    rows.push(row('Elenco non disponibile', '', { iconName: 'alertTriangle', subtitle: s.error }));
+    rows.push(buttonRow('Riprova', 'cvv-links-reload', 'refresh'));
+  } else if (!s.links) {
+    rows.push(row('Caricamento…', spinner(), { iconName: 'cloud' }));
+  } else if (!s.links.length) {
+    rows.push(row('Nessun account BCW', '', { iconName: 'cloud', subtitle: 'Questo account Classeviva non è abbinato a nessun account BCW.' }));
+  } else {
+    for (const link of s.links) {
+      const mine = model.isCloud && link.id === model.activeAccountID;
+      rows.push(`<div class="account-row">${listItem({
+        title: link.username,
+        subtitle: `Abbinato il ${fmt.shortDayWithYear(new Date(link.linkedAt))}${mine ? ' · questo account BCW' : ''}`,
+        leading: iconBadge('cloud', mine ? 'var(--primary)' : 'var(--secondary)', 40),
+      })}<button class="icon-btn account-remove" data-action="cvv-link-remove" data-id="${esc(link.id)}" data-name="${esc(link.username)}" aria-label="Scollega" title="Scollega da questo account BCW">${icon('minusCircle')}</button></div>`);
+    }
+    if (s.links.length > 1) rows.push(buttonRow('Scollega da tutti', 'cvv-link-remove-all', 'trash', { destructive: true }));
+  }
   return section(rows, {
-    header: showsHeader ? 'Account' : null,
-    footer: model.accounts.length > 1
-      ? (ctx.wide ? 'Fai clic su un account per passare ad esso. Usa il cestino per rimuoverlo.' : 'Tocca un account per passare ad esso. Usa il cestino per rimuoverlo.')
-      : "Puoi aggiungere altri account Classeviva (ad esempio quelli di fratelli o sorelle) e passare dall'uno all'altro.",
+    header: 'Account BCW abbinati',
+    footer: `Gli account BCW con cui si entra in ${model.activeAccount?.name ?? 'questo account Classeviva'}. Scollegandolo da uno, quell'account BCW non potrà più entrarci e l'orario sincronizzato per questo account viene eliminato dal server. Per toglierli basta l'accesso a Classeviva.`,
   });
 }
 
 function accountsPane(ctx) {
   const model = ctx.model;
-  return accountsSection(ctx) + (model.isDemo ? section([row(model.demoExitMessage)]) : '');
+  return accountsSection(ctx) + linksSection(ctx) + cloudSection(ctx) + (model.isDemo ? section([row(model.demoExitMessage)]) : '');
 }
 
 // MARK: - Pagina Impostazioni
@@ -389,6 +517,22 @@ export const settings = {
     'account-remove': (ctx, el) => {
       const account = ctx.model.accounts.find((a) => a.id === el.dataset.id);
       if (!account) return;
+      if (ctx.model.isCloud) {
+        ctx.confirm({
+          title: `Scollegare ${account.name}?`,
+          message: `${account.name} non sarà più disponibile con l'account BCW ${ctx.model.cloudUser?.username ?? ''}, su nessun dispositivo, e il suo orario verrà eliminato dal server. Il registro su Classeviva non cambia.`,
+          confirmLabel: 'Scollega', destructive: true,
+          onConfirm: async () => {
+            try {
+              await ctx.model.unlinkAccount(account.id);
+              ctx.toast('Account scollegato.');
+            } catch (error) {
+              ctx.toast(error.message, 'alertTriangle');
+            }
+          },
+        });
+        return;
+      }
       ctx.confirm({
         title: `Vuoi rimuovere ${account.name}?`,
         message: 'Le credenziali e i dati salvati di questo account verranno eliminati da questo browser.',
@@ -397,6 +541,103 @@ export const settings = {
       });
     },
     'proxy-sheet': (ctx) => ctx.openSheet(proxySheet()),
+
+    // Account BCW.
+    'cloud-sync-now': async (ctx) => {
+      const model = ctx.model;
+      await model.sync.flush();
+      await model.refreshCloud({ force: true });
+      if (model.sync.status === 'ok') ctx.toast('Sincronizzazione completata.');
+      else if (model.sync.message) ctx.toast(model.sync.message, 'alertTriangle');
+    },
+    'cloud-password': (ctx) => ctx.openSheet(cloudPasswordSheet()),
+    'cloud-password-input': (ctx, el) => { ctx.state('cloud-password', {})[el.dataset.field] = el.value; },
+    'cloud-password-save': async (ctx) => {
+      const s = ctx.state('cloud-password', {});
+      if ((s.next ?? '').length < 8) {
+        s.error = 'La nuova password deve avere almeno 8 caratteri.';
+        return;
+      }
+      if (s.next !== s.confirm) {
+        s.error = 'Le due password nuove non coincidono.';
+        return;
+      }
+      s.loading = true;
+      s.error = null;
+      ctx.update();
+      try {
+        await ctx.model.changeCloudPassword(s.current ?? '', s.next);
+        ctx.app.viewState.delete('cloud-password');
+        ctx.closeSheet();
+        ctx.toast("Password cambiata. Sugli altri dispositivi va rifatto l'accesso.");
+      } catch (error) {
+        s.error = error.message;
+      } finally {
+        s.loading = false;
+        ctx.update();
+      }
+    },
+    'cloud-delete': (ctx) => ctx.openSheet(cloudDeleteSheet()),
+    'cloud-delete-input': (ctx, el) => { ctx.state('cloud-delete', {}).password = el.value; },
+    'cloud-delete-confirm': (ctx) => {
+      const s = ctx.state('cloud-delete', {});
+      if (!s.password) {
+        s.error = "Inserisci la password dell'account BCW.";
+        return;
+      }
+      ctx.confirm({
+        title: `Eliminare l'account BCW ${ctx.model.cloudUser?.username ?? ''}?`,
+        message: "L'account BCW, gli abbinamenti con gli account Classeviva, le impostazioni sincronizzate e gli orari salvati sul server verranno eliminati definitivamente. Gli account Classeviva non cambiano.",
+        confirmLabel: 'Elimina', destructive: true,
+        onConfirm: async () => {
+          s.loading = true;
+          s.error = null;
+          ctx.update();
+          try {
+            await ctx.model.deleteCloudAccount(s.password);
+            ctx.app.viewState.delete('cloud-delete');
+            ctx.closeSheet();
+            ctx.toast('Account BCW eliminato.');
+          } catch (error) {
+            s.error = error.message;
+          } finally {
+            s.loading = false;
+            ctx.update();
+          }
+        },
+      });
+    },
+    'cvv-links-show': (ctx) => {
+      ctx.state(`cvv-links-${ctx.model.activeAccountID}`, { links: null, error: null, round: 0, requested: false }).requested = true;
+    },
+    'cvv-links-reload': (ctx) => {
+      const s = ctx.state(`cvv-links-${ctx.model.activeAccountID}`, { links: null, error: null, round: 0 });
+      s.error = null;
+      s.links = null;
+      s.round += 1;
+    },
+    'cvv-link-remove': (ctx, el) => {
+      const { id, name } = el.dataset;
+      const model = ctx.model;
+      const mine = model.isCloud && id === model.activeAccountID;
+      ctx.confirm({
+        title: `Scollegare da ${name}?`,
+        message: mine
+          ? `È l'account BCW con cui hai effettuato l'accesso: ${model.activeAccount?.name ?? 'questo account'} non sarà più disponibile con esso e il suo orario verrà eliminato dal server.`
+          : `L'account BCW ${name} non potrà più entrare in ${model.activeAccount?.name ?? 'questo account Classeviva'} e l'orario che ha sincronizzato per questo account verrà eliminato dal server.`,
+        confirmLabel: 'Scollega', destructive: true,
+        onConfirm: () => removeLinks(ctx, id),
+      });
+    },
+    'cvv-link-remove-all': (ctx) => {
+      const model = ctx.model;
+      ctx.confirm({
+        title: 'Scollegare da tutti gli account BCW?',
+        message: `Nessun account BCW potrà più entrare in ${model.activeAccount?.name ?? 'questo account Classeviva'}${model.isCloud ? ", compreso quello con cui hai effettuato l'accesso" : ''}. Gli orari sincronizzati per questo account verranno eliminati dal server.`,
+        confirmLabel: 'Scollega da tutti', destructive: true,
+        onConfirm: () => removeLinks(ctx, null),
+      });
+    },
 
     // Backup dell'orario.
     'tt-export': async (ctx) => {
@@ -458,6 +699,62 @@ export const settings = {
     }),
   },
 };
+
+async function removeLinks(ctx, id) {
+  const model = ctx.model;
+  const key = `cvv-links-${model.activeAccountID}`;
+  try {
+    await model.removeClassevivaLink(id);
+    ctx.toast(id ? 'Account BCW scollegato.' : 'Scollegato da tutti gli account BCW.');
+  } catch (error) {
+    ctx.toast(error.message, 'alertTriangle');
+  }
+  const s = ctx.state(key, { links: null, error: null, round: 0 });
+  s.links = null;
+  s.round += 1;
+  ctx.update();
+}
+
+function cloudPasswordSheet() {
+  return {
+    id: 'cloud-password',
+    render: (ctx) => {
+      const s = ctx.state('cloud-password', { current: '', next: '', confirm: '', loading: false, error: null });
+      const field = (name, placeholder, autocomplete) => `<input class="text-input" type="password" autocomplete="${autocomplete}" placeholder="${placeholder}" value="${esc(s[name] ?? '')}" data-input="cloud-password-input" data-field="${name}">`;
+      return {
+        title: 'Cambia password',
+        size: 'medium',
+        trailing: `<button class="btn filled xs" data-action="cloud-password-save"${s.loading ? ' disabled' : ''}>${s.loading ? spinner() : 'Salva'}</button>`,
+        body: `<div class="stack gap-14 sheet-pad">
+          <p class="body-text">Cambiando la password dell'account BCW ${esc(ctx.model.cloudUser?.username ?? '')} uscirai da BCW sugli altri dispositivi.</p>
+          ${field('current', 'Password attuale', 'current-password')}
+          ${field('next', 'Nuova password (almeno 8 caratteri)', 'new-password')}
+          ${field('confirm', 'Ripeti la nuova password', 'new-password')}
+          ${s.error ? `<p class="login-error">${icon('alertTriangleFill')}<span>${esc(s.error)}</span></p>` : ''}
+        </div>`,
+      };
+    },
+  };
+}
+
+function cloudDeleteSheet() {
+  return {
+    id: 'cloud-delete',
+    render: (ctx) => {
+      const s = ctx.state('cloud-delete', { password: '', loading: false, error: null });
+      return {
+        title: "Elimina l'account BCW",
+        size: 'medium',
+        body: `<div class="stack gap-14 sheet-pad">
+          <p class="body-text">Verranno eliminati l'account BCW ${esc(ctx.model.cloudUser?.username ?? '')}, gli abbinamenti con gli account Classeviva, le impostazioni sincronizzate e gli orari salvati sul server, con i loro file. Da questo browser spariranno gli account abbinati.</p>
+          <input class="text-input" type="password" autocomplete="current-password" placeholder="Password dell'account BCW" value="${esc(s.password)}" data-input="cloud-delete-input">
+          ${s.error ? `<p class="login-error">${icon('alertTriangleFill')}<span>${esc(s.error)}</span></p>` : ''}
+          <button class="btn danger m wide" data-action="cloud-delete-confirm"${s.loading ? ' disabled' : ''}>${s.loading ? spinner() : "<span>Elimina l'account BCW</span>"}</button>
+        </div>`,
+      };
+    },
+  };
+}
 
 /** Chiede il permesso per le notifiche; se manca spiega come darlo. */
 async function askPermission(ctx) {
@@ -528,11 +825,18 @@ export const account = {
         card.miurSchoolCode?.trim() ? valueRow('Codice meccanografico', card.miurSchoolCode) : '',
       ], { header: 'Scuola' });
     }
-    const footer = model.isDemo ? model.demoExitMessage
-      : model.accounts.length > 1
-        ? 'Le credenziali di questo account verranno rimosse e passerai a un altro account salvato.'
-        : 'Uscendo, le credenziali verranno rimosse da questo browser.';
-    html += section([buttonRow(model.isDemo ? 'Esci dalla demo' : 'Esci da questo account', 'sign-out', 'logout', { destructive: true })], { footer });
+    html += linksSection(ctx) + cloudSection(ctx);
+    if (model.isCloud && !model.isDemo && model.activeAccount) {
+      html += section([buttonRow('Scollega da BCW', 'account-remove', 'minusCircle', { destructive: true, params: { id: model.activeAccount.id } })], {
+        footer: `${model.activeAccount.name} non sarà più disponibile con l'account BCW ${model.cloudUser?.username ?? ''} e il suo orario verrà eliminato dal server.`,
+      });
+    } else if (!model.isCloud || model.isDemo) {
+      const footer = model.isDemo ? model.demoExitMessage
+        : model.accounts.length > 1
+          ? 'Le credenziali di questo account verranno rimosse e passerai a un altro account salvato.'
+          : 'Uscendo, le credenziali verranno rimosse da questo browser.';
+      html += section([buttonRow(model.isDemo ? 'Esci dalla demo' : 'Esci da questo account', 'sign-out', 'logout', { destructive: true })], { footer });
+    }
     return { title: 'Account', narrow: true, body: `<div class="form">${html}</div>`, bottomInset: true };
   },
 };

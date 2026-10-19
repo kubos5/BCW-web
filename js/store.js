@@ -9,6 +9,7 @@ import { Preferences } from './prefs.js';
 import { Reminders } from './reminders.js';
 import { TimetableStore } from './timetable.js';
 import { News } from './news.js';
+import { CloudError, CloudStorage, CloudSync, accountFromServer, cloudRequest, isCloudOffline } from './cloud.js';
 import {
   parseAbsencesResponse, parseAgendaResponse, parseCalendarResponse, parseCardResponse, parseDidacticsResponse,
   parseDocumentCheck, parseDocumentsResponse, parseGradesResponse, parseLessonsResponse, parseNoteReadResponse,
@@ -48,6 +49,12 @@ function matches(account, credentials) {
     (account.credentials.ident ?? '') === (credentials.ident ?? '');
 }
 
+/** Stesso profilo Classeviva (l'ident è unico), anche con nomi utente diversi. */
+function sameProfile(a, b) {
+  const ident = (x) => (x.credentials?.ident ?? '').toUpperCase();
+  return !!ident(a) && ident(a) === ident(b);
+}
+
 export class AppModel {
   constructor(onChange) {
     this.onChange = onChange;
@@ -63,6 +70,18 @@ export class AppModel {
     this.isChangingSession = false;
     this.pendingSessionChange = null;
     this.timetable = new TimetableStore(() => this.onChange?.());
+    /** Sessione dell'account BCW (`{ token, user }`), `null` con gli account del browser. */
+    this.cloud = null;
+    /** Messaggio per la schermata di accesso (es. sessione BCW scaduta). */
+    this.cloudNotice = null;
+    /** Nome utente dell'ultimo account BCW, per riempire il campo dopo l'uscita. */
+    this.lastCloudUsername = null;
+    this.cloudRefreshedAt = 0;
+    this.cloudRefreshing = false;
+    this.sync = new CloudSync(this);
+    this.preferences.onPersist = () => this.sync.settingsChanged();
+    this.timetable.onSaved = (owner) => this.sync.timetableChanged(owner);
+    this.timetable.remoteFile = (owner, name) => this.sync.fetchFile(owner, name);
     this.resetFields();
   }
 
@@ -104,8 +123,11 @@ export class AppModel {
   }
 
   bootstrap() {
-    this.accounts = readJSON(ACCOUNTS_KEY, []);
-    const storedID = readJSON(ACTIVE_KEY, null);
+    this.cloud = CloudStorage.session();
+    this.accounts = this.cloud ? CloudStorage.accounts() : readJSON(ACCOUNTS_KEY, []);
+    const storedID = this.storedActiveID();
+    // Con un account BCW gli account abbinati arrivano dal server: intanto si usano quelli salvati.
+    if (this.cloud) queueMicrotask(() => this.refreshCloud({ force: true }));
     if (readJSON(DEMO_KEY, false)) {
       // Uscendo dalla demo si torna all'account che era attivo, anche dopo un riavvio.
       if (this.accounts.some((a) => a.id === storedID)) this.activeAccountID = storedID;
@@ -122,7 +144,16 @@ export class AppModel {
   }
 
   saveAccounts() {
-    writeJSON(ACCOUNTS_KEY, this.accounts.length ? this.accounts : null);
+    if (this.cloud) CloudStorage.saveAccounts(this.accounts);
+    else writeJSON(ACCOUNTS_KEY, this.accounts.length ? this.accounts : null);
+  }
+
+  /** Account attivo salvato (separato per gli account del browser e per l'account BCW). */
+  storedActiveID() { return this.cloud ? CloudStorage.activeAccount() : readJSON(ACTIVE_KEY, null); }
+
+  saveActiveID(id) {
+    if (this.cloud) CloudStorage.saveActiveAccount(id);
+    else writeJSON(ACTIVE_KEY, id);
   }
 
   /**
@@ -137,13 +168,19 @@ export class AppModel {
     const stored = { ...credentials, ident: ident ?? response.ident };
     const name = nameCased([response.firstName, response.lastName].filter(Boolean).join(' '));
 
-    let account = this.accounts.find((a) => matches(a, stored));
-    if (account) {
-      account.credentials = stored;
-      if (name) account.name = name;
+    let account;
+    if (this.cloud) {
+      // Con un account BCW l'account viene abbinato sul server, che verifica le credenziali.
+      account = this.upsertCloudAccount(await this.linkOnServer(stored));
     } else {
-      account = { id: uuid(), credentials: stored, name: name || stored.username, school: null };
-      this.accounts.push(account);
+      account = this.accounts.find((a) => matches(a, stored));
+      if (account) {
+        account.credentials = stored;
+        if (name) account.name = name;
+      } else {
+        account = { id: uuid(), credentials: stored, name: name || stored.username, school: null };
+        this.accounts.push(account);
+      }
     }
     this.saveAccounts();
     if (this.phase === 'signedIn') {
@@ -220,10 +257,11 @@ export class AppModel {
     this.isDemo = false;
     writeJSON(DEMO_KEY, null);
     this.activeAccountID = account.id;
-    writeJSON(ACTIVE_KEY, account.id);
+    this.saveActiveID(account.id);
     this.loginName = account.name;
     this.client = new ClassevivaClient(new HttpTransport(Proxy.officialBase()), `live-${account.id}`, account.credentials);
     this.timetable.load(account.id);
+    if (this.cloud) this.sync.pullTimetable(account.id);
     this.phase = 'signedIn';
     this.changed();
     const client = this.client;
@@ -274,6 +312,10 @@ export class AppModel {
    * passa al successivo, altrimenti torna alla schermata di accesso.
    */
   signOut() {
+    if (this.cloud && !this.isDemo) {
+      this.cloudSignOut();
+      return;
+    }
     if (this.isDemo) {
       const next = this.accountAfterDemo;
       if (next) {
@@ -297,6 +339,11 @@ export class AppModel {
     if (!account) return;
     const wasActive = id === this.activeAccountID && !this.isDemo;
     this.removeCaches(account.id);
+    if (this.cloud) {
+      // L'orario di un account abbinato è sul server: in questo browser se ne va con l'account.
+      TimetableStore.removeData(account.id);
+      this.sync.forgetTimetable(account.id);
+    }
     this.accounts = this.accounts.filter((a) => a.id !== id);
     this.saveAccounts();
     if (!wasActive) {
@@ -315,7 +362,7 @@ export class AppModel {
     this.resetData();
     this.timetable.load(null);
     this.activeAccountID = null;
-    writeJSON(ACTIVE_KEY, null);
+    this.saveActiveID(null);
     Reminders.reschedule([], 18, false, new Set());
     this.phase = 'signedOut';
     this.changed();
@@ -340,6 +387,9 @@ export class AppModel {
     if (name) account.name = name;
     account.school = school;
     this.saveAccounts();
+    if (this.cloud) {
+      cloudRequest('PATCH', `/accounts/${account.id}`, { token: this.cloud.token, body: { name: account.name, school } }).catch(() => {});
+    }
   }
 
   get credentialsForArchive() { return this.client?.credentials ?? null; }
@@ -369,6 +419,252 @@ export class AppModel {
     for (const year of ArchiveModel.availableStartYears) {
       DiskCache.remove(ArchiveModel.cacheNamespace(owner, year));
     }
+  }
+
+  // MARK: Account BCW
+
+  get isCloud() { return !!this.cloud; }
+  get cloudUser() { return this.cloud?.user ?? null; }
+
+  /** Accede (o crea l'account, con `register`) e passa agli account Classeviva abbinati. */
+  async cloudSignIn(username, password, { register = false } = {}) {
+    const response = await cloudRequest('POST', register ? '/auth/register' : '/auth/login', {
+      body: { username: username.trim(), password, client: 'BCW per il web' },
+    });
+    return this.enterCloud({ token: response.token, user: response.user });
+  }
+
+  /**
+   * Entra nell'account BCW. Restituisce gli account salvati nel browser non ancora abbinati,
+   * che l'interfaccia propone di abbinare.
+   */
+  async enterCloud(session) {
+    const remote = await cloudRequest('GET', '/accounts', { token: session.token });
+    const accounts = (remote.accounts ?? []).map(accountFromServer).filter(Boolean);
+    const local = this.cloud ? [] : readJSON(ACCOUNTS_KEY, []);
+    const candidates = local.filter((l) => !accounts.some((a) => sameProfile(a, l)));
+    this.cloudNotice = null;
+    this.cloudRefreshedAt = Date.now();
+    this.changeSession(() => {
+      if (this.isDemo) this.leaveDemo();
+      this.sync.reset();
+      this.cloud = session;
+      CloudStorage.saveSession(session);
+      this.accounts = accounts;
+      this.saveAccounts();
+      if (accounts[0]) this.activate(accounts[0]);
+      else this.endSession();
+      this.sync.pullSettings();
+    });
+    return candidates;
+  }
+
+  async linkOnServer(credentials) {
+    try {
+      const response = await cloudRequest('POST', '/accounts', {
+        token: this.cloud.token,
+        body: { username: credentials.username, password: credentials.password, ident: credentials.ident ?? null },
+      });
+      return accountFromServer(response.account);
+    } catch (error) {
+      if (error instanceof CloudError && error.code === 'unauthorized') this.cloudSessionExpired();
+      throw error;
+    }
+  }
+
+  /** Aggiunge o aggiorna un account abbinato (stesso id del server). */
+  upsertCloudAccount(remote) {
+    const existing = this.accounts.find((a) => a.id === remote.id);
+    if (!existing) {
+      this.accounts.push(remote);
+      return remote;
+    }
+    existing.credentials = remote.credentials;
+    existing.name = remote.name || existing.name;
+    existing.school = remote.school ?? existing.school;
+    return existing;
+  }
+
+  /** Abbina all'account BCW gli account del browser, copiandone l'orario. */
+  async linkLocalAccounts(locals) {
+    const failures = [];
+    for (const local of locals) {
+      if (!this.cloud) break;
+      try {
+        const account = this.upsertCloudAccount(await this.linkOnServer(local.credentials));
+        this.saveAccounts();
+        await TimetableStore.copyData(local.id, account.id);
+        this.sync.pullTimetable(account.id);
+      } catch (error) {
+        if (!this.cloud) break;
+        failures.push({ account: local, message: error.message });
+      }
+    }
+    if (this.cloud && this.phase === 'signedOut' && this.accounts[0]) this.activate(this.accounts[0]);
+    else this.changed();
+    return failures;
+  }
+
+  /** Aggiorna gli account abbinati e sincronizza impostazioni e orario dell'account attivo. */
+  async refreshCloud({ force = false } = {}) {
+    const session = this.cloud;
+    if (!session || this.cloudRefreshing) return;
+    if (!force && Date.now() - this.cloudRefreshedAt < 30_000) return;
+    this.cloudRefreshing = true;
+    try {
+      const remote = await cloudRequest('GET', '/accounts', { token: session.token });
+      if (this.cloud !== session) return;
+      this.cloudRefreshedAt = Date.now();
+      this.applyRemoteAccounts((remote.accounts ?? []).map(accountFromServer).filter(Boolean));
+    } catch (error) {
+      if (this.cloud !== session) return;
+      if (error instanceof CloudError && error.code === 'unauthorized') {
+        this.cloudSessionExpired();
+      } else {
+        this.sync.status = isCloudOffline(error) ? 'offline' : 'error';
+        this.sync.message = error.message;
+        this.changed();
+      }
+      return;
+    } finally {
+      this.cloudRefreshing = false;
+    }
+    this.sync.pullSettings();
+    if (this.activeAccount && !this.isDemo) this.sync.pullTimetable(this.activeAccount.id);
+  }
+
+  /** Allinea gli account abbinati a quelli del server (aggiunti o tolti da un altro dispositivo). */
+  applyRemoteAccounts(list) {
+    const active = this.isDemo ? null : this.activeAccount;
+    const removed = this.accounts.filter((a) => !list.some((r) => r.id === a.id));
+    const next = list.map((r) => {
+      const existing = this.accounts.find((a) => a.id === r.id);
+      if (!existing) return r;
+      existing.credentials = r.credentials;
+      existing.name = r.name || existing.name;
+      existing.school = r.school ?? existing.school;
+      return existing;
+    });
+    this.accounts = next;
+    this.saveAccounts();
+    for (const account of removed) {
+      this.removeCaches(account.id);
+      TimetableStore.removeData(account.id);
+      this.sync.forgetTimetable(account.id);
+    }
+    // Password cambiata da un altro dispositivo: il prossimo accesso usa quella nuova.
+    const fresh = active && next.find((a) => a.id === active.id);
+    if (fresh && this.client?.credentials) this.client.credentials = { ...fresh.credentials };
+    if (this.isDemo) {
+      this.changed();
+    } else if (active && !fresh) {
+      if (next[0]) this.changeSession(() => this.activate(next[0]));
+      else this.endSession();
+    } else if (this.phase === 'signedOut' && next[0]) {
+      this.activate(next[0]);
+    } else {
+      this.changed();
+    }
+  }
+
+  /** Scollega un account Classeviva dall'account BCW (con il suo orario sul server). */
+  async unlinkAccount(id) {
+    if (!this.cloud) {
+      this.removeAccount(id);
+      return;
+    }
+    try {
+      await cloudRequest('DELETE', `/accounts/${id}`, { token: this.cloud.token });
+    } catch (error) {
+      if (error instanceof CloudError && error.code === 'unauthorized') {
+        this.cloudSessionExpired();
+        return;
+      }
+      if (!(error instanceof CloudError && error.code === 'not_found')) throw error;
+    }
+    this.removeAccount(id);
+  }
+
+  /** Esce dall'account BCW: account abbinati, cache e orari spariscono da questo browser. */
+  async cloudSignOut() {
+    const session = this.cloud;
+    if (!session) return;
+    // Le ultime modifiche in attesa partono prima di uscire (al massimo 3 secondi).
+    await Promise.race([this.sync.flush(), new Promise((resolve) => setTimeout(resolve, 3000))]);
+    cloudRequest('POST', '/auth/logout', { token: session.token }).catch(() => {});
+    this.leaveCloud();
+  }
+
+  cloudSessionExpired() {
+    if (!this.cloud) return;
+    this.leaveCloud("La sessione dell'account BCW è scaduta o è stata chiusa: accedi di nuovo.");
+  }
+
+  leaveCloud(notice = null) {
+    if (!this.cloud) return;
+    const cloudAccounts = this.accounts;
+    this.cloudNotice = notice;
+    this.lastCloudUsername = this.cloud.user?.username ?? null;
+    this.changeSession(() => {
+      if (!this.cloud) return;
+      if (this.isDemo) this.leaveDemo();
+      else this.resetData();
+      for (const account of cloudAccounts) {
+        this.removeCaches(account.id);
+        TimetableStore.removeData(account.id);
+      }
+      CloudStorage.clear();
+      this.sync.reset();
+      this.cloud = null;
+      this.accounts = readJSON(ACCOUNTS_KEY, []);
+      const storedID = readJSON(ACTIVE_KEY, null);
+      const next = this.accounts.find((a) => a.id === storedID) ?? this.accounts[0];
+      if (next) this.activate(next);
+      else this.endSession();
+    });
+  }
+
+  async changeCloudPassword(currentPassword, newPassword) {
+    const response = await cloudRequest('PUT', '/me/password', { token: this.cloud.token, body: { currentPassword, newPassword } });
+    this.cloud = { ...this.cloud, token: response.token };
+    CloudStorage.saveSession(this.cloud);
+    this.changed();
+  }
+
+  async deleteCloudAccount(password) {
+    await cloudRequest('DELETE', '/me', { token: this.cloud.token, body: { password } });
+    this.leaveCloud();
+  }
+
+  /** Le impostazioni sono cambiate da un altro dispositivo. */
+  settingsApplied() {
+    this._gradeBook = null;
+    if (this.phase === 'signedIn') this.rescheduleReminders();
+    this.changed();
+  }
+
+  // MARK: Lato Classeviva
+
+  /** Intestazioni che provano a BCW-api l'accesso a Classeviva dell'account attivo. */
+  async classevivaHeaders() {
+    const client = this.client;
+    if (!client || this.isDemo) throw new CloudError('demo', 'Non disponibile nella demo.');
+    await client.ensureToken();
+    return { 'X-Classeviva-Ident': client.ident ?? '', 'X-Classeviva-Token': client.token ?? '' };
+  }
+
+  /** Gli account BCW a cui è abbinato il profilo Classeviva attivo. */
+  async classevivaLinks() {
+    const response = await cloudRequest('GET', '/classeviva/links', { headers: await this.classevivaHeaders() });
+    return response.links ?? [];
+  }
+
+  /** Scollega il profilo attivo da un account BCW (`id` dell'abbinamento, `null` = da tutti). */
+  async removeClassevivaLink(id) {
+    const headers = await this.classevivaHeaders();
+    await cloudRequest('DELETE', id ? `/classeviva/links/${id}` : '/classeviva/links', { headers });
+    // Se era un abbinamento di questo account BCW, l'elenco degli account cambia.
+    if (this.cloud) this.refreshCloud({ force: true });
   }
 
   // MARK: Caricamento
@@ -414,6 +710,7 @@ export class AppModel {
   async refreshAll() {
     const client = this.client;
     if (!client || this.refreshingClient === client) return;
+    if (this.cloud) this.refreshCloud();
     this.refreshingClient = client;
     this.isRefreshing = true;
     this.lastError = null;

@@ -60,6 +60,18 @@ export class Preferences {
     this.values.completedHomework = [...this.completed];
     this.values.collapsedSections = [...this.collapsed];
     try { localStorage.setItem(KEY, JSON.stringify(this.values)); } catch { /* archiviazione piena */ }
+    this.onPersist?.();
+    this.onChange?.();
+  }
+
+  /** Valori arrivati dall'account BCW (senza avvisare `onPersist`). */
+  applyRemote(values) {
+    Object.assign(this.values, values);
+    if (Array.isArray(values.completedHomework)) this.completed = new Set(values.completedHomework);
+    if (Array.isArray(values.collapsedSections)) this.collapsed = new Set(values.collapsedSections);
+    this.values.completedHomework = [...this.completed];
+    this.values.collapsedSections = [...this.collapsed];
+    try { localStorage.setItem(KEY, JSON.stringify(this.values)); } catch { /* archiviazione piena */ }
     this.onChange?.();
   }
 

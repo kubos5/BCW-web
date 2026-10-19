@@ -43,13 +43,24 @@ Il proxy che BCW usa di base si imposta in `config.json`, così chi apre il sito
 
 ```
 {
-  "proxy": "https://bcw-proxy.tuonome.workers.dev"
+  "proxy": "https://bcw-proxy.tuonome.workers.dev",
+  "api": "https://bcw-api.tuonome.workers.dev"
 }
 ```
+
+`api` è l'indirizzo del server per gli account BCW (vedi sotto); senza, l'accesso con un account BCW chiede di impostarlo.
 
 All'avvio BCW sceglie, in ordine: l'indirizzo inserito a mano dall'utente (Modifica accanto a "Server" nella schermata di accesso, oppure Impostazioni › Server), il proxy del sito stesso se c'è (con `node server.js`), poi quello di `config.json`. Lasciando vuoto il campo si torna al predefinito.
 
 Anche `server.js` accetta richieste da altri siti se imposti `ALLOWED_ORIGINS`.
+
+### Account BCW
+
+Con un account BCW (nome utente e password) si abbinano uno o più account Classeviva e si entra in tutti con un solo accesso, su ogni dispositivo e anche nell'app per iPhone e iPad. Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, legati al browser), l'aspetto e l'orario di ogni account abbinato con i file allegati. Nella schermata di accesso un gruppo di pulsanti sceglie tra Classeviva e Account BCW; da Impostazioni › Account si accede o si crea un account anche con un account Classeviva già aperto, e gli account salvati nel browser si possono abbinare subito.
+
+Chi entra con un account Classeviva vede in Impostazioni › Account a quali account BCW è abbinato e può scollegarsi da ognuno: basta l'accesso a Classeviva.
+
+Il server è [BCW-api](https://github.com/kubos5/BCW-api), un Cloudflare Worker con un database D1. Il suo indirizzo predefinito si imposta in `config.json`, alla voce `api`; ognuno può cambiarlo da Impostazioni › Account › Server BCW (o da "Modifica" accanto a "Server BCW" nella schermata di accesso). BCW-api fa anche da proxy per Classeviva, quindi può stare anche nella voce `proxy`.
 
 ### Installazione come app
 
@@ -83,6 +94,7 @@ Le stesse dell'app nativa:
 - blocco dell'app con una passkey (Face ID, Touch ID, Windows Hello o lo sblocco del dispositivo), oppure con un codice
 - consultazione offline con i dati dell'ultima volta
 - account genitore con più figli, più account salvati e passaggio dall'uno all'altro (anche tenendo premuta la scheda Tu), con una dissolvenza tra i dati di un account e quelli dell'altro
+- account BCW: account Classeviva abbinati con un solo accesso, impostazioni e orario sincronizzati tra i dispositivi, scollegamento dagli account BCW anche dal lato Classeviva
 - modalità demo con dati di esempio, anche con un account già collegato (uscendo si torna all'account)
 - notifiche per nuovi voti, comunicazioni, note, assenze e compiti, da attivare in Impostazioni › Notifiche
 - impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account
@@ -109,7 +121,7 @@ La scheda Orario contiene l'orario settimanale, che si compila a mano o si gener
 - generazione automatica di una bozza dell'orario dalle lezioni registrate, mostrata in anteprima con i bordi tratteggiati prima di applicarla
 - backup dell'orario da esportare e reimportare dalle Impostazioni (con i file allegati), compatibile con l'app BCW per iPhone e iPad
 
-L'orario è salvato solo nel browser, separato per ogni account (il documento in `localStorage`, i file in IndexedDB).
+L'orario è salvato nel browser, separato per ogni account (il documento in `localStorage`, i file in IndexedDB); con un account BCW si sincronizza anche con il server.
 
 ### Su schermi larghi
 
@@ -121,7 +133,7 @@ Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, uguale a quel
 
 ### Differenze dovute al web
 
-- le credenziali sono salvate nel browser (`localStorage`) invece che nel Portachiavi, e inviate solo ai server di Classeviva tramite il proxy
+- le credenziali sono salvate nel browser (`localStorage`) invece che nel Portachiavi, e inviate solo ai server di Classeviva tramite il proxy (con un account BCW anche al server di BCW, che le conserva cifrate)
 - le notifiche arrivano mentre BCW è aperta, anche in una scheda in secondo piano o installata come app; per avvisi sempre affidabili conviene esportare l'agenda nel Calendario
 - su iPhone e iPad le notifiche web funzionano solo con BCW aggiunta alla schermata Home
 
@@ -150,6 +162,7 @@ fonts/                Google Sans Flex (licenza OFL)
 js/
 ├── app.js            Shell: navigazione, barre, menu, fogli, dialoghi, scorciatoie
 ├── api.js            Client Classeviva, proxy, cache offline (IndexedDB)
+├── cloud.js          Account BCW: server, richieste a BCW-api, sincronizzazione di impostazioni, orario e file
 ├── models.js         Modelli decodificati in modo tollerante
 ├── store.js          Stato dell'app, account, caricamento dei dati, archivi
 ├── timetable.js      Orario: modello, salvataggio, gruppi, verifiche, colori, generatore, backup
@@ -171,7 +184,7 @@ js/
 ├── charts.js         Grafici SVG
 ├── dom.js            Aggiornamento del DOM per confronto
 └── views/            Dashboard, Orario, Voti, Tu e sottosezioni, Bacheca, Cerca, Impostazioni, Accesso
-config.json           Proxy predefinito
+config.json           Proxy e server BCW predefiniti
 server.js             Server statico e proxy (Node, senza dipendenze)
 proxy/                Proxy come Cloudflare Worker
 sw.js                 Service worker per l'uso offline

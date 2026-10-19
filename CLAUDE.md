@@ -15,8 +15,22 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
 - Stato locale delle viste con `ctx.state(key, init)`; operazioni asincrone una tantum con `ctx.task(key, fn)`.
   Fogli: `openSheet` (sostituisce), `pushSheet` (sopra, chiudendo si torna indietro); i fogli dell'Orario tengono lo
   stato in `sheet:<id>` e lo cancellano in `onClose`. `confirm({ actions })` per dialoghi con più scelte.
-- Proxy predefinito in `config.json` (`{"proxy": "https://…"}`); `Proxy.init()` all'avvio: indirizzo dell'utente
-  (localStorage) > proxy del sito stesso (`/api/ping` con `X-BCW-Proxy`) > `config.json`.
+- Proxy predefinito in `config.json` (`{"proxy": "https://…", "api": "https://…"}`, letto una volta da `loadConfig()`);
+  `Proxy.init()` all'avvio: indirizzo dell'utente (localStorage) > proxy del sito stesso (`/api/ping` con `X-BCW-Proxy`)
+  > `config.json`. `api` è il server degli account BCW (BCW-api, https://github.com/kubos5/BCW-api), `BCWServer` in
+  `js/cloud.js` (cambiabile da Impostazioni › Account › Server BCW, `bcw.api`).
+- Account BCW (`js/cloud.js`, metodi `cloud…` di `AppModel`): `model.cloud` = `{ token, user }` (`bcw.cloud.session`).
+  Con l'account BCW `model.accounts` sono gli account Classeviva abbinati (id del server, con le credenziali, in
+  `bcw.cloud.accounts`, attivo in `bcw.cloud.activeAccount`); quelli del browser restano in `bcw.accounts` e tornano
+  uscendo da BCW. Senza account abbinati la schermata di accesso chiede di abbinare il primo. `signIn` con l'account BCW
+  abbina sul server (`POST /accounts`); il cestino diventa "Scollega" (`unlinkAccount`). `refreshCloud` (all'avvio, con
+  Aggiorna, tornando sulla pagina, al massimo ogni 30 s) allinea gli account; un 401 fa uscire con `cloudNotice`.
+  Lato Classeviva: `classevivaLinks()`/`removeClassevivaLink()` con il token di Classeviva (`linksSection` in
+  Impostazioni; senza account BCW l'elenco si carica solo con "Mostra gli account BCW abbinati", perché il server
+  riceve il token). Sincronizzazione (`CloudSync`): impostazioni di `SYNCED_PREFERENCES` con unione a tre vie (validate prima
+  di applicarle), orario per account (vince il lato cambiato, entrambi = questo dispositivo, la prima volta il server) con
+  i file caricati prima dell'orario; `Preferences.onPersist` e `TimetableStore.onSaved` avvisano, `applyRemote` non
+  avvisa. Per provarla in locale: BCW-api con `npm start` e il suo indirizzo in Server BCW.
 - Design dell'app iOS 3.0 (Material 3 Expressive, senza Liquid Glass) e solo componenti di https://m3.material.io. Il Mac non
   c'è più: il layout degli schermi larghi è un adattamento libero di quello dell'app.
 - Design Material 3 Expressive: colori come variabili CSS (`--primary`, `--surface-container…`, `--good/--fair/--poor/

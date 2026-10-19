@@ -1,3 +1,4 @@
 {
-  "proxy": "https://bcw-proxy.romeo-ca1211.workers.dev"
+  "proxy": "https://bcw-proxy.romeo-ca1211.workers.dev",
+  "api": "https://bcw-api.romeo-ca1211.workers.dev"
 }
