@@ -1604,6 +1604,7 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 @keyframes login-header-in { from { opacity: 0; } }
 
 /* Telefono con la tastiera aperta: logo piccolo e titolo su una riga, tutto in alto. */
+.login-screen:has(.login.compact) { height: var(--keyboard-viewport, 100%); }
 .login.compact { justify-content: flex-start; gap: 20px; padding-top: calc(16px + var(--safe-top)); }
 .login .login-header.compact { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 14px; min-height: 0; padding-top: 8px; animation-name: fade-in; }
 .login .login-header.compact .logo { font-size: 21px; }

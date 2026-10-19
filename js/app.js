@@ -380,6 +380,7 @@ function render() {
     try { fn(root); } catch (error) { console.error(error); }
   }
   updateBarState();
+  fitKeyboard();
 }
 
 // MARK: Transizione ad asse condiviso
@@ -927,6 +928,51 @@ root.addEventListener('pointerdown', (event) => {
 root.addEventListener('pointerup', (event) => {
   const area = event.target.closest('[data-blank-blur]');
   if (area && !event.target.closest('input, textarea, label, button, a, select')) document.activeElement?.blur?.();
+});
+
+// MARK: Tastiera dei telefoni nell'accesso
+
+// Safari su iPhone (e Chrome su Android) non rimpicciolisce la pagina quando si apre la tastiera:
+// la fa scorrere sotto la tastiera per mostrare il campo attivo. L'accesso compatto è già fatto
+// per lo spazio che resta, quindi la pagina prende l'altezza dell'area visibile (non c'è altro
+// da mostrare più in basso) e lo spostamento della pagina, se c'è, si annulla.
+const visualViewport = window.visualViewport;
+
+function fitKeyboard() {
+  const style = document.documentElement.style;
+  if (!visualViewport || !root.querySelector('.login.compact')) {
+    style.removeProperty('--keyboard-viewport');
+    return;
+  }
+  style.setProperty('--keyboard-viewport', `${Math.round(visualViewport.height)}px`);
+  if (window.scrollY || visualViewport.offsetTop) window.scrollTo(0, 0);
+}
+
+visualViewport?.addEventListener('resize', fitKeyboard);
+visualViewport?.addEventListener('scroll', fitKeyboard);
+
+// Primo tocco su un campo: la disposizione compatta si applica prima di dare il fuoco al campo
+// (già in alto), così il browser non fa scorrere la pagina per mostrare dove stava prima.
+let loginFieldTouch = null;
+
+root.addEventListener('touchstart', (event) => {
+  const field = event.target.closest('.login:not(.adding):not(.wide) .login-field');
+  loginFieldTouch = field && event.touches.length === 1 && !document.activeElement?.matches('.login-field input')
+    ? { input: field.querySelector('input'), x: event.touches[0].clientX, y: event.touches[0].clientY, time: Date.now() }
+    : null;
+}, { passive: true });
+
+root.addEventListener('touchend', (event) => {
+  const touch = loginFieldTouch;
+  loginFieldTouch = null;
+  const end = event.changedTouches[0];
+  if (!touch?.input.isConnected || !end) return;
+  // Scorrimenti e pressioni lunghe restano al browser.
+  if (Math.hypot(end.clientX - touch.x, end.clientY - touch.y) > 10 || Date.now() - touch.time > 500) return;
+  event.preventDefault();
+  dispatch('login-focus', touch.input);
+  render();
+  touch.input.focus({ preventScroll: true });
 });
 
 root.addEventListener('input', (event) => {
