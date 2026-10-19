@@ -1,7 +1,7 @@
 // Service worker: rende BCW installabile e la apre anche offline.
 // I dati del registro sono salvati a parte (IndexedDB) dall'app stessa.
 
-const VERSION = 'bcw-v9';
+const VERSION = 'bcw-v10';
 const SHELL = [
   './',
   'index.html',

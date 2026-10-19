@@ -918,6 +918,17 @@ root.addEventListener('click', (event) => {
   dispatch(el.dataset.action, el, event);
 });
 
+// `data-keep-focus`: toccarlo non toglie il fuoco al campo attivo (la tastiera resta aperta).
+// `data-blank-blur`: un tocco nello spazio vuoto chiude la tastiera.
+root.addEventListener('pointerdown', (event) => {
+  if (event.target.closest('[data-keep-focus]') && document.activeElement?.matches('input, textarea')) event.preventDefault();
+});
+
+root.addEventListener('pointerup', (event) => {
+  const area = event.target.closest('[data-blank-blur]');
+  if (area && !event.target.closest('input, textarea, label, button, a, select')) document.activeElement?.blur?.();
+});
+
 root.addEventListener('input', (event) => {
   const el = event.target.closest('[data-input]');
   if (el) dispatch(el.dataset.input, el, event);
