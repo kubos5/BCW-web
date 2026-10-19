@@ -933,32 +933,58 @@ root.addEventListener('pointerup', (event) => {
 // MARK: Tastiera dei telefoni nell'accesso
 
 // Safari su iPhone (e Chrome su Android) non rimpicciolisce la pagina quando si apre la tastiera:
-// la fa scorrere sotto la tastiera per mostrare il campo attivo. L'accesso compatto è già fatto
-// per lo spazio che resta, quindi la pagina prende l'altezza dell'area visibile (non c'è altro
-// da mostrare più in basso) e lo spostamento della pagina, se c'è, si annulla.
+// la fa scorrere sotto la tastiera per mostrare il campo attivo. Qui lo scorrimento lo decide
+// l'app: la pagina prende l'altezza dell'area visibile e la segue se il browser la sposta
+// comunque; i campi prendono il fuoco senza scorrimento e, se l'accesso non ci sta (la
+// registrazione), scorre solo il suo contenuto, quanto basta per mostrare il campo e "Accedi".
 const visualViewport = window.visualViewport;
 
 function fitKeyboard() {
   const style = document.documentElement.style;
   if (!visualViewport || !root.querySelector('.login.compact')) {
     style.removeProperty('--keyboard-viewport');
+    style.removeProperty('--keyboard-top');
     return;
   }
-  style.setProperty('--keyboard-viewport', `${Math.round(visualViewport.height)}px`);
   if (window.scrollY || visualViewport.offsetTop) window.scrollTo(0, 0);
+  style.setProperty('--keyboard-viewport', `${Math.round(visualViewport.height)}px`);
+  style.setProperty('--keyboard-top', `${Math.round(visualViewport.pageTop)}px`);
 }
 
-visualViewport?.addEventListener('resize', fitKeyboard);
+/** Scorre l'accesso quanto basta per mostrare il campo attivo e, se c'è spazio, anche il pulsante. */
+function revealLoginField(input) {
+  const screen = input?.closest('.login-screen');
+  if (!screen || !screen.querySelector('.login.compact')) return;
+  const area = screen.getBoundingClientRect();
+  const top = area.top + 12;
+  const bottom = Math.min(area.bottom, visualViewport ? visualViewport.offsetTop + visualViewport.height : area.bottom) - 12;
+  const field = input.closest('.login-field').getBoundingClientRect();
+  const submit = screen.querySelector('.login-submit')?.getBoundingClientRect();
+  const target = submit && submit.bottom - field.top <= bottom - top ? submit.bottom : field.bottom;
+  let delta = Math.max(0, target - bottom);
+  if (field.top - delta < top) delta = field.top - top;
+  if (Math.abs(delta) >= 1) screen.scrollBy({ top: delta, behavior: 'smooth' });
+}
+
+visualViewport?.addEventListener('resize', () => {
+  fitKeyboard();
+  if (document.activeElement?.matches('.login-field input')) requestAnimationFrame(() => revealLoginField(document.activeElement));
+});
 visualViewport?.addEventListener('scroll', fitKeyboard);
 
-// Primo tocco su un campo: la disposizione compatta si applica prima di dare il fuoco al campo
-// (già in alto), così il browser non fa scorrere la pagina per mostrare dove stava prima.
+root.addEventListener('focusin', (event) => {
+  if (event.target.matches?.('.login-field input')) requestAnimationFrame(() => revealLoginField(event.target));
+});
+
+// Tocco su un campo dell'accesso: il fuoco lo dà l'app, senza lo scorrimento del browser. Al
+// primo tocco la disposizione compatta si applica prima, così il campo è già in alto.
 let loginFieldTouch = null;
 
 root.addEventListener('touchstart', (event) => {
   const field = event.target.closest('.login:not(.adding):not(.wide) .login-field');
-  loginFieldTouch = field && event.touches.length === 1 && !document.activeElement?.matches('.login-field input')
-    ? { input: field.querySelector('input'), x: event.touches[0].clientX, y: event.touches[0].clientY, time: Date.now() }
+  const input = field?.querySelector('input');
+  loginFieldTouch = input && event.touches.length === 1 && input !== document.activeElement
+    ? { input, x: event.touches[0].clientX, y: event.touches[0].clientY, time: Date.now() }
     : null;
 }, { passive: true });
 
@@ -970,8 +996,10 @@ root.addEventListener('touchend', (event) => {
   // Scorrimenti e pressioni lunghe restano al browser.
   if (Math.hypot(end.clientX - touch.x, end.clientY - touch.y) > 10 || Date.now() - touch.time > 500) return;
   event.preventDefault();
-  dispatch('login-focus', touch.input);
-  render();
+  if (!root.querySelector('.login.compact')) {
+    dispatch('login-focus', touch.input);
+    render();
+  }
   touch.input.focus({ preventScroll: true });
 });
 

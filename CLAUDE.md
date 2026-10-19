@@ -53,9 +53,10 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   Il gruppo ha `data-keep-focus` (toccarlo non toglie il fuoco: i campi dei due moduli hanno le stesse chiavi
   `f-user`/`f-pass`, quindi il cursore resta e cambia solo il valore); `data-blank-blur` chiude la tastiera toccando
   lo spazio vuoto; le note dei due moduli occupano sempre l'altezza delle più lunghe. Safari (e Chrome su Android) non
-  rimpiccioliscono la pagina con la tastiera ma la fanno scorrere: il primo tocco su un campo applica la disposizione
-  compatta prima del fuoco (`focus({ preventScroll })`), `fitKeyboard()` dà alla pagina l'altezza di `visualViewport`
-  (`--keyboard-viewport`) e annulla lo spostamento della pagina. Da 840 px un pannello in due
+  rimpiccioliscono la pagina con la tastiera ma la fanno scorrere: ogni tocco su un campo dà il fuoco dall'app
+  (`focus({ preventScroll })`, al primo dopo aver applicato la disposizione compatta), `fitKeyboard()` dà alla pagina
+  l'altezza e la posizione di `visualViewport` (`--keyboard-viewport`, `--keyboard-top`) e `revealLoginField()` fa
+  scorrere solo l'accesso, quanto basta per il campo attivo e il pulsante (registrazione su schermi bassi). Da 840 px un pannello in due
   colonne (logo, titolo e spiegazione a sinistra, modulo a destra) con note e server sotto.
 - Settimana e mese di Dashboard e Orario: `calendarBar()` (`js/calendar-bar.js`), gruppo di pulsanti fermo sopra l'area che
   scorre (`page.fixed`; sugli schermi larghi nella colonna laterale). Il giorno scelto è pieno e più largo; il titolo
