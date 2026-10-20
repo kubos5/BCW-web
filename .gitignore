@@ -1,0 +1,5 @@
+# File di sistema del Mac
+.DS_Store
+# Cartella creata per sbaglio da uno script di prova con un percorso non definito
+# (conteneva screenshot finiti nel repository)
+undefined/
