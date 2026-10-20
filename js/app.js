@@ -368,6 +368,8 @@ const SLIDING_PAGES = '.axis-in, .slide-1, .slide--1, .view-swap';
 const STATE_POPS = '.check';
 /** Pulsante per tornare al giorno predefinito ("Domani", "Oggi") nel giorno in grande. */
 const DAY_JUMP = '.day-jump';
+/** Parte ferma in alto (la settimana di Dashboard e Orario): sale con la pagina solo se è nuova. */
+const PAGE_FIXED = '.page-fixed';
 
 function render() {
   applyTheme();
@@ -384,7 +386,7 @@ function render() {
   else html = renderSignedIn();
   html += renderOverlays();
   const leaving = captureAxisPages();
-  const known = new Set(root.querySelectorAll(`${SLIDE_CONTAINERS}, ${STATE_POPS}, ${DAY_JUMP}`));
+  const known = new Set(root.querySelectorAll(`${SLIDE_CONTAINERS}, ${STATE_POPS}, ${DAY_JUMP}, ${PAGE_FIXED}, .page`));
   const jumpDays = new Set([...root.querySelectorAll(DAY_JUMP)].map((jump) => jump.closest('[data-axis]')));
   morph(root, html);
   animateAxisExits(leaving);
@@ -454,7 +456,8 @@ function animateAxisExits(leaving) {
  * (prima, dopo un cambio di giorno, tornando sulla scheda la pagina saliva e scivolava di lato).
  * Allo stesso modo le caselle dei compiti fatti saltano solo quando le si tocca e il pulsante
  * "Domani"/"Oggi" spunta solo quando compare cambiando giorno, non se c'era già nel giorno prima
- * né in una pagina appena aperta (prima lo facevano a ogni cambio di scheda o di giorno).
+ * né in una pagina appena aperta (prima lo facevano a ogni cambio di scheda o di giorno); la parte
+ * ferma in alto sale con la pagina solo quando la pagina è nuova.
  * Una CSSAnimation annullata non riparte finché la classe resta la stessa.
  */
 function settleNewSlides(known, jumpDays) {
@@ -469,6 +472,11 @@ function settleNewSlides(known, jumpDays) {
     if (known.has(node)) continue;
     const day = node.closest('[data-axis]');
     if (!known.has(day) || jumpDays.has(day)) cancel(node);
+  }
+  // La settimana sale dal basso insieme al contenuto quando si apre la pagina; chiudendo la
+  // ricerca della Dashboard la pagina resta e la settimana, ridisegnata, non sale da sola.
+  for (const node of root.querySelectorAll(PAGE_FIXED)) {
+    if (!known.has(node) && known.has(node.closest('.page'))) cancel(node);
   }
 }
 

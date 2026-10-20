@@ -69,7 +69,7 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   scorrendo di lato (`data-day-swipe`). Il verso resta nello stato della vista, quindi `axis-in`/`slide-±1` tornano a
   ogni disegno: `settleNewSlides()` annulla l'animazione delle pagine in un contenitore appena creato (cambio di scheda,
   ritorno da un'altra pagina), così cambiando scheda tutto sale dal basso (`page-in`, anche la parte ferma
-  `.page-fixed`) e non in diagonale. Un'animazione CSS annullata non riparte finché la classe non cambia. Con la stessa
+  `.page-fixed`, ma solo in una pagina nuova: chiudendo la ricerca non sale da sola) e non in diagonale. Un'animazione CSS annullata non riparte finché la classe non cambia. Con la stessa
   regola le caselle dei compiti fatti (`.check`) saltano solo se c'erano già (quando le si tocca) e il pulsante
   "Domani"/"Oggi" (`.day-jump`) spunta solo se compare cambiando giorno; la pagina che esce, rimessa nel documento da
   `animateAxisExits()`, ha le animazioni dei suoi elementi annullate (altrimenti ripartirebbero). Lista e Giorno
