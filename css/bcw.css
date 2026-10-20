@@ -2326,7 +2326,8 @@ textarea.reply { width: 100%; }
 .dp-weekdays { height: 40px; align-items: center; text-align: center; font-size: 14px; font-weight: 500; }
 .dp-page { display: flex; flex-direction: column; gap: 4px; }
 .dp-cell { display: grid; place-items: center; height: 40px; }
-.dp-day { width: 40px; height: 40px; border-radius: 50%; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--on-surface); position: relative; isolation: isolate; transition: background-color var(--effects-dur) var(--effects); }
+/* I pulsanti ereditano l'allineamento del testo (all'inizio, `button` in alto): il numero va centrato. */
+.dp-day { display: grid; place-items: center; width: 40px; height: 40px; text-align: center; border-radius: 50%; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--on-surface); position: relative; isolation: isolate; transition: background-color var(--effects-dur) var(--effects); }
 .dp-day::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; z-index: -1; transition: opacity var(--effects-fast-dur) linear; }
 @media (hover: hover) { .dp-day:hover:not(:disabled)::after { opacity: .08; } }
 .dp-day.today { color: var(--primary); font-weight: 650; box-shadow: inset 0 0 0 1px var(--primary); }
@@ -2336,7 +2337,7 @@ textarea.reply { width: 100%; }
 .dp-year-row { display: flex; align-items: center; justify-content: space-between; }
 .dp-year-row strong { font-size: 18px; }
 .dp-month-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; padding: 0 8px; }
-.dp-month { height: 44px; text-align: center; border-radius: 22px; background: var(--surface-container-highest); font-size: 15px; font-weight: 500; }
+.dp-month { display: grid; place-items: center; height: 44px; text-align: center; border-radius: 22px; background: var(--surface-container-highest); font-size: 15px; font-weight: 500; }
 .dp-month.selected { background: var(--primary); color: var(--on-primary); font-weight: 650; }
 .dp-actions { display: flex; align-items: center; gap: 4px; padding: 0 12px 12px; }
 
