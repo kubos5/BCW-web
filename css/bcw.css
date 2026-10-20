@@ -1177,7 +1177,10 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .tb-btn:active::after { opacity: .12; }
 .tb-btn.selected { background: var(--primary); color: var(--on-primary); }
 .tb-sep { width: 1px; height: 24px; margin: 0 4px; background: color-mix(in srgb, currentColor 25%, transparent); }
-.tb-done { height: 48px; margin-left: 4px; padding: 0 20px 0 16px; }
+/* "Fine" come nell'app: a riposo una pillola alta 48 px, a 8 px dal bordo della barra (64 px) in
+   alto, in basso e a destra, quindi con gli angoli concentrici (32 − 8 = 24); premuto si
+   stringe come i pulsanti a icona della barra. */
+.tb-done { --h: 48px; --pressed: var(--r-m); margin-left: 4px; padding: 0 20px 0 16px; }
 
 /* MARK: - Shell: schermi larghi (barra superiore con la ricerca, barra di navigazione espansa
    e pannello della pagina con angoli ampi) */
