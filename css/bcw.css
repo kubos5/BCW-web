@@ -954,7 +954,8 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .page.mobile .page-body.bottom-inset { padding-bottom: 72px; }
 /* Spazio per il pulsante d'azione flottante o la barra degli strumenti. */
 .page.mobile .page-body.fab-inset, .page.desktop .page-body.fab-inset { padding-bottom: 112px; }
-.page.mobile .page-scroll { animation: page-in var(--spring-dur) var(--spring); }
+/* Cambiando scheda o pagina tutto il contenuto (anche la parte ferma in alto) sale dal basso. */
+.page.mobile .page-scroll, .page.mobile .page-fixed { animation: page-in var(--spring-dur) var(--spring); }
 @keyframes page-in { from { opacity: 0; transform: translateY(14px); } }
 /* Parte ferma sopra l'area che scorre (la settimana di Dashboard e Orario). */
 .page-fixed { flex: none; position: relative; z-index: 4; background: var(--surface); }

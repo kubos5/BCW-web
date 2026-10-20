@@ -355,6 +355,14 @@ export function showToast(message, iconName = 'checkCircle') {
 
 const root = document.getElementById('app');
 
+/**
+ * Pagine che entrano di lato (`axis-in`, `slide-±1`) e i loro contenitori: giorni e schede
+ * (`[data-axis]`), settimana e mese della barra del calendario (`.cb-rows`), mesi del selettore
+ * della data (`.dp-days`).
+ */
+const SLIDE_CONTAINERS = '[data-axis], .cb-rows, .dp-days';
+const SLIDING_PAGES = '.axis-in, .slide-1, .slide--1';
+
 function render() {
   applyTheme();
   if (app.sessionID !== model.sessionID) {
@@ -370,8 +378,10 @@ function render() {
   else html = renderSignedIn();
   html += renderOverlays();
   const leaving = captureAxisPages();
+  const slideContainers = new Set(root.querySelectorAll(SLIDE_CONTAINERS));
   morph(root, html);
   animateAxisExits(leaving);
+  settleNewSlides(slideContainers);
   restoreScroll();
   drawCharts(root);
   positionMenu();
@@ -421,6 +431,22 @@ function animateAxisExits(leaving) {
     setTimeout(() => layer.remove(), 400);
   }
   swipeRelease = 0;
+}
+
+/**
+ * Il verso del cambio di giorno, settimana o scheda resta nello stato della vista (serve finché
+ * la pagina nuova entra) e le classi `axis-in`/`slide-±1` vengono riscritte a ogni disegno. Una
+ * pagina che entra di lato ha senso solo se cambia dentro un contenitore già sullo schermo: in un
+ * contenitore appena creato (cambio di scheda, ritorno da un'altra pagina, prima apertura) la sua
+ * animazione si annulla, così il contenuto compare con la pagina, dal basso, e non in diagonale
+ * (prima, dopo un cambio di giorno, tornando sulla scheda la pagina saliva e scivolava di lato).
+ * Una CSSAnimation annullata non riparte finché la classe resta la stessa.
+ */
+function settleNewSlides(known) {
+  for (const node of root.querySelectorAll(SLIDING_PAGES)) {
+    if (known.has(node.parentElement)) continue;
+    for (const animation of node.getAnimations()) animation.cancel();
+  }
 }
 
 function renderSignedOut() {

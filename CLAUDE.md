@@ -64,7 +64,10 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   Calendario della Dashboard = mese; l'Orario ha solo Lista e Giorno.
 - Giorni e schede cambiano con la transizione ad asse condiviso: `axisPage(nome, verso, chiave, html)`; la pagina nuova
   entra con `.axis-in`, quella vecchia la ridisegna `animateAxisExits()` dopo il morph. Il giorno accanto si raggiunge
-  scorrendo di lato (`data-day-swipe`).
+  scorrendo di lato (`data-day-swipe`). Il verso resta nello stato della vista, quindi `axis-in`/`slide-±1` tornano a
+  ogni disegno: `settleNewSlides()` annulla l'animazione delle pagine in un contenitore appena creato (cambio di scheda,
+  ritorno da un'altra pagina), così cambiando scheda tutto sale dal basso (`page-in`, anche la parte ferma
+  `.page-fixed`) e non in diagonale. Un'animazione CSS annullata non riparte finché la classe non cambia.
 - Componenti dell'app: `dayHero` (giorno in grande e chip), `statusChip`, `segmentedSection` + `segCell`, `listGroup`
   (anche con `background`), `dateBadge`, `connectedGroup`, `primaryTabs`, `statTile` con `corners`, menu del FAB
   (`page.fabMenu`, voci con un'azione) e barra degli strumenti flottante (`floatingToolbar`, vivace nella modifica
