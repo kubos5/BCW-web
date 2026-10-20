@@ -178,8 +178,17 @@ export const timetable = {
       select(ctx, new Date(target.getFullYear(), target.getMonth(), Math.min(s.selected.getDate(), last)));
     },
     'tt-mode': (ctx, el) => {
-      ctx.prefs.set('timetableMode', el.dataset.value ?? el.value);
+      const value = el.dataset.value ?? el.value;
+      ctx.prefs.set('timetableMode', value);
       ttState(ctx).scrollToHour = true;
+      // La Lista riparte dall'alto (la vista Giorno scorre da sola alla prima ora): prima restava
+      // scorsa quanto la giornata, con il giorno in grande nascosto sotto la settimana.
+      if (value === 'list' && ctx.route.name === 'timetable') {
+        ctx.afterRender(() => {
+          const scroller = ctx.pageScroller();
+          if (scroller) ctx.scrollQuietly(scroller, 0);
+        });
+      }
     },
     'tt-new': (ctx) => {
       if (ctx.model.timetable.draft) return;

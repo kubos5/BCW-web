@@ -74,7 +74,7 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   "Domani"/"Oggi" (`.day-jump`) spunta solo se compare cambiando giorno; la pagina che esce, rimessa nel documento da
   `animateAxisExits()`, ha le animazioni dei suoi elementi annullate (altrimenti ripartirebbero). Lista e Giorno
   dell'Orario sui telefoni hanno contenitori diversi (`.view-swap`, chiave per vista, assi `tt-day`/`tt-grid`) e si
-  scambiano con la dissolvenza, non di lato.
+  scambiano con la dissolvenza, non di lato; tornando alla Lista si riparte dall'alto (`tt-mode`).
 - Componenti dell'app: `dayHero` (giorno in grande e chip), `statusChip`, `segmentedSection` + `segCell`, `listGroup`
   (anche con `background`), `dateBadge`, `connectedGroup`, `primaryTabs`, `statTile` con `corners`, menu del FAB
   (`page.fabMenu`, voci con un'azione) e barra degli strumenti flottante (`floatingToolbar`, vivace nella modifica
