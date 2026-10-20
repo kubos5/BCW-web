@@ -320,11 +320,10 @@ export function lessonRow(lesson) {
 
 /**
  * Riga di un compito, una verifica o un evento. Il cerchio a sinistra segna i compiti
- * come fatti; tenendo premuto (o con il tasto destro) si apre il menu con le altre azioni.
- * Con `plainTap` un tocco su una riga il cui testo è intero esegue quell'azione invece di
- * aprirla (in "Nei prossimi giorni" porta al giorno).
+ * come fatti; toccando il testo lo si apre (se è tagliato); tenendo premuto (o con il tasto
+ * destro) si apre il menu con le altre azioni.
  */
-export function agendaEventRow(event, { done = false, expanded = false, showsDate = false, scope = '', plainTap = null } = {}) {
+export function agendaEventRow(event, { done = false, expanded = false, showsDate = false, scope = '' } = {}) {
   const color = subjectColor(event.subjectId);
   const leading = event.kind === 'event'
     ? `<span class="agenda-lead event" style="${tint(color)}">${icon('calendar')}</span>`
@@ -337,7 +336,7 @@ export function agendaEventRow(event, { done = false, expanded = false, showsDat
   if (event.authorName && event.subjectName != null) meta.push(event.authorName);
   return `<div class="agenda-row ${expanded ? 'expanded' : ''}" data-key="ev-${scope}${event.id}" data-context="agenda"${data({ id: event.id })}>
     ${leading}
-    <div class="grow" data-action="agenda-expand"${data({ id: event.id, scope, plain: plainTap })}>
+    <div class="grow" data-action="agenda-expand"${data({ id: event.id, scope })}>
       <div class="row-head">${subjectTag(event.title, event.subjectId)}${event.kind === 'test' ? pill('Verifica', { cls: 'bold' }) : ''}</div>
       <div class="agenda-notes ${done ? 'done' : ''}">${esc(event.notes || 'Nessuna descrizione')}</div>
       ${meta.length ? `<div class="row-caption">${esc(meta.join(' · '))}</div>` : ''}

@@ -1767,7 +1767,6 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .seg-progress .wavy-progress { height: 10px; }
 .seg-progress .wavy-progress .wp-active { height: 10px; }
 .seg-cell { padding: 14px 16px; background: var(--cell-bg, var(--card)); }
-.seg-cell.tap-day { cursor: pointer; }
 
 .empty-day { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 28px 20px; border-radius: var(--r-xl); background: var(--surface-container-low); text-align: center; }
 .empty-day-art { width: 88px; height: 88px; margin-bottom: 10px; color: var(--on-tertiary-container); --shape-fill: var(--tertiary-container); }

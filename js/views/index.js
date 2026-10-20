@@ -55,16 +55,6 @@ export const commonActions = {
     if (ctx.prefs.isCompleted(event)) navigator.vibrate?.(8);
   },
   'agenda-expand': (ctx, el) => {
-    // In "Nei prossimi giorni" un tocco su una riga con il testo intero porta al giorno.
-    if (el.dataset?.plain) {
-      const notes = el.querySelector?.('.agenda-notes');
-      const expandedRow = el.closest?.('.agenda-row')?.classList.contains('expanded');
-      const truncated = notes && notes.scrollHeight > notes.clientHeight + 1;
-      if (!expandedRow && !truncated) {
-        ctx.run('day-select', { dataset: { time: el.dataset.plain } });
-        return;
-      }
-    }
     const expanded = ctx.state('expanded', () => new Set());
     const key = `${el.dataset.scope ?? ''}${el.dataset.id}`;
     if (expanded.has(key)) expanded.delete(key); else expanded.add(key);

@@ -74,7 +74,7 @@ Le stesse dell'app nativa:
 
 - Dashboard con la settimana (vista Lista) o il mese (vista Calendario) come fila di pulsanti, aperta di default sul giorno dopo; il giorno in grande con i chip di stato e, sotto, compiti, verifiche, eventi, presenze e, per i giorni passati, le lezioni, ognuno in una sezione segmentata comprimibile
 - toccando il periodo sopra la settimana si sceglie una data qualsiasi dal selettore della data; frecce e scorrimento di lato sulla settimana cambiano settimana (o mese), scorrendo di lato sul giorno si passa al giorno prima o dopo, con la transizione ad asse condiviso
-- "Nei prossimi giorni" come la vista Programma di Google Calendar: la data in un riquadro (tocco = vai al giorno), il nome del giorno che comprime gli elementi e gli elementi in una lista segmentata
+- "Nei prossimi giorni" come la vista Programma di Google Calendar: la data in un riquadro (solo toccando quella si va al giorno), il nome del giorno che comprime gli elementi e gli elementi in una lista segmentata, con le stesse azioni del giorno scelto
 - ricerca dalla barra in cima alla Dashboard, con la vista e l'avatar dell'account (che apre gli account): toccandola diventa il campo e i risultati prendono il posto della pagina
 - toccando di nuovo la scheda Dashboard si torna in cima alla pagina e, se si è già in cima, alla giornata di domani
 - puoi segnare i compiti come fatti e, opzionalmente, nasconderli
