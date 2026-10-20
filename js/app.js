@@ -356,12 +356,18 @@ export function showToast(message, iconName = 'checkCircle') {
 const root = document.getElementById('app');
 
 /**
- * Pagine che entrano di lato (`axis-in`, `slide-±1`) e i loro contenitori: giorni e schede
- * (`[data-axis]`), settimana e mese della barra del calendario (`.cb-rows`), mesi del selettore
- * della data (`.dp-days`).
+ * Elementi che entrano con un'animazione propria solo quando cambiano dentro un contenitore già
+ * sullo schermo (vedi `settleNewSlides`), e i loro contenitori: giorni e schede che entrano di
+ * lato (`axis-in` in `[data-axis]`), settimana e mese della barra del calendario (`slide-±1` in
+ * `.cb-rows`), mesi del selettore della data (in `.dp-days`), Lista e Giorno dell'Orario
+ * (`.view-swap` in `.page-body`).
  */
-const SLIDE_CONTAINERS = '[data-axis], .cb-rows, .dp-days';
-const SLIDING_PAGES = '.axis-in, .slide-1, .slide--1';
+const SLIDE_CONTAINERS = '[data-axis], .cb-rows, .dp-days, .page-body';
+const SLIDING_PAGES = '.axis-in, .slide-1, .slide--1, .view-swap';
+/** Elementi che si animano quando cambia il loro stato: solo se c'erano già (la casella del compito). */
+const STATE_POPS = '.check';
+/** Pulsante per tornare al giorno predefinito ("Domani", "Oggi") nel giorno in grande. */
+const DAY_JUMP = '.day-jump';
 
 function render() {
   applyTheme();
@@ -378,10 +384,11 @@ function render() {
   else html = renderSignedIn();
   html += renderOverlays();
   const leaving = captureAxisPages();
-  const slideContainers = new Set(root.querySelectorAll(SLIDE_CONTAINERS));
+  const known = new Set(root.querySelectorAll(`${SLIDE_CONTAINERS}, ${STATE_POPS}, ${DAY_JUMP}`));
+  const jumpDays = new Set([...root.querySelectorAll(DAY_JUMP)].map((jump) => jump.closest('[data-axis]')));
   morph(root, html);
   animateAxisExits(leaving);
-  settleNewSlides(slideContainers);
+  settleNewSlides(known, jumpDays);
   restoreScroll();
   drawCharts(root);
   positionMenu();
@@ -428,6 +435,11 @@ function animateAxisExits(leaving) {
     node.style.cssText = `left:${rect.left - clip.left}px;top:${rect.top - top}px;width:${rect.width}px;--from:${swipeRelease}px;--to:${-dir * 48 + swipeRelease}px`;
     layer.appendChild(node);
     document.body.appendChild(layer);
+    // Rimessa nel documento, la pagina farebbe ripartire le animazioni dei suoi elementi (il
+    // pulsante "Domani" rispuntava, le caselle dei compiti fatti saltavano): esce ferma.
+    for (const animation of node.getAnimations({ subtree: true })) {
+      if (animation.effect?.target !== node) animation.cancel();
+    }
     setTimeout(() => layer.remove(), 400);
   }
   swipeRelease = 0;
@@ -440,12 +452,23 @@ function animateAxisExits(leaving) {
  * contenitore appena creato (cambio di scheda, ritorno da un'altra pagina, prima apertura) la sua
  * animazione si annulla, così il contenuto compare con la pagina, dal basso, e non in diagonale
  * (prima, dopo un cambio di giorno, tornando sulla scheda la pagina saliva e scivolava di lato).
+ * Allo stesso modo le caselle dei compiti fatti saltano solo quando le si tocca e il pulsante
+ * "Domani"/"Oggi" spunta solo quando compare cambiando giorno, non se c'era già nel giorno prima
+ * né in una pagina appena aperta (prima lo facevano a ogni cambio di scheda o di giorno).
  * Una CSSAnimation annullata non riparte finché la classe resta la stessa.
  */
-function settleNewSlides(known) {
+function settleNewSlides(known, jumpDays) {
+  const cancel = (node) => { for (const animation of node.getAnimations()) animation.cancel(); };
   for (const node of root.querySelectorAll(SLIDING_PAGES)) {
-    if (known.has(node.parentElement)) continue;
-    for (const animation of node.getAnimations()) animation.cancel();
+    if (!known.has(node.parentElement?.closest(SLIDE_CONTAINERS))) cancel(node);
+  }
+  for (const node of root.querySelectorAll(STATE_POPS)) {
+    if (!known.has(node)) cancel(node);
+  }
+  for (const node of root.querySelectorAll(DAY_JUMP)) {
+    if (known.has(node)) continue;
+    const day = node.closest('[data-axis]');
+    if (!known.has(day) || jumpDays.has(day)) cancel(node);
   }
 }
 

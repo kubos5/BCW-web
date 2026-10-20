@@ -132,14 +132,18 @@ export const timetable = {
     }
 
     // Telefoni: in alto la settimana, ferma; sotto il giorno (Lista) o la sua giornata (Giorno).
+    // Lista e Giorno si scambiano con la dissolvenza di Material 3 (`.view-swap`, come nell'app),
+    // ognuna con il suo contenitore dei giorni: prima il cambio di vista scorreva di lato, nel
+    // verso dell'ultimo cambio di giorno.
     let body;
     if (mode === 'day') {
       const grid = timeline(ctx, [day], day);
-      body = s.editing ? grid : `<div class="day-swipe" data-day-swipe="tt-day-shift">${axisPage('tt-day', s.dir, `ttg-${dayKey(day)}`, grid)}</div>`;
+      body = s.editing ? grid : `<div class="day-swipe" data-day-swipe="tt-day-shift">${axisPage('tt-grid', s.dir, `ttg-${dayKey(day)}`, grid)}</div>`;
       scheduleHourScroll(ctx, [day]);
     } else {
       body = `<div class="day-swipe" data-day-swipe="tt-day-shift">${axisPage('tt-day', s.dir, `ttd-${dayKey(day)}`, dayList(ctx, content))}</div>`;
     }
+    body = `<div class="view-swap" data-key="tt-view-${mode}">${body}</div>`;
     return {
       title,
       actions,

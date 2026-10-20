@@ -1013,6 +1013,9 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .account-avatar:active .avatar { transform: scale(.92); }
 .fade-through { animation: fade-through var(--spring-dur) var(--spring) 50ms backwards; }
 @keyframes fade-through { from { opacity: 0; transform: scale(.94); } }
+/* Lista e Giorno dell'Orario si scambiano con la stessa dissolvenza, ancorata in alto: la giornata
+   è più alta dello schermo (e scorre subito alla prima ora, misurata con la vista già ridotta). */
+.view-swap { animation: fade-through var(--spring-dur) var(--spring) 50ms backwards; transform-origin: 50% 0; }
 
 /* Trascina per aggiornare: l'indicatore di caricamento in un cerchio. */
 .ptr { height: 0; overflow: hidden; display: grid; place-items: center; opacity: 0; transition: height .25s var(--emphasized-decelerate), opacity .2s; }
