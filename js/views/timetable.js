@@ -15,8 +15,8 @@ import {
   addDays, addMonths, dayKey, esc, fmt, isSameDay, isToday, isTomorrow, isYesterday, isWeekend, startOfDay, startOfMonth, startOfWeek,
 } from '../util.js';
 import {
-  Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, displayTitle, duration, entryColor, isBreak,
-  roundHalfAway, timeRange,
+  Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, defaultTimetableDay, displayTitle, duration, entryColor,
+  isBreak, roundHalfAway, timeRange,
 } from '../timetable.js';
 import {
   detailSheet, editorSheet, generatorSheet, hiddenTestsSheet, seriesSheet, deleteEntryDialog, timetableSheetActions,
@@ -92,9 +92,8 @@ export const timetable = {
     const s = ttState(ctx);
     if (!s.initialized) {
       s.initialized = true;
-      // Nel fine settimana senza lezioni si parte dal lunedì dopo.
-      const today = startOfDay(new Date());
-      if (isWeekend(today) && !store.entriesOn(today).length && !store.isEmpty) s.selected = addDays(startOfWeek(today), 7);
+      // Oggi finché c'è un evento da finire, altrimenti il prossimo giorno con eventi.
+      s.selected = defaultTimetableDay(store);
     }
     if (store.draft && s.editing) s.editing = false;
     const mode = effectiveMode(ctx);

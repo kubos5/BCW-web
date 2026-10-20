@@ -1254,6 +1254,27 @@ export class TimetableStore {
   }
 }
 
+// MARK: - Giorno predefinito
+
+/**
+ * Giorno che l'Orario mostra quando lo sceglie da solo (all'apertura). Stessa regola dell'app iOS
+ * e dei widget: oggi, se c'è ancora un evento non finito (fine dopo adesso); altrimenti (eventi di
+ * oggi tutti finiti, o nessuno) il primo dei 7 giorni successivi con eventi; se non ce n'è
+ * nessuno, oggi. Contano solo gli eventi dell'orario salvato, non gli intervalli, la bozza o le
+ * verifiche di Classeviva.
+ */
+export function defaultTimetableDay(store, now = new Date()) {
+  const today = startOfDay(now);
+  const events = (day) => store.entries(Weekday.of(day), false).filter((e) => !isBreak(e));
+  const minute = TimeOfDay.of(now);
+  if (events(today).some((e) => e.end > minute)) return today;
+  for (let i = 1; i <= 7; i++) {
+    const day = addDays(today, i);
+    if (events(day).length) return day;
+  }
+  return today;
+}
+
 // MARK: - Contenuto di una giornata
 
 /**

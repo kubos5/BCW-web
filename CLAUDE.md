@@ -76,6 +76,10 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   maiuscoli, date senza millisecondi, backup `com.bcw.timetable-backup`), viste in `views/timetable.js` e fogli in
   `views/timetable-sheets.js`. Un documento per account in `localStorage` (`bcw.timetable.<account>`), file in IndexedDB
   (`BlobStore`, spazio `ttfile-<account>`); la demo usa `demo` e si cancella uscendo.
+  Giorno iniziale (`defaultTimetableDay(store)`, stessa regola dell'app iOS e dei widget): oggi se c'è ancora un evento
+  non finito (fine > adesso), altrimenti il primo dei 7 giorni successivi con eventi, se no oggi; contano solo gli eventi
+  dell'orario salvato (non intervalli, bozza o verifiche di Classeviva). Si sceglie alla prima apertura della scheda in
+  una sessione; "Oggi" e un nuovo tocco sulla scheda portano a oggi.
 - Cambi di sessione (account, demo) con `model.changeSession(fn)`: dissolvenza, cambio dei dati e ritorno quando ci
   sono (al massimo 3 s). La demo non è un account: si apre anche con un account collegato e uscendo si torna a quello.
 - `dom.js`: i nodi con `data-key` scomparsi vanno tolti prima di quelli nuovi; spostare un nodo gli toglie il fuoco.

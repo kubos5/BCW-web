@@ -106,6 +106,7 @@ La scheda Orario contiene l'orario settimanale, che si compila a mano o si gener
 
 - due viste: Lista (la settimana in alto e il giorno in grande con le lezioni in una lista segmentata) e Giorno (le ore della giornata, a blocchi pieni nella tinta; su schermi larghi l'intera settimana)
 - in cima la settimana è una fila di pulsanti, come nella Dashboard; scorrendo di lato si passa al giorno prima o dopo
+- si apre su oggi finché c'è un evento da finire, altrimenti sul primo giorno successivo con eventi (finite le lezioni di oggi, o nel fine settimana); il pulsante Oggi riporta a oggi
 - oggi una scheda in cima mostra la lezione in corso (quanto manca, con l'avanzamento) e quella dopo, oppure la prossima lezione
 - toccando un evento si vedono i dettagli e si aggiungono note, file e foto, per un solo giorno o per ogni settimana
 - le verifiche segnate dai docenti su Classeviva compaiono da sole sulla lezione della materia e si possono nascondere; altre verifiche si segnano a mano, per un giorno o per ogni settimana
