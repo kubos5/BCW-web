@@ -49,7 +49,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   (riducibile; tra 840 e 1000 si apre sopra il contenuto); pagina in un pannello con angoli ampi; ricerche di pagina nel
   contenuto (`localSearchField`); Impostazioni e Bacheca con elenco e dettaglio affiancati.
 - Accesso (`views/login.js`): sui telefoni come nell'app; con un campo attivo (tastiera aperta, `pointer: coarse`)
-  disposizione compatta in alto (logo piccolo e titolo su una riga, gruppo Classeviva/Account BCW, campi, Accedi).
+  disposizione compatta in alto (logo piccolo e titolo su una riga, gruppo Classeviva/Account BCW, campi, Accedi);
+  il titolo sta sulla linea di base del logo, alzato perché il centro del testo visibile coincida con quello di "BCW"
+  (metriche di Google Sans Flex nel commento del CSS; misurare con `measureText` e la linea di base, non con le scatole).
   Il gruppo ha `data-keep-focus` (toccarlo non toglie il fuoco: i campi dei due moduli hanno le stesse chiavi
   `f-user`/`f-pass`, quindi il cursore resta e cambia solo il valore); `data-blank-blur` chiude la tastiera toccando
   lo spazio vuoto; le note dei due moduli occupano sempre l'altezza delle più lunghe. Safari (e Chrome su Android) non

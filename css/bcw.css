@@ -1610,9 +1610,13 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 /* Telefono con la tastiera aperta: logo piccolo e titolo su una riga, tutto in alto. */
 .login-screen:has(.login.compact) { height: var(--keyboard-viewport, 100%); transform: translateY(var(--keyboard-top, 0px)); }
 .login.compact { justify-content: flex-start; gap: 16px; padding: calc(12px + var(--safe-top)) 24px 16px; }
-.login .login-header.compact { flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 14px; min-height: 0; padding-top: 8px; animation-name: fade-in; }
-.login .login-header.compact .logo { font-size: 21px; }
-.login .login-header.compact .logo-subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.login .login-header.compact { --logo-size: 21px; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 14px; min-height: 0; padding-top: 8px; animation-name: fade-in; }
+.login .login-header.compact .logo { font-size: var(--logo-size); }
+/* Titolo centrato sul logo (sul testo visibile, non sulle scatole): sulla stessa linea di base
+   lo si alza della differenza tra i centri dei due testi. In Google Sans Flex il centro di "BCW"
+   (maiuscole nere, alte .734em) sta .358em sopra la linea di base, quello del titolo (maiuscole
+   e aste, alte .743em) .363em: con il logo più grande il titolo resterebbe 1,7 px più in basso. */
+.login .login-header.compact .logo-subtitle { position: relative; top: calc(.363em - .358 * var(--logo-size)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 /* Schermi larghi: pannello in due colonne con le note sotto. */
 .login.wide { max-width: none; align-items: center; gap: 16px; padding: 40px; }
