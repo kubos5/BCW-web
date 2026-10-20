@@ -147,7 +147,7 @@ Il sito segue [Material 3 Expressive](https://m3.material.io/):
 - favicon con la linea di BCW nel colore del tema scelto nell'app (chiaro, scuro e colore d'accento)
 - icone Material Symbols Rounded
 - angoli ampi, liste segmentate, sezioni segmentate comprimibili, chip di stato, gruppi di pulsanti collegati, schede, barra di ricerca in alto, menu del pulsante d'azione flottante, barra degli strumenti flottante, selettore della data, barra di navigazione corta e barra di navigazione laterale, fogli dal basso e dialoghi
-- transizioni di Material 3: asse condiviso tra i giorni e tra le schede dei Voti, dissolvenza incrociata verso la ricerca
+- transizioni di Material 3: asse condiviso tra i giorni e tra le schede dei Voti, dissolvenza incrociata verso la ricerca e tra le viste Lista e Giorno dell'orario; sui telefoni, cambiando scheda, le pagine salgono dal basso
 - forme espressive (MaterialShapes): i voti in un "biscotto" a nove lobi, l'indicatore di caricamento che cambia forma ruotando, avatar e stati vuoti nelle forme di Material
 - medie in anelli con la parte piena ondulata e barre di avanzamento ondulate
 - animazioni a molla (pulsanti che stringono gli angoli alla pressione, selezioni che diventano pillole)
