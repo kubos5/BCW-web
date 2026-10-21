@@ -168,8 +168,9 @@ export function averageRing(value, { size = 120, lineWidth = 10, showsLabel = tr
 /** Barra di avanzamento lineare e ondulata, con lo spazio e il punto finale di M3. */
 export function wavyProgress(value, max, { label = '' } = {}) {
   const p = Math.min(1, Math.max(0, max ? value / max : 0));
+  // Come nell'app: a zero solo la pista, al completo solo l'onda (senza spazio né punto finale).
   return `<div class="wavy-progress" role="progressbar" aria-valuenow="${value}" aria-valuemax="${max}" aria-label="${esc(label)}" style="--p:${p}">
-    <span class="wp-active"></span><span class="wp-track"></span></div>`;
+    ${p > 0 ? '<span class="wp-active"></span>' : ''}${p < 1 ? '<span class="wp-track"></span>' : ''}</div>`;
 }
 
 /** Linea ondulata orizzontale (separatori degli intervalli dell'orario). */

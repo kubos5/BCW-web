@@ -924,6 +924,7 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 }
 
 .wavy-progress .wp-track { flex: 1; height: 4px; margin-left: 6px; border-radius: 2px; background: var(--secondary-container); position: relative; }
+.wavy-progress .wp-track:first-child { margin-left: 0; }
 .wavy-progress .wp-track::after { content: ""; position: absolute; right: 0; top: 0; width: 4px; height: 4px; border-radius: 2px; background: var(--primary); }
 @keyframes wave-flow { to { -webkit-mask-position: 40px center; mask-position: 40px center; } }
 @media (prefers-reduced-motion: reduce) { .wavy-progress .wp-active { animation: none; } }
