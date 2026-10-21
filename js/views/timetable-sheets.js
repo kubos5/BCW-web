@@ -518,10 +518,12 @@ function renderGenerator(ctx, id) {
   const hoursFooter = store.alignment === 'automatic' && !alignedSettings
     ? "L'orario usa l'allineamento automatico: con questi orari le lezioni verranno spostate all'ora o alla mezz'ora più vicina. Per tenere gli orari esatti passa all'allineamento libero in Modifica orario."
     : "Classeviva registra solo in quale ora della giornata si svolge una lezione: l'orario si ricava da qui.";
-  const breaks = g.breaks.map((b, i) => `<div class="list-item form-row gen-break"><span class="form-icon">${icon('coffee')}</span><span class="li-text"><strong>Intervallo ${i + 1}</strong></span>
-    ${timeInput(b.start, 'tt-gen-break-start', { sheet: id, index: i })}
-    ${stepper(b.duration, { action: `tt-gen-break-dur" data-sheet="${id}" data-index="${i}`, min: 5, max: 60, step: 5, format: (v) => `${v} min` })}
-    ${iconButton('minusCircle', { action: 'tt-gen-break-remove', params: { sheet: id, index: i }, label: "Rimuovi l'intervallo", cls: 'small danger' })}</div>`);
+  // Come nell'app: in alto il nome con il pulsante per toglierlo, sotto inizio e durata.
+  const breaks = g.breaks.map((b, i) => `<div class="list-item gen-break">
+    <div class="gen-break-head"><span class="form-icon">${icon('coffee')}</span><span class="li-text"><strong>Intervallo ${i + 1}</strong></span>
+      ${iconButton('minusCircle', { action: 'tt-gen-break-remove', params: { sheet: id, index: i }, label: "Rimuovi l'intervallo", cls: 'small danger' })}</div>
+    <div class="gen-break-controls">${timeInput(b.start, 'tt-gen-break-start', { sheet: id, index: i })}<span class="flex"></span>
+      ${stepper(b.duration, { action: `tt-gen-break-dur" data-sheet="${id}" data-index="${i}`, min: 5, max: 60, step: 5, format: (v) => `${v} min` })}</div></div>`);
   breaks.push(`<button class="list-item form-button" data-action="tt-gen-break-add" data-sheet="${id}"><span class="form-icon">${icon('coffee')}</span><span class="li-text"><strong>Aggiungi intervallo</strong></span></button>`);
   if (g.breaks.length) breaks.push(`<button class="list-item form-button danger" data-action="tt-gen-break-clear" data-sheet="${id}"><span class="form-icon">${icon('trash')}</span><span class="li-text"><strong>Rimuovi gli intervalli</strong></span></button>`);
   const body = `<div class="sheet-pad stack gap-20">
