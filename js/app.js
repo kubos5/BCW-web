@@ -771,6 +771,14 @@ function positionMenu() {
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
   menu.style.transformOrigin = `${align === 'start' ? 'left' : 'right'} ${top < rect.top ? 'bottom' : 'top'}`;
+  // Un menu lungo (es. gli orari dell'editor) si apre sulla voce scelta, non in cima.
+  if (!app.menu.revealed) {
+    app.menu.revealed = true;
+    const checked = menu.querySelector('.menu-item.checked');
+    if (checked && menu.scrollHeight > menu.clientHeight) {
+      menu.scrollTop = checked.offsetTop - (menu.clientHeight - checked.offsetHeight) / 2;
+    }
+  }
 }
 
 function renderLock() {
