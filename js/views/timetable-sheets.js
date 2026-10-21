@@ -328,8 +328,9 @@ function renderEditor(ctx, id) {
     details.push(`<div class="field-row">${field('Docente', `<input class="text-input" type="text" value="${esc(d.teacher)}" data-input="tt-ed-field" data-sheet="${id}" data-field="teacher" autocomplete="off">`)}
       ${field('Aula', `<input class="text-input" type="text" value="${esc(d.room)}" data-input="tt-ed-field" data-sheet="${id}" data-field="room" autocomplete="off">`)}</div>`);
   }
-  details.push(`<button class="list-item color-row" data-action="tt-ed-color" data-sheet="${id}"><span class="form-icon">${icon('palette')}</span><span class="li-text"><strong>Colore</strong></span>
-    <span class="trailing">${esc(colorDescription(d.color, store))}</span><span class="swatch-dot" style="background:${entryColor(d, store)}"></span>${icon('chevronRight', { cls: 'trailing-icon' })}</button>`);
+  // In una lista (da sola), per gli angoli: prima la riga era un rettangolo tra campi arrotondati.
+  details.push(listGroup([`<button class="list-item color-row" data-action="tt-ed-color" data-sheet="${id}"><span class="form-icon">${icon('palette')}</span><span class="li-text"><strong>Colore</strong></span>
+    <span class="trailing">${esc(colorDescription(d.color, store))}</span><span class="swatch-dot" style="background:${entryColor(d, store)}"></span>${icon('chevronRight', { cls: 'trailing-icon' })}</button>`]));
   details.push(field('Nota per ogni settimana', `<textarea class="text-input" rows="2" data-input="tt-ed-field" data-sheet="${id}" data-field="note">${esc(d.note)}</textarea>`));
 
   const body = `<div class="sheet-pad stack gap-20 editor">
