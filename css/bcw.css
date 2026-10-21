@@ -1498,7 +1498,14 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 @keyframes lock-spin { to { transform: rotate(360deg); } }
 .lock-center h2 { font-size: 28px; line-height: 36px; }
 .lock-center .error { color: var(--error); font-size: 14px; }
-.pin-form { display: flex; flex-direction: column; gap: 12px; width: min(320px, 100%); }
+/* Larga fino a 320 px come nell'app: dentro la colonna centrata la percentuale del modulo si riferiva al
+   contenitore stretto quanto il contenuto, e campo e pulsante restavano larghi 200 px. */
+.lock-actions { width: min(320px, 100%); display: flex; flex-direction: column; }
+.lock-actions > .btn, .pin-form { width: 100%; }
+.pin-form { display: flex; flex-direction: column; gap: 12px; }
+/* Con le animazioni ridotte le forme stanno ferme, come nell'app. */
+@media (prefers-reduced-motion: reduce) { :is(.lock-art, .lock-art > .icon, .login-art .shape) { animation-play-state: paused; } }
+:root[data-motion="reduced"] :is(.lock-art, .lock-art > .icon, .login-art .shape) { animation-play-state: paused; }
 
 /* MARK: - Griglie di card su schermi larghi */
 
