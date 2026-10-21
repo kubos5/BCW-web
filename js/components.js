@@ -207,7 +207,8 @@ export function pill(text, { short, color = 'var(--primary)', filled = false, cl
  */
 export function statTile(title, value, iconName, color = 'var(--primary)', shapeName = 'cookie4Sided', { corners = '', vertical = false, action, params = {} } = {}) {
   const art = `<span class="stat-icon shaped" style="${tint(color)}">${shape(shapeName)}${icon(iconName)}</span>`;
-  const text = `<span class="stat-text"><span class="stat-value numeral">${esc(value)}</span><span class="stat-title">${esc(title)}</span></span>`;
+  // `--len` serve al CSS per rimpicciolire il titolo che non sta su una riga.
+  const text = `<span class="stat-text"><span class="stat-value numeral">${esc(value)}</span><span class="stat-title" style="--len:${String(title).length}">${esc(title)}</span></span>`;
   const cls = `stat-tile ${vertical ? 'vertical' : ''} ${corners ? `corners-${corners}` : ''}`;
   const inner = vertical ? art + text : text + art;
   if (action) return `<button class="card ${cls}" data-action="${action}"${data(params)}>${inner}</button>`;

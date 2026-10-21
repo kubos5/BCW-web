@@ -600,8 +600,6 @@ button.list-item:active:not(:disabled)::after, a.list-item:active::after { opaci
 
 /* Occhiello: etichetta breve sopra a un contenuto (title-small nei colori del tema). */
 .eyebrow { font-size: 14px; line-height: 20px; font-weight: 650; letter-spacing: .1px; }
-.menu-section > .eyebrow, .stack > .eyebrow:first-child { padding-left: 4px; }
-.card .eyebrow, .card > .stack > .eyebrow { padding-left: 0; }
 
 /* MARK: - Chip */
 
@@ -1963,6 +1961,14 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .stat-value { font-size: 30px; line-height: 36px; }
 .stat-tile.vertical .stat-value { font-size: 28px; line-height: 34px; }
 .stat-title { font-size: 13px; line-height: 16px; color: var(--on-surface-variant); font-weight: 550; overflow-wrap: anywhere; }
+/* Con l'icona accanto il titolo resta su una riga, come nell'app (che lo rimpicciolisce fino
+   all'80%): andando a capo il numero non sarebbe più alla stessa altezza di quello accanto. La
+   larghezza si stima dai caratteri (`--len`, circa 0,55 em ciascuno in Google Sans Flex). */
+.stat-tile:not(.vertical) .stat-text { container-type: inline-size; }
+.stat-tile:not(.vertical) .stat-title {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: clamp(10.4px, 100cqi / (var(--len, 1) * .55), 13px);
+}
 .stat-tile[class*="corners-"] { --w: var(--r-li); --n: var(--r-xs); border-radius: var(--n); }
 .stat-tile.corners-tl { border-top-left-radius: var(--w); }
 .stat-tile.corners-tr { border-top-right-radius: var(--w); }
