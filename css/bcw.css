@@ -779,7 +779,8 @@ button.list-item:active:not(:disabled)::after, a.list-item:active::after { opaci
   color: var(--on-surface);
   font-size: 14px;
   font-weight: 550;
-  flex: 0 1 auto;
+  /* Come nell'app il valore resta intero: semmai va a capo il titolo della riga. */
+  flex: none;
   min-width: 0;
   transition: border-radius var(--spring-fast-dur) var(--spring-fast);
 }
