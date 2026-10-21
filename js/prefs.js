@@ -26,6 +26,8 @@ const defaults = {
   newsNotifications: [],
 };
 
+const APPEARANCE_KEYS = ['accentColor', 'colorStyle', 'contrast', 'corners', 'motion', 'roundedText'];
+
 export const DashboardMode = { list: { title: 'Lista', icon: 'viewAgenda' }, calendar: { title: 'Calendario', icon: 'calendarMonth' } };
 export const AppearanceMode = { system: 'Automatico', light: 'Chiaro', dark: 'Scuro' };
 
@@ -83,6 +85,18 @@ export class Preferences {
   get showUpcomingDays() { return this.values.showUpcomingDays; }
 
   get timetableShowsTests() { return this.values.timetableShowsTests; }
+
+  /** Colori, angoli, animazioni e caratteri sono quelli di BCW (il tema chiaro/scuro non conta). */
+  get isDefaultAppearance() {
+    const value = (key) => (key === 'accentColor' ? String(this.values[key]).toLowerCase() : this.values[key]);
+    return APPEARANCE_KEYS.every((key) => value(key) === defaults[key]);
+  }
+
+  /** Impostazioni › Aspetto › Ripristina l'aspetto di BCW (come `ThemeStore.reset()` nell'app). */
+  resetAppearance() {
+    for (const key of APPEARANCE_KEYS) this.values[key] = defaults[key];
+    this.save();
+  }
 
   newsEnabled(kind) { return this.values.newsNotifications.includes(kind); }
 
