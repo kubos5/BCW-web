@@ -589,7 +589,7 @@ button.list-item:active:not(:disabled)::after, a.list-item:active::after { opaci
 .list-item .li-text strong { font-size: 16px; line-height: 24px; font-weight: 500; }
 .list-item .li-text small { font-size: 14px; line-height: 20px; color: var(--on-surface-variant); }
 .list-item.danger { color: var(--error); }
-.list-item .trailing { color: var(--on-surface-variant); font-size: 14px; }
+.list-item .trailing { color: var(--on-surface-variant); font-size: 14px; white-space: nowrap; flex: none; }
 
 /* MARK: - Intestazioni */
 
@@ -2306,7 +2306,7 @@ textarea.reply { width: 100%; }
 .gen-break { flex-direction: column; align-items: stretch; gap: 8px; padding-top: 12px; padding-bottom: 12px; }
 .gen-break-head, .gen-break-controls { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .gen-break-controls { gap: 12px; padding-left: 40px; }
-.period-add { flex-direction: column; align-items: stretch; gap: 10px; padding-top: 12px; padding-bottom: 12px; }
+.period-date { flex: 0 1 220px; }
 .word-add { gap: 8px; }
 
 /* MARK: - Adattamenti per larghezza */

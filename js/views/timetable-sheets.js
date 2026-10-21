@@ -616,8 +616,9 @@ function renderHidden(ctx, id) {
   const rulesRow = listItem({ title: 'Nascondi in automatico', action: 'tt-rules-open', leading: `<span class="form-icon">${icon('filter')}</span>`,
     trailing: `<span class="trailing">${count === 0 ? 'Nessuna' : count === 1 ? '1 regola' : `${count} regole`}</span>${icon('chevronRight', { cls: 'trailing-icon' })}` });
   let body = listGroup([rulesRow], { footer: 'Le regole nascondono da sole le verifiche segnate dai docenti su Classeviva, ad esempio quelle di un docente, di un giorno della settimana o di un periodo. Puoi sempre mostrarne una a mano.' });
-  body += upcoming.length ? listGroup(upcoming.map((i) => hiddenRow(store, i)), { header: 'Prossime' })
-    : `<div class="stack gap-8"><h3 class="list-header">Prossime</h3><p class="secondary">Nessuna verifica nascosta nei prossimi giorni.</p></div>`;
+  // Come nell'app, anche senza verifiche la sezione è una lista (con una riga che lo dice).
+  body += listGroup(upcoming.length ? upcoming.map((i) => hiddenRow(store, i))
+    : ['<div class="list-item"><span class="li-text"><strong class="secondary">Nessuna verifica nascosta nei prossimi giorni.</strong></span></div>'], { header: 'Prossime' });
   if (past.length) {
     body += `<div class="stack gap-8"><h3 class="list-header">Passate</h3>${s.showsPast ? listGroup(past.map((i) => hiddenRow(store, i))) : ''}
       ${button(s.showsPast ? 'Nascondi le verifiche passate' : `Mostra le verifiche passate (${past.length})`, { action: 'tt-hidden-past', params: { sheet: id }, style: 'text', cls: 'xs' })}</div>`;
@@ -649,21 +650,24 @@ function renderRules(ctx, id) {
   for (const t of tests) if (t.subjectName) subjects.set(normalized(t.subjectName), t.subjectName);
   for (const key of rules.subjects) if (!subjects.has(key)) subjects.set(key, key.charAt(0).toLocaleUpperCase('it-IT') + key.slice(1));
   const subjectList = [...subjects.entries()].sort((a, b) => a[1].localeCompare(b[1], 'it'));
-  const dateValue = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // Come nell'app: la data in una pillola che apre il selettore di Material 3.
+  const dateRow = (label, which, date) => `<div class="list-item"><span class="form-icon">${icon('calendarDay')}</span><span class="li-text"><strong>${label}</strong></span>
+    <button class="date-field period-date" data-action="tt-rule-pick" data-sheet="${id}" data-which="${which}" aria-label="${label}: ${esc(fmt.longDay(date))}">${icon('calendarMonth', { cls: 'small' })}<span>${esc(fmt.longDay(date))}</span></button></div>`;
 
   let body = listGroup([`<div class="list-item"><span class="form-icon">${icon('eyeOff')}</span><span class="li-text"><strong>${esc(status)}</strong></span></div>`],
     { footer: 'Una verifica è nascosta se soddisfa almeno una regola. Le trovi tutte in Verifiche nascoste, da dove puoi mostrarle di nuovo.' });
   body += listGroup(Weekday.names.map((name, i) => toggleRow(name, rules.weekdays.includes(i + 1), 'tt-rule-weekday', { params: { weekday: i + 1 } })), { header: 'Giorni della settimana' });
-  body += teachers.length
-    ? listGroup(teachers.map((t) => toggleRow(t, rules.teachers.includes(t), 'tt-rule-teacher', { params: { value: t } })), { header: 'Docenti', footer: 'Nasconde le verifiche segnate da questi docenti.' })
-    : `<div class="stack gap-8"><h3 class="list-header">Docenti</h3><p class="secondary">Nessun docente ha ancora segnato verifiche.</p></div>`;
+  body += listGroup(teachers.length
+    ? teachers.map((t) => toggleRow(t, rules.teachers.includes(t), 'tt-rule-teacher', { params: { value: t } }))
+    : ['<div class="list-item"><span class="li-text"><strong class="secondary">Nessun docente ha ancora segnato verifiche.</strong></span></div>'],
+  { header: 'Docenti', footer: 'Nasconde le verifiche segnate da questi docenti.' });
   if (subjectList.length) body += listGroup(subjectList.map(([key, name]) => toggleRow(name, rules.subjects.includes(key), 'tt-rule-subject', { params: { value: key } })), { header: 'Materie' });
   body += listGroup([
     ...rules.periods.map((p) => `<div class="list-item"><span class="form-icon">${icon('calendar')}</span><span class="li-text"><strong>${esc(fmt.shortDayWithYear(p.start))} – ${esc(fmt.shortDayWithYear(p.end))}</strong></span>
       ${iconButton('minusCircle', { action: 'tt-rule-period-remove', params: { id: p.id }, label: 'Rimuovi il periodo', cls: 'small danger' })}</div>`),
-    `<div class="list-item period-add"><div class="field-row">${field('Dal', `<input class="text-input" type="date" value="${dateValue(s.from)}" data-change="tt-rule-from" data-sheet="${id}">`)}
-      ${field('Al', `<input class="text-input" type="date" value="${dateValue(s.to)}" min="${dateValue(s.from)}" data-change="tt-rule-to" data-sheet="${id}">`)}</div>
-      ${button('Aggiungi il periodo', { action: 'tt-rule-period-add', params: { sheet: id }, iconName: 'plus', style: 'tonal', cls: 'xs' })}</div>`,
+    dateRow('Dal', 'from', s.from),
+    dateRow('Al', 'to', s.to),
+    `<button class="list-item form-button" data-action="tt-rule-period-add" data-sheet="${id}"><span class="form-icon">${icon('plus')}</span><span class="li-text"><strong>Aggiungi il periodo</strong></span></button>`,
   ], { header: 'Periodi', footer: 'Nasconde le verifiche di questi periodi (estremi compresi), ad esempio durante una gita o uno scambio.' });
   body += listGroup([
     ...rules.keywords.map((w, i) => `<div class="list-item"><span class="form-icon">${icon('textSearch')}</span><span class="li-text"><strong>${esc(w)}</strong></span>
@@ -684,11 +688,6 @@ function updateRules(ctx, change) {
 }
 
 // MARK: - Azioni
-
-const parseDate = (value) => {
-  const [y, m, d] = String(value).split('-').map(Number);
-  return y ? new Date(y, m - 1, d) : null;
-};
 
 export const timetableSheetActions = {
   // Dettaglio
@@ -989,15 +988,21 @@ export const timetableSheetActions = {
     const v = el.dataset.value;
     r.subjects = el.checked ? [...new Set([...r.subjects, v])] : r.subjects.filter((x) => x !== v);
   }),
-  'tt-rule-from': (ctx, el) => {
+  'tt-rule-pick': (ctx, el) => {
     const s = sheetState(ctx, el.dataset.sheet, {});
-    const d = parseDate(el.value);
-    if (d) s.from = d;
-    if (s.to < s.from) s.to = s.from;
-  },
-  'tt-rule-to': (ctx, el) => {
-    const d = parseDate(el.value);
-    if (d) sheetState(ctx, el.dataset.sheet, {}).to = d;
+    const from = el.dataset.which === 'from';
+    ctx.openDatePicker({
+      selection: from ? s.from : s.to,
+      min: from ? null : s.from,
+      onPick: (day) => {
+        if (!from) {
+          s.to = day;
+          return;
+        }
+        s.from = day;
+        if (s.to < s.from) s.to = s.from;
+      },
+    });
   },
   'tt-rule-period-add': (ctx, el) => {
     const s = sheetState(ctx, el.dataset.sheet, {});
