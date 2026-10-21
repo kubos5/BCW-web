@@ -508,7 +508,7 @@ export const settings = {
         return;
       }
       downloadFile(makeICS(events, { reminderHour: ctx.prefs.get('reminderHour'), name: `BCW · ${ctx.model.displayName}` }), 'BCW-agenda.ics', 'text/calendar');
-      ctx.toast(`${events.length} elementi esportati con gli avvisi alle ${ctx.prefs.get('reminderHour')}:00.`);
+      ctx.toast(`${events.length === 1 ? '1 elemento esportato' : `${events.length} elementi esportati`} con gli avvisi alle ${ctx.prefs.get('reminderHour')}:00.`);
     },
     'account-switch': (ctx, el) => {
       if (ctx.app.sheet?.id === 'account-switcher') ctx.closeSheet();
