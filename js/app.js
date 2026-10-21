@@ -1241,6 +1241,7 @@ root.addEventListener('touchmove', (event) => {
   if (indicator) {
     indicator.style.height = `${Math.min(76, pull.distance * 0.5)}px`;
     indicator.style.opacity = String(Math.min(1, pull.distance / 120));
+    indicator.classList.toggle('pulling', pull.distance > 0);
   }
 }, { passive: true });
 
@@ -1249,7 +1250,7 @@ root.addEventListener('touchend', async () => {
   const { scroller, distance } = pull;
   pull = null;
   const indicator = scroller.querySelector('.ptr');
-  if (indicator) { indicator.style.height = ''; indicator.style.opacity = ''; }
+  if (indicator) { indicator.style.height = ''; indicator.style.opacity = ''; indicator.classList.remove('pulling'); }
   if (distance < 120) return;
   const path = currentPath();
   const view = routes[parsePath(path).name];

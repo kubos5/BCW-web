@@ -1022,6 +1022,8 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 /* Trascina per aggiornare: l'indicatore di caricamento in un cerchio. */
 .ptr { height: 0; overflow: hidden; display: grid; place-items: center; opacity: 0; transition: height .25s var(--emphasized-decelerate), opacity .2s; }
 .ptr.active { height: 72px; opacity: 1; }
+/* Nascosto non gira: le tre animazioni infinite (la forma con clip-path) restavano attive in ogni pagina. */
+.ptr:not(.active, .pulling) :is(.loading-indicator, .loading-indicator > i) { animation-play-state: paused; }
 
 /* Barra di navigazione (corta, 68 px) con l'indicatore a pillola 56 × 32. */
 .nav-bar {
