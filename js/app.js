@@ -926,10 +926,14 @@ const shellActions = {
     }
   },
   'lock-pin-input': (ctx, el) => { app.pinInput = el.value; },
-  'lock-pin': async () => {
+  'lock-pin': async (ctx, form) => {
     const ok = await Lock.unlockWithPin(app.pinInput);
     app.pinInput = '';
     app.lockError = ok ? null : 'Codice errato.';
+    // Il campo ha il fuoco, quindi il morph non ne cambia il valore: va svuotato qui, o il
+    // codice sbagliato resterebbe scritto (e quello che si aggiunge finirebbe in coda).
+    const input = form?.querySelector?.('input');
+    if (!ok && input) input.value = '';
     app.update();
   },
 };
