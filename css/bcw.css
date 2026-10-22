@@ -2112,8 +2112,9 @@ textarea.reply { width: 100%; }
 .tt-columns { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 2px; align-items: start; border-radius: inherit; }
 .tt-column { display: flex; flex-direction: column; gap: 2px; }
 .tt-run > .tt-columns .tt-block { border-radius: inherit; }
-.tt-columns > .tt-column:first-child { border-radius: inherit; border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.tt-columns > .tt-column:last-child { border-radius: inherit; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+/* Ogni colonna ha gli angoli della cella, come nell'app: prima gli angoli interni erano dritti e,
+   con colonne di altezze diverse, quella più bassa finiva con un solo angolo arrotondato. */
+.tt-columns > .tt-column { border-radius: inherit; }
 .tt-column > .tt-block { border-radius: var(--r-xs); }
 
 .tt-break { display: flex; align-items: center; gap: 10px; width: 100%; padding: 4px 8px; color: var(--on-surface-variant); border-radius: var(--r-m); }
