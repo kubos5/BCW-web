@@ -137,6 +137,33 @@ function saveScroll() {
 /** Pagine già riportate alla posizione salvata (un attributo verrebbe tolto dal morph). */
 const restoredPages = new WeakSet();
 
+/** Chiave della posizione salvata di un'area: la pagina a cui appartiene e il nome dell'area. */
+const scrollKey = (el) => `${el.closest('.page')?.dataset.path ?? currentPath()}|${el.dataset.scroll}`;
+
+/** Aree della pagina che scorrono prima di un disegno, con la loro chiave e la posizione. */
+function captureScrolls() {
+  const page = document.querySelector('.page.active');
+  const scrolls = new Map();
+  if (!page) return scrolls;
+  for (const el of page.querySelectorAll('[data-scroll]')) scrolls.set(el, { key: scrollKey(el), top: el.scrollTop });
+  return scrolls;
+}
+
+/**
+ * Il morph può togliere un'area o riusarla per un'altra (la ricerca dei telefoni al posto della
+ * Dashboard e ritorno): l'elemento teneva la posizione dell'altra area, così chiudendo la ricerca
+ * la Dashboard restava scorsa fin dove si erano scorsi i risultati. Qui ognuna riprende la sua.
+ */
+function swapReusedScrolls(scrolls) {
+  const reused = [];
+  for (const [el, before] of scrolls) {
+    if (el.isConnected && scrollKey(el) === before.key) continue;
+    app.scroll.set(before.key, before.top);
+    if (el.isConnected) reused.push(el);
+  }
+  for (const el of reused) scrollQuietly(el, app.scroll.get(scrollKey(el)) ?? 0);
+}
+
 function restoreScroll() {
   const page = document.querySelector('.page.active');
   if (!page || restoredPages.has(page)) return;
@@ -388,9 +415,11 @@ function render() {
   const leaving = captureAxisPages();
   const known = new Set(root.querySelectorAll(`${SLIDE_CONTAINERS}, ${STATE_POPS}, ${DAY_JUMP}, ${PAGE_FIXED}, .page`));
   const jumpDays = new Set([...root.querySelectorAll(DAY_JUMP)].map((jump) => jump.closest('[data-axis]')));
+  const scrolls = captureScrolls();
   morph(root, html);
   animateAxisExits(leaving);
   settleNewSlides(known, jumpDays);
+  swapReusedScrolls(scrolls);
   restoreScroll();
   drawCharts(root);
   positionMenu();
