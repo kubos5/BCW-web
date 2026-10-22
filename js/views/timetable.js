@@ -724,7 +724,11 @@ function endDrag(state, commit) {
 }
 
 let touchTimer = null;
-let suppressNextClick = false;
+// Dopo un trascinamento il clic che segue subito (con il mouse c'è sempre, col dito di solito
+// no) non apre l'editor. Vale per poco: prima restava in attesa e, col dito, mangiava il tocco
+// successivo su un altro evento, che così non si apriva.
+let suppressClicksUntil = 0;
+const suppressClickAfter = (moved) => { suppressClicksUntil = moved ? performance.now() + 400 : 0; };
 
 document.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'touch' || event.button !== 0) return;
@@ -753,7 +757,7 @@ document.addEventListener('pointerup', () => {
   if (!drag.active) return;
   const state = drag.active;
   drag.active = null;
-  suppressNextClick = state.moved;
+  suppressClickAfter(state.moved);
   endDrag(state, state.moved);
 });
 
@@ -791,13 +795,25 @@ document.addEventListener('touchend', () => {
   const state = drag.active;
   drag.active = null;
   // Lasciando senza essersi spostati si apre l'editor dell'evento.
-  suppressNextClick = state.moved;
+  suppressClickAfter(state.moved);
   endDrag(state, state.moved);
 });
 
+// Tocco interrotto dal sistema: l'evento torna dov'era. Prima il trascinamento restava attivo
+// (o partiva comunque allo scadere della pressione prolungata) e il tocco successivo, anche solo
+// per scorrere, spostava l'evento e lo salvava dove finiva il dito.
+document.addEventListener('touchcancel', () => {
+  clearTimeout(touchTimer);
+  drag.touchStart = null;
+  if (!drag.active) return;
+  const state = drag.active;
+  drag.active = null;
+  endDrag(state, false);
+});
+
 document.addEventListener('click', (event) => {
-  if (!suppressNextClick) return;
-  suppressNextClick = false;
+  if (performance.now() > suppressClicksUntil) return;
+  suppressClicksUntil = 0;
   if (event.target.closest?.('.tt-seg')) {
     event.preventDefault();
     event.stopPropagation();
