@@ -604,11 +604,11 @@ function segment(ctx, entry, content, { left, width, roundsTop, roundsBottom, da
   let label;
   const icons = `${badge.isTest ? `<span class="tt-seg-test">${icon('test', { cls: 'small' })}</span>` : ''}`;
   if (height >= 34) {
-    label = `<span class="tt-seg-title ${height >= 70 ? 'two' : ''}">${esc(title)}${icons}</span>
+    label = `<span class="tt-seg-title ${height >= 70 ? 'two' : ''}"><span class="tt-seg-name">${esc(title)}</span>${icons}</span>
       <span class="tt-seg-time numeral-mono">${timeRange(entry)}${entry.room ? ` · ${esc(entry.room)}` : ''}</span>
       ${badge.isTest && height >= 52 ? '<span class="tt-seg-pill">Verifica</span>' : ''}`;
   } else {
-    label = `<span class="tt-seg-line"><span class="tt-seg-title">${esc(title)}</span><span class="tt-seg-time numeral-mono">${timeRange(entry)}</span>${icons}</span>`;
+    label = `<span class="tt-seg-line"><span class="tt-seg-title"><span class="tt-seg-name">${esc(title)}</span></span><span class="tt-seg-time numeral-mono">${timeRange(entry)}</span>${icons}</span>`;
   }
   const cls = ['tt-seg', isBreak(entry) ? 'break' : 'lesson', roundsTop ? 'rt' : 'follow', roundsBottom ? 'rb' : '', content.isDraft ? 'draft' : ''].join(' ');
   const attrs = data({ id: entry.id, time: content.day.getTime(), dayIndex });

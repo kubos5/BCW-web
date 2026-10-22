@@ -2240,8 +2240,13 @@ textarea.reply { width: 100%; }
 }
 
 .tt-seg.draft { background: color-mix(in srgb, var(--tint) 16%, var(--surface)); outline: 1.5px dashed var(--tint); outline-offset: -1.5px; }
-.tt-seg-title { font-weight: 650; display: flex; align-items: flex-start; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tt-seg-title.two { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* Il nome sta in un elemento a parte: i puntini di sospensione non valgono per il testo diretto
+   di un contenitore flex (i nomi lunghi venivano tagliati di netto) e l'icona della verifica
+   resta visibile accanto. */
+.tt-seg-title { font-weight: 650; display: flex; align-items: flex-start; gap: 4px; min-width: 0; overflow: hidden; }
+.tt-seg-title .tt-seg-test { flex: none; }
+.tt-seg-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-seg-title.two .tt-seg-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .tt-seg-time { font-size: 11px; color: var(--on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tt-seg-line { display: flex; gap: 6px; white-space: nowrap; overflow: hidden; }
 .tt-seg-line .tt-seg-title { flex: 0 1 auto; }
