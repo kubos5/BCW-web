@@ -238,7 +238,7 @@ function profileSheet(ctx) {
 export function addAccountSheet() {
   return {
     id: 'add-account',
-    render: (ctx) => ({ title: '', size: 'login', body: renderLogin(ctx, { adding: true }) }),
+    render: (ctx) => ({ title: '', size: 'login-sheet', body: renderLogin(ctx, { adding: true }) }),
   };
 }
 
@@ -255,7 +255,7 @@ export function cloudLoginSheet({ register = false } = {}) {
       }
       return {
         title: '',
-        size: 'login',
+        size: 'login-sheet',
         body: `<div class="login adding"><div class="login-header">${logo('logo')}<span class="logo-subtitle">${s.register ? 'Crea un account BCW' : 'Accedi con un account BCW'}</span></div>
           ${bcwForm(ctx, s)}${footer(ctx, 'bcw', { adding: true })}</div>`,
       };

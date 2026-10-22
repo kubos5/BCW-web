@@ -1335,7 +1335,8 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .sheet-layer.centered .sheet.large { height: min(860px, 100%); max-width: 680px; }
 .sheet-layer.centered .sheet.viewer { max-width: 920px; }
 .sheet-layer.centered .sheet.medium { min-height: 0; }
-.sheet-layer.centered .sheet.login { max-width: 460px; }
+/* Non `.login`: il foglio prenderebbe le regole della schermata di accesso (altezza piena, margini). */
+.sheet-layer.centered .sheet.login-sheet { max-width: 460px; }
 @keyframes sheet-up { from { transform: translateY(100%); } }
 @keyframes sheet-pop { from { opacity: 0; transform: scale(.92); } }
 
