@@ -20,7 +20,7 @@ import { esc, fmt, GradeFormat, sentenceCased, nameCased, startOfDay } from '../
 import { proxySheet } from './login.js';
 import { BCWServer } from '../cloud.js';
 
-export const VERSION = '3.0';
+export const VERSION = '3.2';
 
 // MARK: - Mattoni del modulo
 
