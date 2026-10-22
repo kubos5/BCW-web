@@ -1029,6 +1029,10 @@ export const timetableSheetActions = {
     if (!word) return;
     updateRules(ctx, (r) => { if (!r.keywords.includes(word)) r.keywords.push(word); });
     s.word = '';
+    // Il campo ha ancora il fuoco (Invio) e il morph non ne cambia il valore: va svuotato qui,
+    // o la parola aggiunta resterebbe scritta, con "Aggiungi" attivo.
+    const input = el.querySelector?.('input');
+    if (input) input.value = '';
   },
   'tt-rule-word-remove': (ctx, el) => updateRules(ctx, (r) => { r.keywords.splice(Number(el.dataset.index), 1); }),
   'tt-rule-unmatched': (ctx, el) => updateRules(ctx, (r) => { r.unmatched = el.checked; }),
