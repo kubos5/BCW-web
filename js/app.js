@@ -1228,6 +1228,17 @@ root.addEventListener('touchend', (event) => {
   dispatch(el.dataset.daySwipe || el.dataset.swipe, { dataset: { delta: dx < 0 ? '1' : '-1' } }, event);
 }, { passive: true });
 
+// Tocco interrotto dal sistema: il giorno torna al suo posto con la molla, senza cambiare
+// (prima restava spostato dove l'aveva lasciato il dito fino al tocco successivo).
+root.addEventListener('touchcancel', () => {
+  if (!swipe) return;
+  const { el } = swipe;
+  swipe = null;
+  if (!el.dataset.daySwipe) return;
+  el.style.transition = '';
+  el.style.transform = '';
+}, { passive: true });
+
 // MARK: - Scorrimento: barra superiore e "trascina per aggiornare"
 
 root.addEventListener('scroll', (event) => {
