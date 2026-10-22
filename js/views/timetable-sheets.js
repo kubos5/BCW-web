@@ -492,8 +492,8 @@ function renderSeries(ctx, id) {
       <button class="palette-card new" data-action="tt-palette-new" data-colors="8BCF7E,2B5C9E">${icon('plus')}<span>Nuova</span></button></div></div>
     <div class="stack gap-8"><div class="row-between"><h3 class="list-header">Eventi</h3><div class="row gap-4">
       ${button('Tutti', { action: 'tt-series-all', params: { sheet: id }, style: 'text', cls: 'xs' })}${button('Nessuno', { action: 'tt-series-none', params: { sheet: id }, style: 'text', cls: 'xs' })}</div></div>
-      ${lessons.length ? listGroup(rows) : `<p class="secondary">Nessuna lezione il ${esc(Weekday.lower(s.weekday))}.</p>`}
-      <p class="list-footer">${esc(`${hint} Gli eventi uguali accostati prendono lo stesso colore. La palette vale solo per il ${Weekday.lower(s.weekday)}: gli eventi con lo stesso nome negli altri giorni restano come sono.`)}</p></div></div>`;
+      ${lessons.length ? listGroup(rows) : `<p class="secondary">Nessuna lezione ${esc(Weekday.withArticle(s.weekday))}.</p>`}
+      <p class="list-footer">${esc(`${hint} Gli eventi uguali accostati prendono lo stesso colore. La palette vale solo per ${Weekday.withArticle(s.weekday)}: gli eventi con lo stesso nome negli altri giorni restano come sono.`)}</p></div></div>`;
   const trailing = `<button class="btn filled xs" data-action="tt-series-apply" data-sheet="${id}"${chosen.length ? '' : ' disabled'}>${icon('check')}<span>Applica</span></button>`;
   const footer = `<button class="btn text danger-text" data-action="tt-series-clear" data-sheet="${id}"${chosen.length ? '' : ' disabled'} title="Riporta gli eventi scelti al colore automatico">Togli i colori</button>`;
   return { title: 'Colora una giornata', size: 'large', trailing, body, footer };

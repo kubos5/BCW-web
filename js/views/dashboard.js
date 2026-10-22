@@ -12,7 +12,7 @@ import { calendarBar } from '../calendar-bar.js';
 import { icon } from '../icons.js';
 import { shape } from '../shapes.js';
 import {
-  addDays, addMonths, esc, fmt, isToday, isTomorrow, isWeekend, startOfDay, startOfMonth, startOfWeek, groupBy, dayKey,
+  addDays, addMonths, esc, fmt, isToday, isTomorrow, isWeekend, startOfDay, startOfMonth, startOfWeek, groupBy, dayKey, plural,
 } from '../util.js';
 import { DashboardMode } from '../prefs.js';
 import { AbsenceKind } from '../models.js';
@@ -198,7 +198,7 @@ export function dayDetail(ctx, day, { jump = null } = {}) {
     if (lessons.length) {
       const hours = lessons.reduce((sum, l) => sum + Math.trunc(l.duration), 0);
       parts.push(segmentedSection(ctx, { section: 'lessons', title: 'Lezioni', iconName: 'bookText', color: 'var(--secondary)',
-        trailing: `${hours} ore`, cells: lessons.map((l) => segCell(lessonRow(l))) }));
+        trailing: plural(hours, '1 ora', '# ore'), cells: lessons.map((l) => segCell(lessonRow(l))) }));
     } else if (!model.hasLoadedLessons(day) && !isWeekend(day)) {
       parts.push(loadingCard('Carico le lezioni…'));
     }

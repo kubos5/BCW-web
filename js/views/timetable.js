@@ -12,7 +12,7 @@ import { icon } from '../icons.js';
 import { shape } from '../shapes.js';
 import { data } from '../dom.js';
 import {
-  addDays, addMonths, dayKey, esc, fmt, isSameDay, isToday, isTomorrow, isYesterday, isWeekend, startOfDay, startOfMonth, startOfWeek,
+  addDays, addMonths, dayKey, esc, fmt, isSameDay, isToday, isTomorrow, isYesterday, isWeekend, startOfDay, startOfMonth, startOfWeek, plural,
 } from '../util.js';
 import {
   Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, defaultTimetableDay, displayTitle, duration, entryColor,
@@ -331,7 +331,7 @@ function weekOverview(ctx) {
       .map((b) => `<i style="width:${6 * b.entries.length}px;background:${entryColor(b.entries[0], store)}"></i>`).join('');
     rows.push(`<button class="list-item tt-week-row ${selected ? 'selected' : ''} ${content.isDraft ? 'draft' : ''}" data-action="tt-select" data-time="${day.getTime()}">
       <span class="li-text"><strong>${esc(fmt.weekdayLongDay(day))}${showsTests && content.testCount ? ` <span class="tt-test-mark">${icon('test')}</span>` : ''}</strong>
-      <small>${span ? `${lessons} lezioni · ${TimeOfDay.string(span.start)}–${TimeOfDay.string(span.end)}` : 'Nessuna lezione'}</small></span>
+      <small>${span ? `${plural(lessons, '1 lezione', '# lezioni')} · ${TimeOfDay.string(span.start)}–${TimeOfDay.string(span.end)}` : 'Nessuna lezione'}</small></span>
       <span class="tt-bars">${bars}</span></button>`);
   }
   return listGroup(rows, { header: 'Settimana' });
@@ -390,7 +390,7 @@ export function dayList(ctx, content) {
       : 'Aggiungi un evento per questo giorno della settimana.';
     const actions = content.isDraft ? '' : button('Aggiungi', { action: 'tt-new', iconName: 'plus', style: 'tonal' }) +
       (store.isEmpty ? button('Genera', { action: 'tt-generate', iconName: 'wand', style: 'filled' }) : '');
-    return `<div class="stack gap-16">${header}${unmatched}<div class="card tt-empty">${emptyState(`Nessuna lezione il ${Weekday.lower(Weekday.of(day))}`, weekend ? 'sun' : 'calendarPlus', text, actions)}</div></div>`;
+    return `<div class="stack gap-16">${header}${unmatched}<div class="card tt-empty">${emptyState(`Nessuna lezione ${Weekday.withArticle(Weekday.of(day))}`, weekend ? 'sun' : 'calendarPlus', text, actions)}</div></div>`;
   }
 
   // Le lezioni di seguito (senza pause tra loro) formano una lista segmentata.
@@ -486,7 +486,7 @@ function draftBanner(ctx) {
   return `<div class="tt-draft-banner">
     <div class="row gap-12 align-start"><span class="tt-draft-icon">${icon('wand')}</span>
       <div class="grow"><strong>Anteprima dell'orario generato</strong>
-      <p>${lessons} lezioni ricavate da ${draft.analyzedDays} giorni di registro (${esc(fmt.shortDay(draft.from))} – ${esc(fmt.shortDay(draft.to))}). Controllale prima di applicarle.</p></div></div>
+      <p>${plural(lessons, '1 lezione ricavata', '# lezioni ricavate')} da ${plural(draft.analyzedDays, '1 giorno', '# giorni')} di registro (${esc(fmt.shortDay(draft.from))} – ${esc(fmt.shortDay(draft.to))}). ${lessons === 1 ? 'Controllala prima di applicarla.' : 'Controllale prima di applicarle.'}</p></div></div>
     <div class="row gap-8">${button('Applica', { action: 'tt-draft-apply', iconName: 'check', style: 'filled', cls: 'xs' })}
       ${button('Scarta', { action: 'tt-draft-discard', iconName: 'x', style: 'tonal', cls: 'xs' })}<span class="flex"></span>
       ${iconButton('tune', { action: 'tt-generate', label: 'Cambia le impostazioni e rigenera', cls: 'small tonal' })}</div></div>`;
@@ -585,7 +585,7 @@ function dayColumn(ctx, day, dayIndex, count, { canEdit, multiple, selected, hh 
     const hint = canEdit
       ? (ctx.wide ? "Fai doppio clic su un'ora per aggiungere un evento." : "Tocca due volte un'ora per aggiungere un evento.")
       : 'Aggiungi eventi con + o da Modifica orario.';
-    empty = `<div class="tt-col-empty" style="top:${8 * hh}px"><strong>Nessuna lezione il ${Weekday.lower(Weekday.of(day))}</strong><span>${esc(hint)}</span></div>`;
+    empty = `<div class="tt-col-empty" style="top:${8 * hh}px"><strong>Nessuna lezione ${Weekday.withArticle(Weekday.of(day))}</strong><span>${esc(hint)}</span></div>`;
   }
   void store;
   return `<div class="tt-col ${multiple && isSel ? 'selected' : ''} ${content.isDraft ? 'draft' : ''}" data-day-index="${dayIndex}" data-time="${day.getTime()}"${canEdit ? ' data-dblclick="tt-col-dbl"' : ''}>${segments.join('')}${empty}</div>`;

@@ -16,6 +16,8 @@ export const Weekday = {
   name: (w) => Weekday.names[w - 1] ?? '',
   shortName: (w) => Weekday.short[w - 1] ?? '',
   lower: (w) => (Weekday.names[w - 1] ?? '').toLocaleLowerCase('it-IT'),
+  /** Con l'articolo: "il lunedì", ma "la domenica". */
+  withArticle: (w) => `${w === 7 ? 'la' : 'il'} ${Weekday.lower(w)}`,
   /** 1 = lunedì … 7 = domenica. */
   of: (date) => ((date.getDay() + 6) % 7) + 1,
   /** Giorno della settimana `w` nella settimana di `date`. */
