@@ -362,7 +362,8 @@ export const didactics = {
         } else {
           popup?.close();
           if (item.kind === 'text') {
-            ctx.openSheet({ id: `text-${id}`, render: () => ({ title: content.name, size: 'medium',
+            // Solo "Fine", come nell'app: la X accanto chiuderebbe allo stesso modo.
+            ctx.openSheet({ id: `text-${id}`, render: () => ({ title: content.name, size: 'medium', leading: '',
               trailing: '<button class="btn filled xs" data-action="sheet-close">Fine</button>',
               body: `<div class="text-sheet">${esc(item.text)}</div>` }) });
           } else {
