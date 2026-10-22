@@ -763,7 +763,7 @@ async function askPermission(ctx) {
   if (await Reminders.requestAuthorization()) return true;
   ctx.confirm({
     title: 'Notifiche disattivate',
-    message: 'Per ricevere i promemoria consenti le notifiche a questo sito nelle impostazioni del browser. Su iPhone e iPad le notifiche funzionano dopo aver aggiunto BCW alla schermata Home.',
+    message: 'Per ricevere promemoria e novità consenti le notifiche a questo sito nelle impostazioni del browser. Su iPhone e iPad le notifiche funzionano dopo aver aggiunto BCW alla schermata Home.',
     confirmLabel: 'OK', cancelLabel: null,
   });
   return false;
