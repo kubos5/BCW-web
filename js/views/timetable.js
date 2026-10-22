@@ -544,13 +544,15 @@ function timeline(ctx, days, selected) {
     return `<button class="tt-day-head ${isSel ? 'selected' : ''} ${isToday(day) ? 'today' : ''}" data-action="tt-select" data-time="${day.getTime()}">
       <span>${esc(fmt.weekdayShort(day))}</span><span class="tt-day-num numeral">${day.getDate()}</span></button>`;
   }).join('')}</div>` : '';
-  const hours = [];
-  for (let h = 0; h < 24; h++) {
-    hours.push(`<div class="tt-hour" style="top:${h * hh}px"><span class="numeral-mono">${String(h).padStart(2, '0')}:00</span></div>`);
-  }
   const now = new Date();
   const showsNow = days.some((d) => isToday(d));
   const nowMinutes = TimeOfDay.of(now);
+  const hours = [];
+  for (let h = 0; h < 24; h++) {
+    // L'ora coperta dall'etichetta di adesso (alta 18 px) si toglie: prima ne spuntava mezza sotto.
+    const covered = showsNow && Math.abs((nowMinutes / 60) * hh - h * hh) < 17;
+    hours.push(`<div class="tt-hour" style="top:${h * hh}px">${covered ? '' : `<span class="numeral-mono">${String(h).padStart(2, '0')}:00</span>`}</div>`);
+  }
   const columns = days.map((day, dayIndex) => dayColumn(ctx, day, dayIndex, days.length, { canEdit, multiple, selected, hh })).join('');
   const nowLine = showsNow ? `<div class="tt-now" style="top:${(nowMinutes / 60) * hh}px"><span class="tt-now-label numeral-mono">${TimeOfDay.string(nowMinutes)}</span></div>` : '';
   const grid = `<div class="tt-grid ${canEdit ? 'editing' : ''}" style="--hh:${hh}px;height:${24 * hh}px" data-days="${days.length}">
