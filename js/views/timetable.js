@@ -612,7 +612,9 @@ function segment(ctx, entry, content, { left, width, roundsTop, roundsBottom, da
   }
   const cls = ['tt-seg', isBreak(entry) ? 'break' : 'lesson', roundsTop ? 'rt' : 'follow', roundsBottom ? 'rb' : '', content.isDraft ? 'draft' : ''].join(' ');
   const attrs = data({ id: entry.id, time: content.day.getTime(), dayIndex });
-  return `<button class="${cls}" style="--tint:${tint};top:${top}px;height:${height}px;left:${left};width:${width}" data-action="tt-open"${attrs}${content.isDraft ? '' : ' data-context="tt-entry"'}${canEdit ? ' data-seg="1"' : ''} aria-label="${esc(`${title}, ${timeRange(entry)}`)}" data-key="seg-${entry.id}">
+  // In modifica niente menu tenendo premuto (come nell'app): col dito si apriva sopra il
+  // trascinamento appena cominciato, che restava attivo senza vedersi.
+  return `<button class="${cls}" style="--tint:${tint};top:${top}px;height:${height}px;left:${left};width:${width}" data-action="tt-open"${attrs}${content.isDraft || canEdit ? '' : ' data-context="tt-entry"'}${canEdit ? ' data-seg="1"' : ''} aria-label="${esc(`${title}, ${timeRange(entry)}`)}" data-key="seg-${entry.id}">
     ${label}${canEdit ? '<span class="tt-resize" data-resize="1"><i></i></span>' : ''}</button>`;
 }
 
