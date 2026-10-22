@@ -1019,13 +1019,19 @@ root.addEventListener('click', (event) => {
 
 // `data-keep-focus`: toccarlo non toglie il fuoco al campo attivo (la tastiera resta aperta).
 // `data-blank-blur`: un tocco nello spazio vuoto chiude la tastiera.
+// Il tocco conta come vuoto solo se comincia e finisce nel vuoto: se il campo toccato si sposta
+// sotto il dito (la disposizione compatta dell'accesso), il rilascio non chiude la tastiera.
+const blankTarget = (target) => target.closest('[data-blank-blur]') && !target.closest('input, textarea, label, button, a, select');
+let blankPointerDown = false;
+
 root.addEventListener('pointerdown', (event) => {
   if (event.target.closest('[data-keep-focus]') && document.activeElement?.matches('input, textarea')) event.preventDefault();
+  blankPointerDown = Boolean(blankTarget(event.target));
 });
 
 root.addEventListener('pointerup', (event) => {
-  const area = event.target.closest('[data-blank-blur]');
-  if (area && !event.target.closest('input, textarea, label, button, a, select')) document.activeElement?.blur?.();
+  if (blankPointerDown && blankTarget(event.target)) document.activeElement?.blur?.();
+  blankPointerDown = false;
 });
 
 // MARK: Tastiera dei telefoni nell'accesso
