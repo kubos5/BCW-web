@@ -485,12 +485,25 @@ function renderSeries(ctx, id) {
       <span class="series-check">${icon(on ? 'checkCircleFill' : 'circle')}</span><span class="series-bar" style="background:${on ? preview.get(e.id) : entryColor(e, store)}"></span>
       <span class="li-text"><strong>${esc(displayTitle(e))}</strong><small class="numeral-mono">${timeRange(e)}</small></span></button>`;
   });
+  // La palette scelta resta in vista (all'apertura e quando cambia), come nell'app: sui telefoni
+  // quella proposta all'inizio (Laguna) stava fuori dallo schermo.
+  if (s.shownPalette !== s.paletteID) {
+    const smooth = s.shownPalette != null;
+    s.shownPalette = s.paletteID;
+    ctx.afterRender((root) => {
+      const card = root.querySelector('.palette-cards .palette-card.selected');
+      const row = card?.parentElement;
+      if (!row) return;
+      const left = card.getBoundingClientRect().left - row.getBoundingClientRect().left + row.scrollLeft;
+      row.scrollTo({ left: Math.max(0, left - (row.clientWidth - card.offsetWidth) / 2), behavior: smooth ? 'smooth' : 'auto' });
+    });
+  }
   const hint = ctx.wide ? 'Fai clic sugli eventi per sceglierli (con ⇧ prendi tutti quelli di seguito).' : 'Tocca gli eventi per sceglierli: una serie di seguito o tutta la giornata.';
   const body = `<div class="sheet-pad stack gap-20">
     ${listGroup([formRow('Giorno', select(Weekday.names.map((n, i) => [i + 1, n]), s.weekday, 'tt-series-day', { label: 'Giorno', params: { sheet: id } }))])}
     <div class="stack gap-8"><h3 class="list-header">Palette</h3><div class="palette-cards">${cards}
       <button class="palette-card new" data-action="tt-palette-new" data-colors="8BCF7E,2B5C9E">${icon('plus')}<span>Nuova</span></button></div></div>
-    <div class="stack gap-8"><div class="row-between"><h3 class="list-header">Eventi</h3><div class="row gap-4">
+    <div class="stack gap-8"><div class="row-between series-events-head"><h3 class="list-header">Eventi</h3><div class="row gap-4">
       ${button('Tutti', { action: 'tt-series-all', params: { sheet: id }, style: 'text', cls: 'xs' })}${button('Nessuno', { action: 'tt-series-none', params: { sheet: id }, style: 'text', cls: 'xs' })}</div></div>
       ${lessons.length ? listGroup(rows) : `<p class="secondary">Nessuna lezione ${esc(Weekday.withArticle(s.weekday))}.</p>`}
       <p class="list-footer">${esc(`${hint} Gli eventi uguali accostati prendono lo stesso colore. La palette vale solo per ${Weekday.withArticle(s.weekday)}: gli eventi con lo stesso nome negli altri giorni restano come sono.`)}</p></div></div>`;
