@@ -1591,7 +1591,8 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 
 /* MARK: - Accesso */
 
-.login-screen { height: 100%; overflow-y: auto; background: var(--surface); }
+/* Le forme che ruotano dietro al logo escono un po' dai lati: niente scorrimento orizzontale. */
+.login-screen { height: 100%; overflow: hidden auto; background: var(--surface); }
 .login { max-width: 440px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 24px; padding: calc(32px + var(--safe-top)) 24px calc(32px + var(--safe-bottom)); }
 .login.adding { min-height: 0; padding: 0 20px 24px; }
 .login-header { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 200px; isolation: isolate; }
@@ -1654,6 +1655,8 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .login-legal .proxy-line { margin: 0; }
 .proxy-line { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .proxy-line .icon { width: 16px; height: 16px; }
+/* "· Modifica" resta unito: andando a capo il punto non resta in fondo alla riga sopra. */
+.proxy-edit { display: inline-flex; align-items: center; gap: 6px; }
 .proxy-warning { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--r-li); background: var(--fair-container); color: var(--on-fair-container); font-size: 14px; }
 
 /* MARK: - Settimana e mese (gruppo di pulsanti di M3 Expressive) */
