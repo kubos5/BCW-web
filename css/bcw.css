@@ -599,6 +599,8 @@ button.list-item:active:not(:disabled)::after, a.list-item:active::after { opaci
 .section-header h3 { font-size: 22px; line-height: 28px; font-weight: 500; }
 .section-header p { font-size: 14px; color: var(--on-surface-variant); margin-top: 2px; }
 .section-toggle { width: 100%; display: block; border-radius: var(--r-m); }
+/* La freccia sta sul bordo (in colonna con quelle dei giorni e delle sezioni segmentate) e al centro del titolo. */
+.section-toggle > .section-header { padding-right: 0; align-items: center; }
 
 /* Occhiello: etichetta breve sopra a un contenuto (title-small nei colori del tema). */
 .eyebrow { font-size: 14px; line-height: 20px; font-weight: 650; letter-spacing: .1px; }
