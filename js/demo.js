@@ -116,7 +116,9 @@ export class DemoTransport {
       case 'noticeboard':
         if (route[1] === 'read') return json(this.noticeDetail(Number(route[3]) || 0, body));
         if (route[1] === 'attach') {
-          return file(makePDF('Circolare', 'Allegato dimostrativo della comunicazione.'), 'circolare.pdf', 'application/pdf');
+          // Lo stesso nome dell'elenco degli allegati (`notices()`), anche nel visore.
+          const index = Math.max(0, (Number(route[3]) || 5000) - 5000);
+          return file(makePDF('Circolare', 'Allegato dimostrativo della comunicazione.'), `circolare_${index + 1}.pdf`, 'application/pdf');
         }
         return json({ items: this.notices() });
       case 'notes':
