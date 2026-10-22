@@ -771,11 +771,14 @@ function renderOverlays() {
       <div class="dialog-actions">${buttons}</div></div></div>`;
   }
   if (app.menu) {
+    // La colonna delle icone c'è solo se serve a qualche voce (icona o spunta): nei menu di soli
+    // testi (es. le materie proposte dall'editor) i titoli partono dal bordo, come nell'app.
+    const hasLead = app.menu.items.some((item) => item.checked || item.icon);
     const items = app.menu.items.map((item, index) => {
       if (item.divider) return '<hr>';
       if (item.section) return `<h3>${esc(item.section)}</h3>`;
       return `<button class="menu-item ${item.destructive ? 'destructive' : ''} ${item.checked ? 'checked' : ''}" role="menuitem" data-action="menu-run" data-index="${index}"${item.disabled ? ' disabled' : ''}>
-        <span class="menu-lead">${item.checked ? icon('check') : (item.icon ? icon(item.icon) : '')}</span>
+        ${hasLead ? `<span class="menu-lead">${item.checked ? icon('check') : (item.icon ? icon(item.icon) : '')}</span>` : ''}
         <span class="grow"><span>${esc(item.label)}</span>${item.subtitle ? `<small>${esc(item.subtitle)}</small>` : ''}</span>
         ${item.trailing ? `<span class="menu-trail">${esc(item.trailing)}</span>` : ''}</button>`;
     }).join('');
