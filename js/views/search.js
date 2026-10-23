@@ -84,12 +84,21 @@ export const search = {
 
   actions: {
     'search-input': (ctx, el) => {
-      ctx.state('search', { query: '' }).query = el.dataset.clear ? '' : el.value;
-      if (el.dataset.clear) requestAnimationFrame(() => document.querySelector('.search-app-bar input, .global-search input')?.focus());
+      if (el.dataset.clear) setQuery(ctx, '');
+      else ctx.state('search', { query: '' }).query = el.value;
     },
-    'search-suggestion': (ctx, el) => {
-      ctx.state('search', { query: '' }).query = el.dataset.value;
-      requestAnimationFrame(() => document.querySelector('.global-search input, .search-app-bar input')?.focus());
-    },
+    'search-suggestion': (ctx, el) => setQuery(ctx, el.dataset.value),
   },
 };
+
+/**
+ * Testo scelto dall'app (X, suggerimenti): va scritto anche nel campo, perché il morph non
+ * cambia il valore di un campo con il fuoco e il campo lo riprende subito.
+ */
+function setQuery(ctx, value) {
+  ctx.state('search', { query: '' }).query = value;
+  const input = document.querySelector('.search-app-bar input, .global-search input');
+  if (!input) return;
+  input.value = value;
+  input.focus();
+}

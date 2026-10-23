@@ -137,6 +137,33 @@ function saveScroll() {
 /** Pagine già riportate alla posizione salvata (un attributo verrebbe tolto dal morph). */
 const restoredPages = new WeakSet();
 
+/** Chiave della posizione salvata di un'area: la pagina a cui appartiene e il nome dell'area. */
+const scrollKey = (el) => `${el.closest('.page')?.dataset.path ?? currentPath()}|${el.dataset.scroll}`;
+
+/** Aree della pagina che scorrono prima di un disegno, con la loro chiave e la posizione. */
+function captureScrolls() {
+  const page = document.querySelector('.page.active');
+  const scrolls = new Map();
+  if (!page) return scrolls;
+  for (const el of page.querySelectorAll('[data-scroll]')) scrolls.set(el, { key: scrollKey(el), top: el.scrollTop });
+  return scrolls;
+}
+
+/**
+ * Il morph può togliere un'area o riusarla per un'altra (la ricerca dei telefoni al posto della
+ * Dashboard e ritorno): l'elemento teneva la posizione dell'altra area, così chiudendo la ricerca
+ * la Dashboard restava scorsa fin dove si erano scorsi i risultati. Qui ognuna riprende la sua.
+ */
+function swapReusedScrolls(scrolls) {
+  const reused = [];
+  for (const [el, before] of scrolls) {
+    if (el.isConnected && scrollKey(el) === before.key) continue;
+    app.scroll.set(before.key, before.top);
+    if (el.isConnected) reused.push(el);
+  }
+  for (const el of reused) scrollQuietly(el, app.scroll.get(scrollKey(el)) ?? 0);
+}
+
 function restoreScroll() {
   const page = document.querySelector('.page.active');
   if (!page || restoredPages.has(page)) return;
@@ -355,6 +382,22 @@ export function showToast(message, iconName = 'checkCircle') {
 
 const root = document.getElementById('app');
 
+/**
+ * Elementi che entrano con un'animazione propria solo quando cambiano dentro un contenitore già
+ * sullo schermo (vedi `settleNewSlides`), e i loro contenitori: giorni e schede che entrano di
+ * lato (`axis-in` in `[data-axis]`), settimana e mese della barra del calendario (`slide-±1` in
+ * `.cb-rows`), mesi del selettore della data (in `.dp-days`), Lista e Giorno dell'Orario
+ * (`.view-swap` in `.page-body`).
+ */
+const SLIDE_CONTAINERS = '[data-axis], .cb-rows, .dp-days, .page-body';
+const SLIDING_PAGES = '.axis-in, .slide-1, .slide--1, .view-swap';
+/** Elementi che si animano quando cambia il loro stato: solo se c'erano già (la casella del compito). */
+const STATE_POPS = '.check';
+/** Pulsante per tornare al giorno predefinito ("Domani", "Oggi") nel giorno in grande. */
+const DAY_JUMP = '.day-jump';
+/** Parte ferma in alto (la settimana di Dashboard e Orario): sale con la pagina solo se è nuova. */
+const PAGE_FIXED = '.page-fixed';
+
 function render() {
   applyTheme();
   if (app.sessionID !== model.sessionID) {
@@ -370,8 +413,13 @@ function render() {
   else html = renderSignedIn();
   html += renderOverlays();
   const leaving = captureAxisPages();
+  const known = new Set(root.querySelectorAll(`${SLIDE_CONTAINERS}, ${STATE_POPS}, ${DAY_JUMP}, ${PAGE_FIXED}, .page`));
+  const jumpDays = new Set([...root.querySelectorAll(DAY_JUMP)].map((jump) => jump.closest('[data-axis]')));
+  const scrolls = captureScrolls();
   morph(root, html);
   animateAxisExits(leaving);
+  settleNewSlides(known, jumpDays);
+  swapReusedScrolls(scrolls);
   restoreScroll();
   drawCharts(root);
   positionMenu();
@@ -418,9 +466,47 @@ function animateAxisExits(leaving) {
     node.style.cssText = `left:${rect.left - clip.left}px;top:${rect.top - top}px;width:${rect.width}px;--from:${swipeRelease}px;--to:${-dir * 48 + swipeRelease}px`;
     layer.appendChild(node);
     document.body.appendChild(layer);
+    // Rimessa nel documento, la pagina farebbe ripartire le animazioni dei suoi elementi (il
+    // pulsante "Domani" rispuntava, le caselle dei compiti fatti saltavano): esce ferma.
+    for (const animation of node.getAnimations({ subtree: true })) {
+      if (animation.effect?.target !== node) animation.cancel();
+    }
     setTimeout(() => layer.remove(), 400);
   }
   swipeRelease = 0;
+}
+
+/**
+ * Il verso del cambio di giorno, settimana o scheda resta nello stato della vista (serve finché
+ * la pagina nuova entra) e le classi `axis-in`/`slide-±1` vengono riscritte a ogni disegno. Una
+ * pagina che entra di lato ha senso solo se cambia dentro un contenitore già sullo schermo: in un
+ * contenitore appena creato (cambio di scheda, ritorno da un'altra pagina, prima apertura) la sua
+ * animazione si annulla, così il contenuto compare con la pagina, dal basso, e non in diagonale
+ * (prima, dopo un cambio di giorno, tornando sulla scheda la pagina saliva e scivolava di lato).
+ * Allo stesso modo le caselle dei compiti fatti saltano solo quando le si tocca e il pulsante
+ * "Domani"/"Oggi" spunta solo quando compare cambiando giorno, non se c'era già nel giorno prima
+ * né in una pagina appena aperta (prima lo facevano a ogni cambio di scheda o di giorno); la parte
+ * ferma in alto sale con la pagina solo quando la pagina è nuova.
+ * Una CSSAnimation annullata non riparte finché la classe resta la stessa.
+ */
+function settleNewSlides(known, jumpDays) {
+  const cancel = (node) => { for (const animation of node.getAnimations()) animation.cancel(); };
+  for (const node of root.querySelectorAll(SLIDING_PAGES)) {
+    if (!known.has(node.parentElement?.closest(SLIDE_CONTAINERS))) cancel(node);
+  }
+  for (const node of root.querySelectorAll(STATE_POPS)) {
+    if (!known.has(node)) cancel(node);
+  }
+  for (const node of root.querySelectorAll(DAY_JUMP)) {
+    if (known.has(node)) continue;
+    const day = node.closest('[data-axis]');
+    if (!known.has(day) || jumpDays.has(day)) cancel(node);
+  }
+  // La settimana sale dal basso insieme al contenuto quando si apre la pagina; chiudendo la
+  // ricerca della Dashboard la pagina resta e la settimana, ridisegnata, non sale da sola.
+  for (const node of root.querySelectorAll(PAGE_FIXED)) {
+    if (!known.has(node) && known.has(node.closest('.page'))) cancel(node);
+  }
 }
 
 function renderSignedOut() {
@@ -685,11 +771,14 @@ function renderOverlays() {
       <div class="dialog-actions">${buttons}</div></div></div>`;
   }
   if (app.menu) {
+    // La colonna delle icone c'è solo se serve a qualche voce (icona o spunta): nei menu di soli
+    // testi (es. le materie proposte dall'editor) i titoli partono dal bordo, come nell'app.
+    const hasLead = app.menu.items.some((item) => item.checked || item.icon);
     const items = app.menu.items.map((item, index) => {
       if (item.divider) return '<hr>';
       if (item.section) return `<h3>${esc(item.section)}</h3>`;
       return `<button class="menu-item ${item.destructive ? 'destructive' : ''} ${item.checked ? 'checked' : ''}" role="menuitem" data-action="menu-run" data-index="${index}"${item.disabled ? ' disabled' : ''}>
-        <span class="menu-lead">${item.checked ? icon('check') : (item.icon ? icon(item.icon) : '')}</span>
+        ${hasLead ? `<span class="menu-lead">${item.checked ? icon('check') : (item.icon ? icon(item.icon) : '')}</span>` : ''}
         <span class="grow"><span>${esc(item.label)}</span>${item.subtitle ? `<small>${esc(item.subtitle)}</small>` : ''}</span>
         ${item.trailing ? `<span class="menu-trail">${esc(item.trailing)}</span>` : ''}</button>`;
     }).join('');
@@ -714,6 +803,14 @@ function positionMenu() {
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
   menu.style.transformOrigin = `${align === 'start' ? 'left' : 'right'} ${top < rect.top ? 'bottom' : 'top'}`;
+  // Un menu lungo (es. gli orari dell'editor) si apre sulla voce scelta, non in cima.
+  if (!app.menu.revealed) {
+    app.menu.revealed = true;
+    const checked = menu.querySelector('.menu-item.checked');
+    if (checked && menu.scrollHeight > menu.clientHeight) {
+      menu.scrollTop = checked.offsetTop - (menu.clientHeight - checked.offsetHeight) / 2;
+    }
+  }
 }
 
 function renderLock() {
@@ -861,10 +958,14 @@ const shellActions = {
     }
   },
   'lock-pin-input': (ctx, el) => { app.pinInput = el.value; },
-  'lock-pin': async () => {
+  'lock-pin': async (ctx, form) => {
     const ok = await Lock.unlockWithPin(app.pinInput);
     app.pinInput = '';
     app.lockError = ok ? null : 'Codice errato.';
+    // Il campo ha il fuoco, quindi il morph non ne cambia il valore: va svuotato qui, o il
+    // codice sbagliato resterebbe scritto (e quello che si aggiunge finirebbe in coda).
+    const input = form?.querySelector?.('input');
+    if (!ok && input) input.value = '';
     app.update();
   },
 };
@@ -921,13 +1022,19 @@ root.addEventListener('click', (event) => {
 
 // `data-keep-focus`: toccarlo non toglie il fuoco al campo attivo (la tastiera resta aperta).
 // `data-blank-blur`: un tocco nello spazio vuoto chiude la tastiera.
+// Il tocco conta come vuoto solo se comincia e finisce nel vuoto: se il campo toccato si sposta
+// sotto il dito (la disposizione compatta dell'accesso), il rilascio non chiude la tastiera.
+const blankTarget = (target) => target.closest('[data-blank-blur]') && !target.closest('input, textarea, label, button, a, select');
+let blankPointerDown = false;
+
 root.addEventListener('pointerdown', (event) => {
   if (event.target.closest('[data-keep-focus]') && document.activeElement?.matches('input, textarea')) event.preventDefault();
+  blankPointerDown = Boolean(blankTarget(event.target));
 });
 
 root.addEventListener('pointerup', (event) => {
-  const area = event.target.closest('[data-blank-blur]');
-  if (area && !event.target.closest('input, textarea, label, button, a, select')) document.activeElement?.blur?.();
+  if (blankPointerDown && blankTarget(event.target)) document.activeElement?.blur?.();
+  blankPointerDown = false;
 });
 
 // MARK: Tastiera dei telefoni nell'accesso
@@ -1121,6 +1228,17 @@ root.addEventListener('touchend', (event) => {
   dispatch(el.dataset.daySwipe || el.dataset.swipe, { dataset: { delta: dx < 0 ? '1' : '-1' } }, event);
 }, { passive: true });
 
+// Tocco interrotto dal sistema: il giorno torna al suo posto con la molla, senza cambiare
+// (prima restava spostato dove l'aveva lasciato il dito fino al tocco successivo).
+root.addEventListener('touchcancel', () => {
+  if (!swipe) return;
+  const { el } = swipe;
+  swipe = null;
+  if (!el.dataset.daySwipe) return;
+  el.style.transition = '';
+  el.style.transform = '';
+}, { passive: true });
+
 // MARK: - Scorrimento: barra superiore e "trascina per aggiornare"
 
 root.addEventListener('scroll', (event) => {
@@ -1172,6 +1290,7 @@ root.addEventListener('touchmove', (event) => {
   if (indicator) {
     indicator.style.height = `${Math.min(76, pull.distance * 0.5)}px`;
     indicator.style.opacity = String(Math.min(1, pull.distance / 120));
+    indicator.classList.toggle('pulling', pull.distance > 0);
   }
 }, { passive: true });
 
@@ -1180,7 +1299,7 @@ root.addEventListener('touchend', async () => {
   const { scroller, distance } = pull;
   pull = null;
   const indicator = scroller.querySelector('.ptr');
-  if (indicator) { indicator.style.height = ''; indicator.style.opacity = ''; }
+  if (indicator) { indicator.style.height = ''; indicator.style.opacity = ''; indicator.classList.remove('pulling'); }
   if (distance < 120) return;
   const path = currentPath();
   const view = routes[parsePath(path).name];

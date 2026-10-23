@@ -12,11 +12,11 @@ import { icon } from '../icons.js';
 import { shape } from '../shapes.js';
 import { data } from '../dom.js';
 import {
-  addDays, addMonths, dayKey, esc, fmt, isSameDay, isToday, isTomorrow, isYesterday, isWeekend, startOfDay, startOfMonth, startOfWeek,
+  addDays, addMonths, dayKey, esc, fmt, isSameDay, isToday, isTomorrow, isYesterday, isWeekend, startOfDay, startOfMonth, startOfWeek, plural,
 } from '../util.js';
 import {
-  Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, displayTitle, duration, entryColor, isBreak,
-  roundHalfAway, timeRange,
+  Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, defaultTimetableDay, displayTitle, duration, entryColor,
+  isBreak, roundHalfAway, timeRange,
 } from '../timetable.js';
 import {
   detailSheet, editorSheet, generatorSheet, hiddenTestsSheet, seriesSheet, deleteEntryDialog, timetableSheetActions,
@@ -92,9 +92,8 @@ export const timetable = {
     const s = ttState(ctx);
     if (!s.initialized) {
       s.initialized = true;
-      // Nel fine settimana senza lezioni si parte dal lunedì dopo.
-      const today = startOfDay(new Date());
-      if (isWeekend(today) && !store.entriesOn(today).length && !store.isEmpty) s.selected = addDays(startOfWeek(today), 7);
+      // Oggi finché c'è un evento da finire, altrimenti il prossimo giorno con eventi.
+      s.selected = defaultTimetableDay(store);
     }
     if (store.draft && s.editing) s.editing = false;
     const mode = effectiveMode(ctx);
@@ -133,14 +132,18 @@ export const timetable = {
     }
 
     // Telefoni: in alto la settimana, ferma; sotto il giorno (Lista) o la sua giornata (Giorno).
+    // Lista e Giorno si scambiano con la dissolvenza di Material 3 (`.view-swap`, come nell'app),
+    // ognuna con il suo contenitore dei giorni: prima il cambio di vista scorreva di lato, nel
+    // verso dell'ultimo cambio di giorno.
     let body;
     if (mode === 'day') {
       const grid = timeline(ctx, [day], day);
-      body = s.editing ? grid : `<div class="day-swipe" data-day-swipe="tt-day-shift">${axisPage('tt-day', s.dir, `ttg-${dayKey(day)}`, grid)}</div>`;
+      body = s.editing ? grid : `<div class="day-swipe" data-day-swipe="tt-day-shift">${axisPage('tt-grid', s.dir, `ttg-${dayKey(day)}`, grid)}</div>`;
       scheduleHourScroll(ctx, [day]);
     } else {
       body = `<div class="day-swipe" data-day-swipe="tt-day-shift">${axisPage('tt-day', s.dir, `ttd-${dayKey(day)}`, dayList(ctx, content))}</div>`;
     }
+    body = `<div class="view-swap" data-key="tt-view-${mode}">${body}</div>`;
     return {
       title,
       actions,
@@ -175,8 +178,17 @@ export const timetable = {
       select(ctx, new Date(target.getFullYear(), target.getMonth(), Math.min(s.selected.getDate(), last)));
     },
     'tt-mode': (ctx, el) => {
-      ctx.prefs.set('timetableMode', el.dataset.value ?? el.value);
+      const value = el.dataset.value ?? el.value;
+      ctx.prefs.set('timetableMode', value);
       ttState(ctx).scrollToHour = true;
+      // La Lista riparte dall'alto (la vista Giorno scorre da sola alla prima ora): prima restava
+      // scorsa quanto la giornata, con il giorno in grande nascosto sotto la settimana.
+      if (value === 'list' && ctx.route.name === 'timetable') {
+        ctx.afterRender(() => {
+          const scroller = ctx.pageScroller();
+          if (scroller) ctx.scrollQuietly(scroller, 0);
+        });
+      }
     },
     'tt-new': (ctx) => {
       if (ctx.model.timetable.draft) return;
@@ -319,7 +331,7 @@ function weekOverview(ctx) {
       .map((b) => `<i style="width:${6 * b.entries.length}px;background:${entryColor(b.entries[0], store)}"></i>`).join('');
     rows.push(`<button class="list-item tt-week-row ${selected ? 'selected' : ''} ${content.isDraft ? 'draft' : ''}" data-action="tt-select" data-time="${day.getTime()}">
       <span class="li-text"><strong>${esc(fmt.weekdayLongDay(day))}${showsTests && content.testCount ? ` <span class="tt-test-mark">${icon('test')}</span>` : ''}</strong>
-      <small>${span ? `${lessons} lezioni · ${TimeOfDay.string(span.start)}–${TimeOfDay.string(span.end)}` : 'Nessuna lezione'}</small></span>
+      <small>${span ? `${plural(lessons, '1 lezione', '# lezioni')} · ${TimeOfDay.string(span.start)}–${TimeOfDay.string(span.end)}` : 'Nessuna lezione'}</small></span>
       <span class="tt-bars">${bars}</span></button>`);
   }
   return listGroup(rows, { header: 'Settimana' });
@@ -378,7 +390,7 @@ export function dayList(ctx, content) {
       : 'Aggiungi un evento per questo giorno della settimana.';
     const actions = content.isDraft ? '' : button('Aggiungi', { action: 'tt-new', iconName: 'plus', style: 'tonal' }) +
       (store.isEmpty ? button('Genera', { action: 'tt-generate', iconName: 'wand', style: 'filled' }) : '');
-    return `<div class="stack gap-16">${header}${unmatched}<div class="card tt-empty">${emptyState(`Nessuna lezione il ${Weekday.lower(Weekday.of(day))}`, weekend ? 'sun' : 'calendarPlus', text, actions)}</div></div>`;
+    return `<div class="stack gap-16">${header}${unmatched}<div class="card tt-empty">${emptyState(`Nessuna lezione ${Weekday.withArticle(Weekday.of(day))}`, weekend ? 'sun' : 'calendarPlus', text, actions)}</div></div>`;
   }
 
   // Le lezioni di seguito (senza pause tra loro) formano una lista segmentata.
@@ -474,7 +486,7 @@ function draftBanner(ctx) {
   return `<div class="tt-draft-banner">
     <div class="row gap-12 align-start"><span class="tt-draft-icon">${icon('wand')}</span>
       <div class="grow"><strong>Anteprima dell'orario generato</strong>
-      <p>${lessons} lezioni ricavate da ${draft.analyzedDays} giorni di registro (${esc(fmt.shortDay(draft.from))} – ${esc(fmt.shortDay(draft.to))}). Controllale prima di applicarle.</p></div></div>
+      <p>${plural(lessons, '1 lezione ricavata', '# lezioni ricavate')} da ${plural(draft.analyzedDays, '1 giorno', '# giorni')} di registro (${esc(fmt.shortDay(draft.from))} – ${esc(fmt.shortDay(draft.to))}). ${lessons === 1 ? 'Controllala prima di applicarla.' : 'Controllale prima di applicarle.'}</p></div></div>
     <div class="row gap-8">${button('Applica', { action: 'tt-draft-apply', iconName: 'check', style: 'filled', cls: 'xs' })}
       ${button('Scarta', { action: 'tt-draft-discard', iconName: 'x', style: 'tonal', cls: 'xs' })}<span class="flex"></span>
       ${iconButton('tune', { action: 'tt-generate', label: 'Cambia le impostazioni e rigenera', cls: 'small tonal' })}</div></div>`;
@@ -532,13 +544,15 @@ function timeline(ctx, days, selected) {
     return `<button class="tt-day-head ${isSel ? 'selected' : ''} ${isToday(day) ? 'today' : ''}" data-action="tt-select" data-time="${day.getTime()}">
       <span>${esc(fmt.weekdayShort(day))}</span><span class="tt-day-num numeral">${day.getDate()}</span></button>`;
   }).join('')}</div>` : '';
-  const hours = [];
-  for (let h = 0; h < 24; h++) {
-    hours.push(`<div class="tt-hour" style="top:${h * hh}px"><span class="numeral-mono">${String(h).padStart(2, '0')}:00</span></div>`);
-  }
   const now = new Date();
   const showsNow = days.some((d) => isToday(d));
   const nowMinutes = TimeOfDay.of(now);
+  const hours = [];
+  for (let h = 0; h < 24; h++) {
+    // L'ora coperta dall'etichetta di adesso (alta 18 px) si toglie: prima ne spuntava mezza sotto.
+    const covered = showsNow && Math.abs((nowMinutes / 60) * hh - h * hh) < 17;
+    hours.push(`<div class="tt-hour" style="top:${h * hh}px">${covered ? '' : `<span class="numeral-mono">${String(h).padStart(2, '0')}:00</span>`}</div>`);
+  }
   const columns = days.map((day, dayIndex) => dayColumn(ctx, day, dayIndex, days.length, { canEdit, multiple, selected, hh })).join('');
   const nowLine = showsNow ? `<div class="tt-now" style="top:${(nowMinutes / 60) * hh}px"><span class="tt-now-label numeral-mono">${TimeOfDay.string(nowMinutes)}</span></div>` : '';
   const grid = `<div class="tt-grid ${canEdit ? 'editing' : ''}" style="--hh:${hh}px;height:${24 * hh}px" data-days="${days.length}">
@@ -573,7 +587,7 @@ function dayColumn(ctx, day, dayIndex, count, { canEdit, multiple, selected, hh 
     const hint = canEdit
       ? (ctx.wide ? "Fai doppio clic su un'ora per aggiungere un evento." : "Tocca due volte un'ora per aggiungere un evento.")
       : 'Aggiungi eventi con + o da Modifica orario.';
-    empty = `<div class="tt-col-empty" style="top:${8 * hh}px"><strong>Nessuna lezione il ${Weekday.lower(Weekday.of(day))}</strong><span>${esc(hint)}</span></div>`;
+    empty = `<div class="tt-col-empty" style="top:${8 * hh}px"><strong>Nessuna lezione ${Weekday.withArticle(Weekday.of(day))}</strong><span>${esc(hint)}</span></div>`;
   }
   void store;
   return `<div class="tt-col ${multiple && isSel ? 'selected' : ''} ${content.isDraft ? 'draft' : ''}" data-day-index="${dayIndex}" data-time="${day.getTime()}"${canEdit ? ' data-dblclick="tt-col-dbl"' : ''}>${segments.join('')}${empty}</div>`;
@@ -590,15 +604,17 @@ function segment(ctx, entry, content, { left, width, roundsTop, roundsBottom, da
   let label;
   const icons = `${badge.isTest ? `<span class="tt-seg-test">${icon('test', { cls: 'small' })}</span>` : ''}`;
   if (height >= 34) {
-    label = `<span class="tt-seg-title ${height >= 70 ? 'two' : ''}">${esc(title)}${icons}</span>
+    label = `<span class="tt-seg-title ${height >= 70 ? 'two' : ''}"><span class="tt-seg-name">${esc(title)}</span>${icons}</span>
       <span class="tt-seg-time numeral-mono">${timeRange(entry)}${entry.room ? ` · ${esc(entry.room)}` : ''}</span>
       ${badge.isTest && height >= 52 ? '<span class="tt-seg-pill">Verifica</span>' : ''}`;
   } else {
-    label = `<span class="tt-seg-line"><span class="tt-seg-title">${esc(title)}</span><span class="tt-seg-time numeral-mono">${timeRange(entry)}</span>${icons}</span>`;
+    label = `<span class="tt-seg-line"><span class="tt-seg-title"><span class="tt-seg-name">${esc(title)}</span></span><span class="tt-seg-time numeral-mono">${timeRange(entry)}</span>${icons}</span>`;
   }
   const cls = ['tt-seg', isBreak(entry) ? 'break' : 'lesson', roundsTop ? 'rt' : 'follow', roundsBottom ? 'rb' : '', content.isDraft ? 'draft' : ''].join(' ');
   const attrs = data({ id: entry.id, time: content.day.getTime(), dayIndex });
-  return `<button class="${cls}" style="--tint:${tint};top:${top}px;height:${height}px;left:${left};width:${width}" data-action="tt-open"${attrs}${content.isDraft ? '' : ' data-context="tt-entry"'}${canEdit ? ' data-seg="1"' : ''} aria-label="${esc(`${title}, ${timeRange(entry)}`)}" data-key="seg-${entry.id}">
+  // In modifica niente menu tenendo premuto (come nell'app): col dito si apriva sopra il
+  // trascinamento appena cominciato, che restava attivo senza vedersi.
+  return `<button class="${cls}" style="--tint:${tint};top:${top}px;height:${height}px;left:${left};width:${width}" data-action="tt-open"${attrs}${content.isDraft || canEdit ? '' : ' data-context="tt-entry"'}${canEdit ? ' data-seg="1"' : ''} aria-label="${esc(`${title}, ${timeRange(entry)}`)}" data-key="seg-${entry.id}">
     ${label}${canEdit ? '<span class="tt-resize" data-resize="1"><i></i></span>' : ''}</button>`;
 }
 
@@ -710,7 +726,11 @@ function endDrag(state, commit) {
 }
 
 let touchTimer = null;
-let suppressNextClick = false;
+// Dopo un trascinamento il clic che segue subito (con il mouse c'è sempre, col dito di solito
+// no) non apre l'editor. Vale per poco: prima restava in attesa e, col dito, mangiava il tocco
+// successivo su un altro evento, che così non si apriva.
+let suppressClicksUntil = 0;
+const suppressClickAfter = (moved) => { suppressClicksUntil = moved ? performance.now() + 400 : 0; };
 
 document.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'touch' || event.button !== 0) return;
@@ -739,7 +759,7 @@ document.addEventListener('pointerup', () => {
   if (!drag.active) return;
   const state = drag.active;
   drag.active = null;
-  suppressNextClick = state.moved;
+  suppressClickAfter(state.moved);
   endDrag(state, state.moved);
 });
 
@@ -777,13 +797,25 @@ document.addEventListener('touchend', () => {
   const state = drag.active;
   drag.active = null;
   // Lasciando senza essersi spostati si apre l'editor dell'evento.
-  suppressNextClick = state.moved;
+  suppressClickAfter(state.moved);
   endDrag(state, state.moved);
 });
 
+// Tocco interrotto dal sistema: l'evento torna dov'era. Prima il trascinamento restava attivo
+// (o partiva comunque allo scadere della pressione prolungata) e il tocco successivo, anche solo
+// per scorrere, spostava l'evento e lo salvava dove finiva il dito.
+document.addEventListener('touchcancel', () => {
+  clearTimeout(touchTimer);
+  drag.touchStart = null;
+  if (!drag.active) return;
+  const state = drag.active;
+  drag.active = null;
+  endDrag(state, false);
+});
+
 document.addEventListener('click', (event) => {
-  if (!suppressNextClick) return;
-  suppressNextClick = false;
+  if (performance.now() > suppressClicksUntil) return;
+  suppressClicksUntil = 0;
   if (event.target.closest?.('.tt-seg')) {
     event.preventDefault();
     event.stopPropagation();

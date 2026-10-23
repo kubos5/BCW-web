@@ -74,7 +74,7 @@ Le stesse dell'app nativa:
 
 - Dashboard con la settimana (vista Lista) o il mese (vista Calendario) come fila di pulsanti, aperta di default sul giorno dopo; il giorno in grande con i chip di stato e, sotto, compiti, verifiche, eventi, presenze e, per i giorni passati, le lezioni, ognuno in una sezione segmentata comprimibile
 - toccando il periodo sopra la settimana si sceglie una data qualsiasi dal selettore della data; frecce e scorrimento di lato sulla settimana cambiano settimana (o mese), scorrendo di lato sul giorno si passa al giorno prima o dopo, con la transizione ad asse condiviso
-- "Nei prossimi giorni" come la vista Programma di Google Calendar: la data in un riquadro (tocco = vai al giorno), il nome del giorno che comprime gli elementi e gli elementi in una lista segmentata
+- "Nei prossimi giorni" come la vista Programma di Google Calendar: la data in un riquadro (solo toccando quella si va al giorno), il nome del giorno che comprime gli elementi e gli elementi in una lista segmentata, con le stesse azioni del giorno scelto
 - ricerca dalla barra in cima alla Dashboard, con la vista e l'avatar dell'account (che apre gli account): toccandola diventa il campo e i risultati prendono il posto della pagina
 - toccando di nuovo la scheda Dashboard si torna in cima alla pagina e, se si è già in cima, alla giornata di domani
 - puoi segnare i compiti come fatti e, opzionalmente, nasconderli
@@ -98,7 +98,7 @@ Le stesse dell'app nativa:
 - modalità demo con dati di esempio, anche con un account già collegato (uscendo si torna all'account)
 - notifiche per nuovi voti, comunicazioni, note, assenze e compiti, da attivare in Impostazioni › Notifiche
 - impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account
-- aspetto personalizzabile (Impostazioni › Aspetto): tema chiaro, scuro o automatico, colore d'accento (campioni o un colore qualsiasi) da cui si generano tutti i colori del sito, stile dei colori (Tonale, Vivace, Espressivo, Fedele, Neutro, Arcobaleno, Macedonia), contrasto, angoli più o meno arrotondati, animazioni espressive, standard o ridotte, caratteri arrotondati
+- aspetto personalizzabile (Impostazioni › Aspetto): tema chiaro, scuro o automatico, colore d'accento (campioni o un colore qualsiasi) da cui si generano tutti i colori del sito, stile dei colori (Tonale, Vivace, Espressivo, Fedele, Neutro, Arcobaleno, Macedonia), contrasto, angoli più o meno arrotondati, animazioni espressive, standard o ridotte, caratteri arrotondati; "Ripristina l'aspetto di BCW" riporta tutto com'era
 
 ### Orario
 
@@ -106,6 +106,7 @@ La scheda Orario contiene l'orario settimanale, che si compila a mano o si gener
 
 - due viste: Lista (la settimana in alto e il giorno in grande con le lezioni in una lista segmentata) e Giorno (le ore della giornata, a blocchi pieni nella tinta; su schermi larghi l'intera settimana)
 - in cima la settimana è una fila di pulsanti, come nella Dashboard; scorrendo di lato si passa al giorno prima o dopo
+- si apre su oggi finché c'è un evento da finire, altrimenti sul primo giorno successivo con eventi (finite le lezioni di oggi, o nel fine settimana); il pulsante Oggi riporta a oggi
 - oggi una scheda in cima mostra la lezione in corso (quanto manca, con l'avanzamento) e quella dopo, oppure la prossima lezione
 - toccando un evento si vedono i dettagli e si aggiungono note, file e foto, per un solo giorno o per ogni settimana
 - le verifiche segnate dai docenti su Classeviva compaiono da sole sulla lezione della materia e si possono nascondere; altre verifiche si segnano a mano, per un giorno o per ogni settimana
@@ -146,7 +147,7 @@ Il sito segue [Material 3 Expressive](https://m3.material.io/):
 - favicon con la linea di BCW nel colore del tema scelto nell'app (chiaro, scuro e colore d'accento)
 - icone Material Symbols Rounded
 - angoli ampi, liste segmentate, sezioni segmentate comprimibili, chip di stato, gruppi di pulsanti collegati, schede, barra di ricerca in alto, menu del pulsante d'azione flottante, barra degli strumenti flottante, selettore della data, barra di navigazione corta e barra di navigazione laterale, fogli dal basso e dialoghi
-- transizioni di Material 3: asse condiviso tra i giorni e tra le schede dei Voti, dissolvenza incrociata verso la ricerca
+- transizioni di Material 3: asse condiviso tra i giorni e tra le schede dei Voti, dissolvenza incrociata verso la ricerca e tra le viste Lista e Giorno dell'orario; sui telefoni, cambiando scheda, le pagine salgono dal basso
 - forme espressive (MaterialShapes): i voti in un "biscotto" a nove lobi, l'indicatore di caricamento che cambia forma ruotando, avatar e stati vuoti nelle forme di Material
 - medie in anelli con la parte piena ondulata e barre di avanzamento ondulate
 - animazioni a molla (pulsanti che stringono gli angoli alla pressione, selezioni che diventano pillole)

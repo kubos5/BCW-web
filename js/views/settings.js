@@ -20,7 +20,7 @@ import { esc, fmt, GradeFormat, sentenceCased, nameCased, startOfDay } from '../
 import { proxySheet } from './login.js';
 import { BCWServer } from '../cloud.js';
 
-export const VERSION = '3.0';
+export const VERSION = '3.2';
 
 // MARK: - Mattoni del modulo
 
@@ -109,6 +109,7 @@ function appearancePane(ctx) {
     row('Angoli', select(Object.entries(Corners), p.get('corners'), 'pref-corners', { label: 'Angoli' }), { iconName: 'corners' }),
     row('Animazioni', select(Object.entries(Motion), p.get('motion'), 'pref-motion', { label: 'Animazioni' }), { iconName: 'motion' }),
     row('Caratteri arrotondati', select(Object.entries(RoundedText), p.get('roundedText'), 'pref-rounded-text', { label: 'Caratteri arrotondati' }), { iconName: 'textStyle' }),
+    p.isDefaultAppearance ? '' : buttonRow("Ripristina l'aspetto di BCW", 'appearance-reset', 'refresh'),
   ], {
     header: 'Forme e movimento',
     footer: 'Espressive: animazioni a molla con un piccolo rimbalzo, come in Material 3 Expressive. Standard: senza rimbalzo. Ridotte: brevi e senza movimenti ampi. I caratteri arrotondati usano l\'asse ROND di Google Sans Flex.',
@@ -431,6 +432,7 @@ export const settings = {
     'pref-corners': (ctx, el) => ctx.prefs.set('corners', el.value),
     'pref-motion': (ctx, el) => ctx.prefs.set('motion', el.value),
     'pref-rounded-text': (ctx, el) => ctx.prefs.set('roundedText', el.value),
+    'appearance-reset': (ctx) => ctx.prefs.resetAppearance(),
     'pref-tt-tests': (ctx, el) => ctx.prefs.set('timetableShowsTests', el.checked),
     'tt-alignment': (ctx, el) => requestAlignment(ctx, el.value),
     'pref-reminder-hour': (ctx, el) => {
@@ -508,7 +510,7 @@ export const settings = {
         return;
       }
       downloadFile(makeICS(events, { reminderHour: ctx.prefs.get('reminderHour'), name: `BCW · ${ctx.model.displayName}` }), 'BCW-agenda.ics', 'text/calendar');
-      ctx.toast(`${events.length} elementi esportati con gli avvisi alle ${ctx.prefs.get('reminderHour')}:00.`);
+      ctx.toast(`${events.length === 1 ? '1 elemento esportato' : `${events.length} elementi esportati`} con gli avvisi alle ${ctx.prefs.get('reminderHour')}:00.`);
     },
     'account-switch': (ctx, el) => {
       if (ctx.app.sheet?.id === 'account-switcher') ctx.closeSheet();
@@ -761,7 +763,7 @@ async function askPermission(ctx) {
   if (await Reminders.requestAuthorization()) return true;
   ctx.confirm({
     title: 'Notifiche disattivate',
-    message: 'Per ricevere i promemoria consenti le notifiche a questo sito nelle impostazioni del browser. Su iPhone e iPad le notifiche funzionano dopo aver aggiunto BCW alla schermata Home.',
+    message: 'Per ricevere promemoria e novità consenti le notifiche a questo sito nelle impostazioni del browser. Su iPhone e iPad le notifiche funzionano dopo aver aggiunto BCW alla schermata Home.',
     confirmLabel: 'OK', cancelLabel: null,
   });
   return false;

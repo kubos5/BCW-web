@@ -328,8 +328,9 @@ function renderEditor(ctx, id) {
     details.push(`<div class="field-row">${field('Docente', `<input class="text-input" type="text" value="${esc(d.teacher)}" data-input="tt-ed-field" data-sheet="${id}" data-field="teacher" autocomplete="off">`)}
       ${field('Aula', `<input class="text-input" type="text" value="${esc(d.room)}" data-input="tt-ed-field" data-sheet="${id}" data-field="room" autocomplete="off">`)}</div>`);
   }
-  details.push(`<button class="list-item color-row" data-action="tt-ed-color" data-sheet="${id}"><span class="form-icon">${icon('palette')}</span><span class="li-text"><strong>Colore</strong></span>
-    <span class="trailing">${esc(colorDescription(d.color, store))}</span><span class="swatch-dot" style="background:${entryColor(d, store)}"></span>${icon('chevronRight', { cls: 'trailing-icon' })}</button>`);
+  // In una lista (da sola), per gli angoli: prima la riga era un rettangolo tra campi arrotondati.
+  details.push(listGroup([`<button class="list-item color-row" data-action="tt-ed-color" data-sheet="${id}"><span class="form-icon">${icon('palette')}</span><span class="li-text"><strong>Colore</strong></span>
+    <span class="trailing">${esc(colorDescription(d.color, store))}</span><span class="swatch-dot" style="background:${entryColor(d, store)}"></span>${icon('chevronRight', { cls: 'trailing-icon' })}</button>`]));
   details.push(field('Nota per ogni settimana', `<textarea class="text-input" rows="2" data-input="tt-ed-field" data-sheet="${id}" data-field="note">${esc(d.note)}</textarea>`));
 
   const body = `<div class="sheet-pad stack gap-20 editor">
@@ -484,15 +485,28 @@ function renderSeries(ctx, id) {
       <span class="series-check">${icon(on ? 'checkCircleFill' : 'circle')}</span><span class="series-bar" style="background:${on ? preview.get(e.id) : entryColor(e, store)}"></span>
       <span class="li-text"><strong>${esc(displayTitle(e))}</strong><small class="numeral-mono">${timeRange(e)}</small></span></button>`;
   });
+  // La palette scelta resta in vista (all'apertura e quando cambia), come nell'app: sui telefoni
+  // quella proposta all'inizio (Laguna) stava fuori dallo schermo.
+  if (s.shownPalette !== s.paletteID) {
+    const smooth = s.shownPalette != null;
+    s.shownPalette = s.paletteID;
+    ctx.afterRender((root) => {
+      const card = root.querySelector('.palette-cards .palette-card.selected');
+      const row = card?.parentElement;
+      if (!row) return;
+      const left = card.getBoundingClientRect().left - row.getBoundingClientRect().left + row.scrollLeft;
+      row.scrollTo({ left: Math.max(0, left - (row.clientWidth - card.offsetWidth) / 2), behavior: smooth ? 'smooth' : 'auto' });
+    });
+  }
   const hint = ctx.wide ? 'Fai clic sugli eventi per sceglierli (con ⇧ prendi tutti quelli di seguito).' : 'Tocca gli eventi per sceglierli: una serie di seguito o tutta la giornata.';
   const body = `<div class="sheet-pad stack gap-20">
     ${listGroup([formRow('Giorno', select(Weekday.names.map((n, i) => [i + 1, n]), s.weekday, 'tt-series-day', { label: 'Giorno', params: { sheet: id } }))])}
     <div class="stack gap-8"><h3 class="list-header">Palette</h3><div class="palette-cards">${cards}
       <button class="palette-card new" data-action="tt-palette-new" data-colors="8BCF7E,2B5C9E">${icon('plus')}<span>Nuova</span></button></div></div>
-    <div class="stack gap-8"><div class="row-between"><h3 class="list-header">Eventi</h3><div class="row gap-4">
+    <div class="stack gap-8"><div class="row-between series-events-head"><h3 class="list-header">Eventi</h3><div class="row gap-4">
       ${button('Tutti', { action: 'tt-series-all', params: { sheet: id }, style: 'text', cls: 'xs' })}${button('Nessuno', { action: 'tt-series-none', params: { sheet: id }, style: 'text', cls: 'xs' })}</div></div>
-      ${lessons.length ? listGroup(rows) : `<p class="secondary">Nessuna lezione il ${esc(Weekday.lower(s.weekday))}.</p>`}
-      <p class="list-footer">${esc(`${hint} Gli eventi uguali accostati prendono lo stesso colore. La palette vale solo per il ${Weekday.lower(s.weekday)}: gli eventi con lo stesso nome negli altri giorni restano come sono.`)}</p></div></div>`;
+      ${lessons.length ? listGroup(rows) : `<p class="secondary">Nessuna lezione ${esc(Weekday.withArticle(s.weekday))}.</p>`}
+      <p class="list-footer">${esc(`${hint} Gli eventi uguali accostati prendono lo stesso colore. La palette vale solo per ${Weekday.withArticle(s.weekday)}: gli eventi con lo stesso nome negli altri giorni restano come sono.`)}</p></div></div>`;
   const trailing = `<button class="btn filled xs" data-action="tt-series-apply" data-sheet="${id}"${chosen.length ? '' : ' disabled'}>${icon('check')}<span>Applica</span></button>`;
   const footer = `<button class="btn text danger-text" data-action="tt-series-clear" data-sheet="${id}"${chosen.length ? '' : ' disabled'} title="Riporta gli eventi scelti al colore automatico">Togli i colori</button>`;
   return { title: 'Colora una giornata', size: 'large', trailing, body, footer };
@@ -518,10 +532,12 @@ function renderGenerator(ctx, id) {
   const hoursFooter = store.alignment === 'automatic' && !alignedSettings
     ? "L'orario usa l'allineamento automatico: con questi orari le lezioni verranno spostate all'ora o alla mezz'ora più vicina. Per tenere gli orari esatti passa all'allineamento libero in Modifica orario."
     : "Classeviva registra solo in quale ora della giornata si svolge una lezione: l'orario si ricava da qui.";
-  const breaks = g.breaks.map((b, i) => `<div class="list-item form-row gen-break"><span class="form-icon">${icon('coffee')}</span><span class="li-text"><strong>Intervallo ${i + 1}</strong></span>
-    ${timeInput(b.start, 'tt-gen-break-start', { sheet: id, index: i })}
-    ${stepper(b.duration, { action: `tt-gen-break-dur" data-sheet="${id}" data-index="${i}`, min: 5, max: 60, step: 5, format: (v) => `${v} min` })}
-    ${iconButton('minusCircle', { action: 'tt-gen-break-remove', params: { sheet: id, index: i }, label: "Rimuovi l'intervallo", cls: 'small danger' })}</div>`);
+  // Come nell'app: in alto il nome con il pulsante per toglierlo, sotto inizio e durata.
+  const breaks = g.breaks.map((b, i) => `<div class="list-item gen-break">
+    <div class="gen-break-head"><span class="form-icon">${icon('coffee')}</span><span class="li-text"><strong>Intervallo ${i + 1}</strong></span>
+      ${iconButton('minusCircle', { action: 'tt-gen-break-remove', params: { sheet: id, index: i }, label: "Rimuovi l'intervallo", cls: 'small danger' })}</div>
+    <div class="gen-break-controls">${timeInput(b.start, 'tt-gen-break-start', { sheet: id, index: i })}<span class="flex"></span>
+      ${stepper(b.duration, { action: `tt-gen-break-dur" data-sheet="${id}" data-index="${i}`, min: 5, max: 60, step: 5, format: (v) => `${v} min` })}</div></div>`);
   breaks.push(`<button class="list-item form-button" data-action="tt-gen-break-add" data-sheet="${id}"><span class="form-icon">${icon('coffee')}</span><span class="li-text"><strong>Aggiungi intervallo</strong></span></button>`);
   if (g.breaks.length) breaks.push(`<button class="list-item form-button danger" data-action="tt-gen-break-clear" data-sheet="${id}"><span class="form-icon">${icon('trash')}</span><span class="li-text"><strong>Rimuovi gli intervalli</strong></span></button>`);
   const body = `<div class="sheet-pad stack gap-20">
@@ -613,8 +629,9 @@ function renderHidden(ctx, id) {
   const rulesRow = listItem({ title: 'Nascondi in automatico', action: 'tt-rules-open', leading: `<span class="form-icon">${icon('filter')}</span>`,
     trailing: `<span class="trailing">${count === 0 ? 'Nessuna' : count === 1 ? '1 regola' : `${count} regole`}</span>${icon('chevronRight', { cls: 'trailing-icon' })}` });
   let body = listGroup([rulesRow], { footer: 'Le regole nascondono da sole le verifiche segnate dai docenti su Classeviva, ad esempio quelle di un docente, di un giorno della settimana o di un periodo. Puoi sempre mostrarne una a mano.' });
-  body += upcoming.length ? listGroup(upcoming.map((i) => hiddenRow(store, i)), { header: 'Prossime' })
-    : `<div class="stack gap-8"><h3 class="list-header">Prossime</h3><p class="secondary">Nessuna verifica nascosta nei prossimi giorni.</p></div>`;
+  // Come nell'app, anche senza verifiche la sezione è una lista (con una riga che lo dice).
+  body += listGroup(upcoming.length ? upcoming.map((i) => hiddenRow(store, i))
+    : ['<div class="list-item"><span class="li-text"><strong class="secondary">Nessuna verifica nascosta nei prossimi giorni.</strong></span></div>'], { header: 'Prossime' });
   if (past.length) {
     body += `<div class="stack gap-8"><h3 class="list-header">Passate</h3>${s.showsPast ? listGroup(past.map((i) => hiddenRow(store, i))) : ''}
       ${button(s.showsPast ? 'Nascondi le verifiche passate' : `Mostra le verifiche passate (${past.length})`, { action: 'tt-hidden-past', params: { sheet: id }, style: 'text', cls: 'xs' })}</div>`;
@@ -646,21 +663,24 @@ function renderRules(ctx, id) {
   for (const t of tests) if (t.subjectName) subjects.set(normalized(t.subjectName), t.subjectName);
   for (const key of rules.subjects) if (!subjects.has(key)) subjects.set(key, key.charAt(0).toLocaleUpperCase('it-IT') + key.slice(1));
   const subjectList = [...subjects.entries()].sort((a, b) => a[1].localeCompare(b[1], 'it'));
-  const dateValue = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // Come nell'app: la data in una pillola che apre il selettore di Material 3.
+  const dateRow = (label, which, date) => `<div class="list-item"><span class="form-icon">${icon('calendarDay')}</span><span class="li-text"><strong>${label}</strong></span>
+    <button class="date-field period-date" data-action="tt-rule-pick" data-sheet="${id}" data-which="${which}" aria-label="${label}: ${esc(fmt.longDay(date))}">${icon('calendarMonth', { cls: 'small' })}<span>${esc(fmt.longDay(date))}</span></button></div>`;
 
   let body = listGroup([`<div class="list-item"><span class="form-icon">${icon('eyeOff')}</span><span class="li-text"><strong>${esc(status)}</strong></span></div>`],
     { footer: 'Una verifica è nascosta se soddisfa almeno una regola. Le trovi tutte in Verifiche nascoste, da dove puoi mostrarle di nuovo.' });
   body += listGroup(Weekday.names.map((name, i) => toggleRow(name, rules.weekdays.includes(i + 1), 'tt-rule-weekday', { params: { weekday: i + 1 } })), { header: 'Giorni della settimana' });
-  body += teachers.length
-    ? listGroup(teachers.map((t) => toggleRow(t, rules.teachers.includes(t), 'tt-rule-teacher', { params: { value: t } })), { header: 'Docenti', footer: 'Nasconde le verifiche segnate da questi docenti.' })
-    : `<div class="stack gap-8"><h3 class="list-header">Docenti</h3><p class="secondary">Nessun docente ha ancora segnato verifiche.</p></div>`;
+  body += listGroup(teachers.length
+    ? teachers.map((t) => toggleRow(t, rules.teachers.includes(t), 'tt-rule-teacher', { params: { value: t } }))
+    : ['<div class="list-item"><span class="li-text"><strong class="secondary">Nessun docente ha ancora segnato verifiche.</strong></span></div>'],
+  { header: 'Docenti', footer: 'Nasconde le verifiche segnate da questi docenti.' });
   if (subjectList.length) body += listGroup(subjectList.map(([key, name]) => toggleRow(name, rules.subjects.includes(key), 'tt-rule-subject', { params: { value: key } })), { header: 'Materie' });
   body += listGroup([
     ...rules.periods.map((p) => `<div class="list-item"><span class="form-icon">${icon('calendar')}</span><span class="li-text"><strong>${esc(fmt.shortDayWithYear(p.start))} – ${esc(fmt.shortDayWithYear(p.end))}</strong></span>
       ${iconButton('minusCircle', { action: 'tt-rule-period-remove', params: { id: p.id }, label: 'Rimuovi il periodo', cls: 'small danger' })}</div>`),
-    `<div class="list-item period-add"><div class="field-row">${field('Dal', `<input class="text-input" type="date" value="${dateValue(s.from)}" data-change="tt-rule-from" data-sheet="${id}">`)}
-      ${field('Al', `<input class="text-input" type="date" value="${dateValue(s.to)}" min="${dateValue(s.from)}" data-change="tt-rule-to" data-sheet="${id}">`)}</div>
-      ${button('Aggiungi il periodo', { action: 'tt-rule-period-add', params: { sheet: id }, iconName: 'plus', style: 'tonal', cls: 'xs' })}</div>`,
+    dateRow('Dal', 'from', s.from),
+    dateRow('Al', 'to', s.to),
+    `<button class="list-item form-button" data-action="tt-rule-period-add" data-sheet="${id}"><span class="form-icon">${icon('plus')}</span><span class="li-text"><strong>Aggiungi il periodo</strong></span></button>`,
   ], { header: 'Periodi', footer: 'Nasconde le verifiche di questi periodi (estremi compresi), ad esempio durante una gita o uno scambio.' });
   body += listGroup([
     ...rules.keywords.map((w, i) => `<div class="list-item"><span class="form-icon">${icon('textSearch')}</span><span class="li-text"><strong>${esc(w)}</strong></span>
@@ -681,11 +701,6 @@ function updateRules(ctx, change) {
 }
 
 // MARK: - Azioni
-
-const parseDate = (value) => {
-  const [y, m, d] = String(value).split('-').map(Number);
-  return y ? new Date(y, m - 1, d) : null;
-};
 
 export const timetableSheetActions = {
   // Dettaglio
@@ -986,15 +1001,21 @@ export const timetableSheetActions = {
     const v = el.dataset.value;
     r.subjects = el.checked ? [...new Set([...r.subjects, v])] : r.subjects.filter((x) => x !== v);
   }),
-  'tt-rule-from': (ctx, el) => {
+  'tt-rule-pick': (ctx, el) => {
     const s = sheetState(ctx, el.dataset.sheet, {});
-    const d = parseDate(el.value);
-    if (d) s.from = d;
-    if (s.to < s.from) s.to = s.from;
-  },
-  'tt-rule-to': (ctx, el) => {
-    const d = parseDate(el.value);
-    if (d) sheetState(ctx, el.dataset.sheet, {}).to = d;
+    const from = el.dataset.which === 'from';
+    ctx.openDatePicker({
+      selection: from ? s.from : s.to,
+      min: from ? null : s.from,
+      onPick: (day) => {
+        if (!from) {
+          s.to = day;
+          return;
+        }
+        s.from = day;
+        if (s.to < s.from) s.to = s.from;
+      },
+    });
   },
   'tt-rule-period-add': (ctx, el) => {
     const s = sheetState(ctx, el.dataset.sheet, {});
@@ -1008,6 +1029,10 @@ export const timetableSheetActions = {
     if (!word) return;
     updateRules(ctx, (r) => { if (!r.keywords.includes(word)) r.keywords.push(word); });
     s.word = '';
+    // Il campo ha ancora il fuoco (Invio) e il morph non ne cambia il valore: va svuotato qui,
+    // o la parola aggiunta resterebbe scritta, con "Aggiungi" attivo.
+    const input = el.querySelector?.('input');
+    if (input) input.value = '';
   },
   'tt-rule-word-remove': (ctx, el) => updateRules(ctx, (r) => { r.keywords.splice(Number(el.dataset.index), 1); }),
   'tt-rule-unmatched': (ctx, el) => updateRules(ctx, (r) => { r.unmatched = el.checked; }),

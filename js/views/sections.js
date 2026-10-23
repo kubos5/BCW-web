@@ -14,7 +14,7 @@ import { NoteCategory, AgendaKind, AbsenceKind } from '../models.js';
 import { ArchiveModel } from '../store.js';
 import {
   addDays, addMonths, byName, contains, daysBetween, esc, fmt, groupBy, GradeFormat, isToday, isWeekend, schoolYear,
-  startOfDay, startOfMonth, startOfWeek, dayKey, StableID,
+  startOfDay, startOfMonth, startOfWeek, dayKey, StableID, plural,
 } from '../util.js';
 
 const noteTint = { NTTE: 'var(--neutral)', NTCL: 'var(--poor)', NTST: 'var(--poor)', NTWN: 'var(--fair)' };
@@ -279,9 +279,11 @@ function subjectCards(s) {
     const topics = g.lessons.filter((l) => l.topic);
     const hours = g.lessons.reduce((sum, l) => sum + Math.trunc(l.duration), 0);
     const shown = topics.slice(0, s.subject == null ? 4 : 200);
-    return card(`<div class="row-between">${subjectTag(g.name, g.id)}<span class="row-caption">${hours} ore</span></div>
+    // "gli" davanti ai numeri che si leggono con una vocale (8, 11, 80…).
+    const article = topics.length === 11 || String(topics.length).startsWith('8') ? 'gli' : 'i';
+    return card(`<div class="row-between">${subjectTag(g.name, g.id)}<span class="row-caption">${plural(hours, '1 ora', '# ore')}</span></div>
       ${shown.map((l) => `<div class="topic-row"><span class="numeral-mono">${esc(fmt.shortDay(l.date))}</span><span>${esc(l.topic)}</span></div>`).join('')}
-      ${s.subject == null && topics.length > 4 ? `<button class="link-button" data-action="lessons-subject" data-value="${g.id}">Mostra tutti i ${topics.length} argomenti</button>` : ''}`,
+      ${s.subject == null && topics.length > 4 ? `<button class="link-button" data-action="lessons-subject" data-value="${g.id}">Mostra tutti ${article} ${topics.length} argomenti</button>` : ''}`,
     { cls: 'stack gap-12', attrs: ` data-key="ls-${g.id}"` });
   }).join(''), 380);
 }
@@ -360,7 +362,8 @@ export const didactics = {
         } else {
           popup?.close();
           if (item.kind === 'text') {
-            ctx.openSheet({ id: `text-${id}`, render: () => ({ title: content.name, size: 'medium',
+            // Solo "Fine", come nell'app: la X accanto chiuderebbe allo stesso modo.
+            ctx.openSheet({ id: `text-${id}`, render: () => ({ title: content.name, size: 'medium', leading: '',
               trailing: '<button class="btn filled xs" data-action="sheet-close">Fine</button>',
               body: `<div class="text-sheet">${esc(item.text)}</div>` }) });
           } else {
@@ -390,7 +393,7 @@ function folderCard(s, teacher, folder) {
   return `<div class="folder-card" data-key="f-${esc(key)}">
     <button class="folder-head" data-action="didactics-folder" data-folder="${esc(key)}" aria-expanded="${expanded}">
       <span class="folder-icon">${icon(expanded ? 'folderFill' : 'folder')}</span>
-      <span class="grow"><strong>${esc(folder.name)}</strong><small>${folder.contents.length} elementi${folder.lastShare ? ` · ${esc(fmt.shortDayWithYear(folder.lastShare))}` : ''}</small></span>
+      <span class="grow"><strong>${esc(folder.name)}</strong><small>${plural(folder.contents.length, '1 elemento', '# elementi')}${folder.lastShare ? ` · ${esc(fmt.shortDayWithYear(folder.lastShare))}` : ''}</small></span>
       ${chevron(!expanded, { rotateUp: true })}</button>
     ${collapsible(expanded, rows)}</div>`;
 }
@@ -622,10 +625,10 @@ export const calendar = {
     const range = (h) => (h.start.getTime() === h.end.getTime() ? fmt.longDay(h.start) : `${fmt.shortDay(h.start)} – ${fmt.shortDay(h.end)}`);
 
     const progress = total ? card(`${eyebrow('Anno scolastico')}<div class="row baseline gap-8"><span class="numeral huge">${done}</span><span class="secondary">di ${total} giorni di lezione</span></div>
-      ${wavyProgress(done, Math.max(total, 1), { label: 'Giorni di lezione' })}<p class="caption secondary">Mancano ${total - done} giorni di scuola</p>`, { cls: 'stack gap-12' }) : '';
+      ${wavyProgress(done, Math.max(total, 1), { label: 'Giorni di lezione' })}<p class="caption secondary">${plural(total - done, 'Manca 1 giorno di scuola', 'Mancano # giorni di scuola')}</p>`, { cls: 'stack gap-12' }) : '';
     const next = holidays.find((h) => h.end >= today);
     const nextCard = next ? card(`${eyebrow('Prossima vacanza', 'var(--accent)')}<div class="next-holiday stack gap-8"><h3 class="title3">${esc(range(next))}</h3>
-      <p class="secondary">${daysBetween(today, next.start) <= 0 ? 'Sei in vacanza!' : `Tra ${daysBetween(today, next.start)} giorni`}</p></div>`, { cls: 'stack gap-8' }) : '';
+      <p class="secondary">${daysBetween(today, next.start) <= 0 ? 'Sei in vacanza!' : plural(daysBetween(today, next.start), 'Domani', 'Tra # giorni')}</p></div>`, { cls: 'stack gap-8' }) : '';
     const list = holidays.map((h) => {
       const past = h.end < today;
       const count = daysBetween(h.start, h.end) + 1;

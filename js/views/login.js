@@ -184,9 +184,9 @@ function footerText(ctx, mode) {
 /** Server a cui va l'accesso: il server BCW per gli account BCW, il proxy per Classeviva. */
 function serverLine(mode) {
   if (mode === 'bcw') {
-    return `<p class="proxy-line">${icon('cloud')}<span>Server BCW: ${esc(BCWServer.isConfigured ? hostOf(BCWServer.base) : 'non impostato')}</span> · <button class="link-button" data-action="cloud-server-sheet">Modifica</button></p>`;
+    return `<p class="proxy-line">${icon('cloud')}<span>Server BCW: ${esc(BCWServer.isConfigured ? hostOf(BCWServer.base) : 'non impostato')}</span><span class="proxy-edit">·<button class="link-button" data-action="cloud-server-sheet">Modifica</button></span></p>`;
   }
-  return `<p class="proxy-line">${icon('server')}<span>Server: ${esc(hostOf(Proxy.base))}</span> · <button class="link-button" data-action="proxy-sheet">Modifica</button></p>`;
+  return `<p class="proxy-line">${icon('server')}<span>Server: ${esc(hostOf(Proxy.base))}</span><span class="proxy-edit">·<button class="link-button" data-action="proxy-sheet">Modifica</button></span></p>`;
 }
 
 function footer(ctx, mode, { adding, linkingFirst }, { hidden = false } = {}) {
@@ -238,7 +238,7 @@ function profileSheet(ctx) {
 export function addAccountSheet() {
   return {
     id: 'add-account',
-    render: (ctx) => ({ title: '', size: 'login', body: renderLogin(ctx, { adding: true }) }),
+    render: (ctx) => ({ title: '', size: 'login-sheet', body: renderLogin(ctx, { adding: true }) }),
   };
 }
 
@@ -255,7 +255,7 @@ export function cloudLoginSheet({ register = false } = {}) {
       }
       return {
         title: '',
-        size: 'login',
+        size: 'login-sheet',
         body: `<div class="login adding"><div class="login-header">${logo('logo')}<span class="logo-subtitle">${s.register ? 'Crea un account BCW' : 'Accedi con un account BCW'}</span></div>
           ${bcwForm(ctx, s)}${footer(ctx, 'bcw', { adding: true })}</div>`,
       };

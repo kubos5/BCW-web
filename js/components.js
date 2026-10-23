@@ -168,8 +168,9 @@ export function averageRing(value, { size = 120, lineWidth = 10, showsLabel = tr
 /** Barra di avanzamento lineare e ondulata, con lo spazio e il punto finale di M3. */
 export function wavyProgress(value, max, { label = '' } = {}) {
   const p = Math.min(1, Math.max(0, max ? value / max : 0));
+  // Come nell'app: a zero solo la pista, al completo solo l'onda (senza spazio né punto finale).
   return `<div class="wavy-progress" role="progressbar" aria-valuenow="${value}" aria-valuemax="${max}" aria-label="${esc(label)}" style="--p:${p}">
-    <span class="wp-active"></span><span class="wp-track"></span></div>`;
+    ${p > 0 ? '<span class="wp-active"></span>' : ''}${p < 1 ? '<span class="wp-track"></span>' : ''}</div>`;
 }
 
 /** Linea ondulata orizzontale (separatori degli intervalli dell'orario). */
@@ -206,7 +207,8 @@ export function pill(text, { short, color = 'var(--primary)', filled = false, cl
  */
 export function statTile(title, value, iconName, color = 'var(--primary)', shapeName = 'cookie4Sided', { corners = '', vertical = false, action, params = {} } = {}) {
   const art = `<span class="stat-icon shaped" style="${tint(color)}">${shape(shapeName)}${icon(iconName)}</span>`;
-  const text = `<span class="stat-text"><span class="stat-value numeral">${esc(value)}</span><span class="stat-title">${esc(title)}</span></span>`;
+  // `--len` serve al CSS per rimpicciolire il titolo che non sta su una riga.
+  const text = `<span class="stat-text"><span class="stat-value numeral">${esc(value)}</span><span class="stat-title" style="--len:${String(title).length}">${esc(title)}</span></span>`;
   const cls = `stat-tile ${vertical ? 'vertical' : ''} ${corners ? `corners-${corners}` : ''}`;
   const inner = vertical ? art + text : text + art;
   if (action) return `<button class="card ${cls}" data-action="${action}"${data(params)}>${inner}</button>`;
@@ -320,11 +322,10 @@ export function lessonRow(lesson) {
 
 /**
  * Riga di un compito, una verifica o un evento. Il cerchio a sinistra segna i compiti
- * come fatti; tenendo premuto (o con il tasto destro) si apre il menu con le altre azioni.
- * Con `plainTap` un tocco su una riga il cui testo è intero esegue quell'azione invece di
- * aprirla (in "Nei prossimi giorni" porta al giorno).
+ * come fatti; toccando il testo lo si apre (se è tagliato); tenendo premuto (o con il tasto
+ * destro) si apre il menu con le altre azioni.
  */
-export function agendaEventRow(event, { done = false, expanded = false, showsDate = false, scope = '', plainTap = null } = {}) {
+export function agendaEventRow(event, { done = false, expanded = false, showsDate = false, scope = '' } = {}) {
   const color = subjectColor(event.subjectId);
   const leading = event.kind === 'event'
     ? `<span class="agenda-lead event" style="${tint(color)}">${icon('calendar')}</span>`
@@ -337,7 +338,7 @@ export function agendaEventRow(event, { done = false, expanded = false, showsDat
   if (event.authorName && event.subjectName != null) meta.push(event.authorName);
   return `<div class="agenda-row ${expanded ? 'expanded' : ''}" data-key="ev-${scope}${event.id}" data-context="agenda"${data({ id: event.id })}>
     ${leading}
-    <div class="grow" data-action="agenda-expand"${data({ id: event.id, scope, plain: plainTap })}>
+    <div class="grow" data-action="agenda-expand"${data({ id: event.id, scope })}>
       <div class="row-head">${subjectTag(event.title, event.subjectId)}${event.kind === 'test' ? pill('Verifica', { cls: 'bold' }) : ''}</div>
       <div class="agenda-notes ${done ? 'done' : ''}">${esc(event.notes || 'Nessuna descrizione')}</div>
       ${meta.length ? `<div class="row-caption">${esc(meta.join(' · '))}</div>` : ''}

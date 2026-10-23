@@ -12,7 +12,7 @@ import { calendarBar } from '../calendar-bar.js';
 import { icon } from '../icons.js';
 import { shape } from '../shapes.js';
 import {
-  addDays, addMonths, esc, fmt, isToday, isTomorrow, isWeekend, startOfDay, startOfMonth, startOfWeek, groupBy, dayKey,
+  addDays, addMonths, esc, fmt, isToday, isTomorrow, isWeekend, startOfDay, startOfMonth, startOfWeek, groupBy, dayKey, plural,
 } from '../util.js';
 import { DashboardMode } from '../prefs.js';
 import { AbsenceKind } from '../models.js';
@@ -198,7 +198,7 @@ export function dayDetail(ctx, day, { jump = null } = {}) {
     if (lessons.length) {
       const hours = lessons.reduce((sum, l) => sum + Math.trunc(l.duration), 0);
       parts.push(segmentedSection(ctx, { section: 'lessons', title: 'Lezioni', iconName: 'bookText', color: 'var(--secondary)',
-        trailing: `${hours} ore`, cells: lessons.map((l) => segCell(lessonRow(l))) }));
+        trailing: plural(hours, '1 ora', '# ore'), cells: lessons.map((l) => segCell(lessonRow(l))) }));
     } else if (!model.hasLoadedLessons(day) && !isWeekend(day)) {
       parts.push(loadingCard('Carico le lezioni…'));
     }
@@ -237,9 +237,9 @@ function summary(events) {
 
 /**
  * "Nei prossimi giorni", come la vista Programma di Google Calendar: a sinistra la data in un
- * riquadro (toccandola si va a quel giorno), a destra il nome del giorno, che comprime gli
- * elementi, e gli elementi in una lista segmentata. Toccando un elemento che non fa già
- * qualcosa (la casella del compito, il testo tagliato che si apre) si va al giorno.
+ * riquadro (solo toccando quello si va al giorno), a destra il nome del giorno, che comprime gli
+ * elementi, e gli elementi in una lista segmentata, con le loro azioni (la casella del compito,
+ * il testo tagliato che si apre, il menu tenendo premuto) come nel giorno scelto.
  */
 function upcomingDays(ctx, after) {
   const prefs = ctx.prefs;
@@ -253,8 +253,8 @@ function upcomingDays(ctx, after) {
     const closed = s.collapsedDays.has(time);
     const sorted = [...events].sort((a, b) => (a.kind === 'test' ? 0 : 1) - (b.kind === 'test' ? 0 : 1));
     const cells = sorted.map((e) => segCell(agendaEventRow(e, {
-      done: prefs.isCompleted(e), scope: 'up', expanded: expanded?.has(`up${e.id}`), plainTap: time,
-    }), { cls: 'tap-day', attrs: ` data-action="day-select" data-time="${time}"` }));
+      done: prefs.isCompleted(e), scope: 'up', expanded: expanded?.has(`up${e.id}`),
+    })));
     return `<div class="upcoming-day" data-key="upd-${time}">
       <button class="date-badge-btn" data-action="day-select" data-time="${time}" aria-label="Vai a ${esc(fmt.relativeDayName(day))}" title="Vai a ${esc(fmt.relativeDayName(day))}">${dateBadge(day, { highlighted: events.some((e) => e.kind === 'test'), today: isToday(day) })}</button>
       <div class="upcoming-body">

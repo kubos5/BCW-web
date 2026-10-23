@@ -49,7 +49,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   (riducibile; tra 840 e 1000 si apre sopra il contenuto); pagina in un pannello con angoli ampi; ricerche di pagina nel
   contenuto (`localSearchField`); Impostazioni e Bacheca con elenco e dettaglio affiancati.
 - Accesso (`views/login.js`): sui telefoni come nell'app; con un campo attivo (tastiera aperta, `pointer: coarse`)
-  disposizione compatta in alto (logo piccolo e titolo su una riga, gruppo Classeviva/Account BCW, campi, Accedi).
+  disposizione compatta in alto (logo piccolo e titolo su una riga, gruppo Classeviva/Account BCW, campi, Accedi);
+  il titolo sta sulla linea di base del logo, alzato perché il centro del testo visibile coincida con quello di "BCW"
+  (metriche di Google Sans Flex nel commento del CSS; misurare con `measureText` e la linea di base, non con le scatole).
   Il gruppo ha `data-keep-focus` (toccarlo non toglie il fuoco: i campi dei due moduli hanno le stesse chiavi
   `f-user`/`f-pass`, quindi il cursore resta e cambia solo il valore); `data-blank-blur` chiude la tastiera toccando
   lo spazio vuoto; le note dei due moduli occupano sempre l'altezza delle più lunghe. Safari (e Chrome su Android) non
@@ -64,7 +66,16 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   Calendario della Dashboard = mese; l'Orario ha solo Lista e Giorno.
 - Giorni e schede cambiano con la transizione ad asse condiviso: `axisPage(nome, verso, chiave, html)`; la pagina nuova
   entra con `.axis-in`, quella vecchia la ridisegna `animateAxisExits()` dopo il morph. Il giorno accanto si raggiunge
-  scorrendo di lato (`data-day-swipe`).
+  scorrendo di lato (`data-day-swipe`). Il verso resta nello stato della vista, quindi `axis-in`/`slide-±1` tornano a
+  ogni disegno: `settleNewSlides()` annulla l'animazione delle pagine in un contenitore appena creato (cambio di scheda,
+  ritorno da un'altra pagina), così cambiando scheda tutto sale dal basso (`page-in`, anche la parte ferma
+  `.page-fixed`, ma solo in una pagina nuova: chiudendo la ricerca non sale da sola) e non in diagonale. Un'animazione
+  CSS annullata non riparte finché la classe non cambia. Con la stessa regola le caselle dei compiti fatti (`.check`)
+  saltano solo se c'erano già (quando le si tocca) e il pulsante "Domani"/"Oggi" (`.day-jump`) spunta solo se compare
+  cambiando giorno; la pagina che esce, rimessa nel documento da `animateAxisExits()`, ha le animazioni dei suoi
+  elementi annullate (altrimenti ripartirebbero). Lista e Giorno dell'Orario sui telefoni hanno contenitori diversi
+  (`.view-swap`, chiave per vista, assi `tt-day`/`tt-grid`) e si scambiano con la dissolvenza, non di lato; tornando
+  alla Lista si riparte dall'alto (`tt-mode`).
 - Componenti dell'app: `dayHero` (giorno in grande e chip), `statusChip`, `segmentedSection` + `segCell`, `listGroup`
   (anche con `background`), `dateBadge`, `connectedGroup`, `primaryTabs`, `statTile` con `corners`, menu del FAB
   (`page.fabMenu`, voci con un'azione) e barra degli strumenti flottante (`floatingToolbar`, vivace nella modifica
@@ -76,6 +87,10 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   maiuscoli, date senza millisecondi, backup `com.bcw.timetable-backup`), viste in `views/timetable.js` e fogli in
   `views/timetable-sheets.js`. Un documento per account in `localStorage` (`bcw.timetable.<account>`), file in IndexedDB
   (`BlobStore`, spazio `ttfile-<account>`); la demo usa `demo` e si cancella uscendo.
+  Giorno iniziale (`defaultTimetableDay(store)`, stessa regola dell'app iOS e dei widget): oggi se c'è ancora un evento
+  non finito (fine > adesso), altrimenti il primo dei 7 giorni successivi con eventi, se no oggi; contano solo gli eventi
+  dell'orario salvato (non intervalli, bozza o verifiche di Classeviva). Si sceglie alla prima apertura della scheda in
+  una sessione; "Oggi" e un nuovo tocco sulla scheda portano a oggi.
 - Cambi di sessione (account, demo) con `model.changeSession(fn)`: dissolvenza, cambio dei dati e ritorno quando ci
   sono (al massimo 3 s). La demo non è un account: si apre anche con un account collegato e uscendo si torna a quello.
 - `dom.js`: i nodi con `data-key` scomparsi vanno tolti prima di quelli nuovi; spostare un nodo gli toglie il fuoco.
