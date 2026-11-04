@@ -166,10 +166,12 @@ export function averageRing(value, { size = 120, lineWidth = 10, showsLabel = tr
 }
 
 /** Barra di avanzamento lineare e ondulata, con lo spazio e il punto finale di M3. */
-export function wavyProgress(value, max, { label = '' } = {}) {
+export function wavyProgress(value, max, { label = '', decorative = false } = {}) {
   const p = Math.min(1, Math.max(0, max ? value / max : 0));
   // Come nell'app: a zero solo la pista, al completo solo l'onda (senza spazio né punto finale).
-  return `<div class="wavy-progress" role="progressbar" aria-valuenow="${value}" aria-valuemax="${max}" aria-label="${esc(label)}" style="--p:${p}">
+  // `decorative`: il valore lo dice già un elemento che la contiene.
+  const role = decorative ? 'aria-hidden="true"' : `role="progressbar" aria-valuenow="${value}" aria-valuemax="${max}" aria-label="${esc(label)}"`;
+  return `<div class="wavy-progress" ${role} style="--p:${p}">
     ${p > 0 ? '<span class="wp-active"></span>' : ''}${p < 1 ? '<span class="wp-track"></span>' : ''}</div>`;
 }
 
@@ -414,8 +416,8 @@ export function segmented(options, selected, action, { compact = false, icons = 
   }).join('')}</div>`;
 }
 
-export function toggle(checked, action, { label = '', disabled = false } = {}) {
-  return `<label class="switch"><input type="checkbox" role="switch" data-change="${action}"${checked ? ' checked' : ''}${disabled ? ' disabled' : ''} aria-label="${esc(label)}"><span></span></label>`;
+export function toggle(checked, action, { label = '', disabled = false, params = {} } = {}) {
+  return `<label class="switch"><input type="checkbox" role="switch" data-change="${action}"${data(params)}${checked ? ' checked' : ''}${disabled ? ' disabled' : ''} aria-label="${esc(label)}"><span></span></label>`;
 }
 
 export function stepper(value, { action, min, max, step, format = (v) => v }) {
@@ -464,14 +466,17 @@ export function axisPage(name, dir, key, content, { cls = '' } = {}) {
 
 /**
  * Il giorno in grande (Dashboard e Orario): "Domani" o il giorno della settimana, la data sotto,
- * a destra il pulsante per tornare al giorno predefinito e sotto i chip di stato.
+ * a destra il pulsante per tornare al giorno predefinito (`jump`: `{ title, action, help, label }`)
+ * e sotto i chip di stato. `progress` va a destra del nome del giorno (l'avanzamento della
+ * giornata nell'Orario). Il nome che non ci sta si rimpicciolisce (`fitDayTitles` in `app.js`).
  */
-export function dayHero(day, { jump = null, chips = [] } = {}) {
+export function dayHero(day, { jump = null, chips = [], progress = '' } = {}) {
   const relative = isTodayLike(day);
   const title = relative ? fmt.relativeDayName(day) : fmt.weekdayLong(day);
   const subtitle = relative ? fmt.longDay(day) : fmt.dayMonthYear(day);
-  const button = jump ? `<button class="btn s tonal day-jump" data-action="${jump.action}" title="${esc(jump.help ?? jump.title)}">${icon('today')}<span>${esc(jump.title)}</span></button>` : '';
-  return `<div class="day-hero"><div class="day-hero-row"><div class="day-hero-text"><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></div>${button}</div>
+  const button = jump ? `<button class="btn s tonal day-jump" data-action="${jump.action}" title="${esc(jump.help ?? jump.title)}"${jump.label ? ` aria-label="${esc(jump.label)}"` : ''}>${icon('today')}<span>${esc(jump.title)}</span></button>` : '';
+  const heading = progress ? `<div class="day-hero-title"><h2>${esc(title)}</h2>${progress}</div>` : `<h2>${esc(title)}</h2>`;
+  return `<div class="day-hero"><div class="day-hero-row"><div class="day-hero-text">${heading}<p>${esc(subtitle)}</p></div>${button}</div>
     ${chips.length ? `<div class="chip-flow">${chips.join('')}</div>` : ''}</div>`;
 }
 

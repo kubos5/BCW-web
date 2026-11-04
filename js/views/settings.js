@@ -18,9 +18,9 @@ import { readBackup, Alignment } from '../timetable.js';
 import { requestAlignment } from './timetable.js';
 import { esc, fmt, GradeFormat, sentenceCased, nameCased, startOfDay } from '../util.js';
 import { proxySheet } from './login.js';
-import { BCWServer } from '../cloud.js';
+import { BCWServer, SyncCategory } from '../cloud.js';
 
-export const VERSION = '3.2';
+export const VERSION = '3.2.1';
 
 // MARK: - Mattoni del modulo
 
@@ -31,8 +31,8 @@ function row(label, control = '', { iconName, subtitle, cls = '' } = {}) {
 }
 
 /** Riga con un interruttore: toccando la riga intera l'interruttore cambia. */
-function toggleRow(label, checked, action, { iconName, subtitle, disabled = false, extra = '' } = {}) {
-  return `<label class="list-item form-row toggle-row ${disabled ? 'disabled' : ''}">${iconName ? `<span class="form-icon">${icon(iconName)}</span>` : ''}<span class="li-text"><strong>${esc(label)}${extra}</strong>${subtitle ? `<small>${esc(subtitle)}</small>` : ''}</span>${toggle(checked, action, { label, disabled })}</label>`;
+function toggleRow(label, checked, action, { iconName, subtitle, disabled = false, extra = '', params = {} } = {}) {
+  return `<label class="list-item form-row toggle-row ${disabled ? 'disabled' : ''}">${iconName ? `<span class="form-icon">${icon(iconName)}</span>` : ''}<span class="li-text"><strong>${esc(label)}${extra}</strong>${subtitle ? `<small>${esc(subtitle)}</small>` : ''}</span>${toggle(checked, action, { label, disabled, params })}</label>`;
 }
 
 const valueRow = (label, value) => row(label, `<span class="form-value">${esc(value)}</span>`, { cls: 'value-row' });
@@ -172,9 +172,16 @@ function timetablePane(ctx) {
   const store = ctx.model.timetable;
   const p = ctx.prefs;
   const hasOwner = store.owner != null;
+  const synced = ctx.model.isCloud && p.syncs('timetable');
   return section([
+    toggleRow('Mostra la scheda Orario', p.showsTimetableTab, 'pref-tt-tab', { iconName: 'timetable' }),
+  ], {
+    header: 'Scheda',
+    footer: `Nascosta, la scheda Orario sparisce dalla barra di navigazione (anche da quella degli schermi larghi). L'orario resta${synced ? " e si sincronizza ancora con l'account BCW" : ''}: nell'app per iPhone e iPad widget e attività in diretta continuano a usarlo. Per riaverla torna qui (Impostazioni, dall'ingranaggio ${ctx.wide ? 'in alto' : 'in Tu'}).`,
+  }) + section([
     row('Allineamento', select(Object.values(Alignment).map((a) => [a.id, a.shortTitle]), store.alignment, 'tt-alignment', { label: 'Allineamento' }), { iconName: Alignment[store.alignment].icon }),
     toggleRow('Mostra le verifiche nella lista', p.timetableShowsTests, 'pref-tt-tests', { iconName: 'test' }),
+    toggleRow('Barra di avanzamento della giornata', p.showsDayProgress, 'pref-tt-progress', { iconName: 'timeline', subtitle: 'Accanto al giorno in grande, nella vista Lista' }),
   ], {
     header: 'Vista e allineamento',
     footer: 'Con "Mostra le verifiche" la vista Lista segna le verifiche di Classeviva e quelle segnate a mano; si vedono sempre nel dettaglio dell\'evento e nella vista Giorno. Quelle nascoste, e le regole per nasconderle in automatico, sono in Verifiche nascoste (menu dell\'orario). L\'allineamento vale per tutto l\'orario e per la modalità di modifica (pulsante + dell\'orario › Modifica orario). Automatico: gli eventi iniziano all\'ora o alla mezz\'ora e durano 30 minuti o un\'ora; passando all\'automatico gli eventi non allineati vengono allineati, dopo una conferma. Libero: qualsiasi orario e durata. Gli intervalli si posizionano sempre liberamente.',
@@ -184,7 +191,7 @@ function timetablePane(ctx) {
     buttonRow("Elimina l'orario", 'tt-delete-all', 'trash', { destructive: true, disabled: store.isEmpty }),
   ], {
     header: "Backup dell'orario",
-    footer: `${ctx.model.isCloud ? "L'orario di ogni account abbinato si sincronizza con il tuo account BCW." : "L'orario è salvato solo in questo browser, separato per ogni account."} Il backup contiene eventi, colori, palette, note, verifiche segnate e file allegati; importandolo sostituisce l'orario attuale. È compatibile con l'app BCW per iPhone e iPad.`,
+    footer: `${synced ? "L'orario di ogni account abbinato si sincronizza con il tuo account BCW." : "L'orario è salvato solo in questo browser, separato per ogni account."} Il backup contiene eventi, colori, palette, note, verifiche segnate e file allegati; importandolo sostituisce l'orario attuale. È compatibile con l'app BCW per iPhone e iPad.`,
   }) + `<input type="file" id="tt-import-input" accept=".json,application/json" hidden data-change="tt-import-file">` + timetableSyncSection(ctx);
 }
 
@@ -198,14 +205,35 @@ function timetableSyncSection(ctx) {
       footer: "Con un account BCW l'orario di ogni account Classeviva abbinato, con i file allegati, si sincronizza tra i tuoi dispositivi (app per iPhone e iPad compresa).",
     });
   }
-  return section([
-    row('Sincronizzazione', `<span class="form-value">${esc(syncStatus(model.sync))}</span>`, { iconName: 'cloud', cls: 'value-row', subtitle: model.sync.fileWarning ?? undefined }),
-    buttonRow('Sincronizza ora', 'cloud-sync-now', 'refresh', { disabled: model.sync.status === 'syncing' || model.isDemo }),
-  ], {
-    header: 'Sincronizzazione',
-    footer: model.isDemo
-      ? "L'orario della demo non si sincronizza."
-      : `L'orario di questo account, con i file allegati, si sincronizza con l'account BCW ${model.cloudUser?.username ?? ''}.`,
+  // La stessa scelta della voce Orario di Impostazioni › Account › Da sincronizzare.
+  const on = ctx.prefs.syncs('timetable');
+  const rows = model.isDemo ? [] : [syncCategoryRow(ctx, SyncCategory.timetable, { title: "Sincronizza l'orario", iconName: 'backup' })];
+  if (on || model.isDemo) {
+    rows.push(
+      row('Sincronizzazione', `<span class="form-value">${esc(syncStatus(model.sync))}</span>`, { iconName: 'cloud', cls: 'value-row', subtitle: model.sync.fileWarning ?? undefined }),
+      buttonRow('Sincronizza ora', 'cloud-sync-now', 'refresh', { disabled: model.sync.status === 'syncing' || model.isDemo }),
+    );
+  }
+  let footer;
+  if (model.isDemo) footer = "L'orario della demo non si sincronizza.";
+  else if (on) footer = `L'orario di questo account, con i file allegati, si sincronizza con l'account BCW ${model.cloudUser?.username ?? ''}.`;
+  else footer = "L'orario resta solo in questo browser e non cambia sugli altri dispositivi. Riaccendendo la sincronizzazione vince il lato cambiato nel frattempo (se sono cambiati entrambi, questo browser).";
+  return section(rows, { header: 'Sincronizzazione', footer });
+}
+
+/** Interruttore di una voce di "Da sincronizzare" (`SyncCategory`). */
+function syncCategoryRow(ctx, category, { title = category.title, iconName = category.icon, subtitle = category.subtitle } = {}) {
+  return toggleRow(title, ctx.prefs.syncs(category.id), 'pref-sync-category', { iconName, subtitle: title === category.title ? subtitle : undefined, params: { kind: category.id } });
+}
+
+/**
+ * Da sincronizzare (solo con l'account BCW, come `CloudSyncChoicesSection` nell'app): le voci che
+ * si sincronizzano, scelte per questo browser.
+ */
+function syncChoicesSection(ctx) {
+  return section(Object.values(SyncCategory).map((category) => syncCategoryRow(ctx, category)), {
+    header: 'Da sincronizzare',
+    footer: "Vale solo per questo browser. Una voce spenta resta com'è qui e non cambia sugli altri dispositivi. Riaccendendo impostazioni, aspetto o compiti, questo browser prende quelli dell'account BCW; riaccendendo l'orario vince il lato cambiato nel frattempo (se sono cambiati entrambi, questo browser). L'icona dell'app, che si sceglie nell'app per iPhone e iPad, resta com'è sul server.",
   });
 }
 
@@ -306,8 +334,8 @@ export function cloudSection(ctx) {
     buttonRow("Elimina l'account BCW…", 'cloud-delete', 'trash', { destructive: true }),
   ], {
     header: 'Account BCW',
-    footer: "Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, che valgono solo in questo browser), l'aspetto e l'orario di ogni account abbinato, con i file allegati.",
-  });
+    footer: "Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, che valgono solo in questo browser), l'aspetto e l'orario di ogni account abbinato, con i file allegati. Sotto scegli cosa sincronizzare.",
+  }) + syncChoicesSection(ctx);
 }
 
 /**
@@ -434,6 +462,14 @@ export const settings = {
     'pref-rounded-text': (ctx, el) => ctx.prefs.set('roundedText', el.value),
     'appearance-reset': (ctx) => ctx.prefs.resetAppearance(),
     'pref-tt-tests': (ctx, el) => ctx.prefs.set('timetableShowsTests', el.checked),
+    'pref-tt-tab': (ctx, el) => ctx.prefs.set('showsTimetableTab', el.checked),
+    'pref-tt-progress': (ctx, el) => ctx.prefs.set('showsDayProgress', el.checked),
+    'pref-sync-category': (ctx, el) => {
+      const category = el.dataset.kind;
+      if (!SyncCategory[category] || ctx.prefs.syncs(category) === el.checked) return;
+      ctx.prefs.setSyncs(category, el.checked);
+      ctx.model.sync.categoryChanged(category, el.checked);
+    },
     'tt-alignment': (ctx, el) => requestAlignment(ctx, el.value),
     'pref-reminder-hour': (ctx, el) => {
       ctx.prefs.set('reminderHour', Number(el.value));

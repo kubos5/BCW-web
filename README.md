@@ -56,7 +56,7 @@ Anche `server.js` accetta richieste da altri siti se imposti `ALLOWED_ORIGINS`.
 
 ### Account BCW
 
-Con un account BCW (nome utente e password) si abbinano uno o più account Classeviva e si entra in tutti con un solo accesso, su ogni dispositivo e anche nell'app per iPhone e iPad. Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, legati al browser), l'aspetto e l'orario di ogni account abbinato con i file allegati. Nella schermata di accesso (sui computer un pannello in due colonne, sui telefoni come nell'app, compatta con la tastiera aperta) un gruppo di pulsanti sceglie tra Classeviva e Account BCW; da Impostazioni › Account si accede o si crea un account anche con un account Classeviva già aperto, e gli account salvati nel browser si possono abbinare subito.
+Con un account BCW (nome utente e password) si abbinano uno o più account Classeviva e si entra in tutti con un solo accesso, su ogni dispositivo e anche nell'app per iPhone e iPad. Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, legati al browser), l'aspetto e l'orario di ogni account abbinato con i file allegati. Nella schermata di accesso (sui computer un pannello in due colonne, sui telefoni come nell'app, compatta con la tastiera aperta) un gruppo di pulsanti sceglie tra Classeviva e Account BCW; da Impostazioni › Account si accede o si crea un account anche con un account Classeviva già aperto, e gli account salvati nel browser si possono abbinare subito. In Impostazioni › Account › Da sincronizzare si sceglie, per ogni browser, cosa sincronizzare: impostazioni, aspetto, compiti fatti e orario (come nell'app, che ha in più l'icona dell'app); una voce spenta resta com'è nel browser e non cambia sugli altri dispositivi, e riaccendendola si riprendono i valori dell'account BCW (per l'orario vince il lato cambiato nel frattempo).
 
 Chi entra con un account Classeviva vede in Impostazioni › Account a quali account BCW è abbinato e può scollegarsi da ognuno: basta l'accesso a Classeviva.
 
@@ -94,7 +94,7 @@ Le stesse dell'app nativa:
 - blocco dell'app con una passkey (Face ID, Touch ID, Windows Hello o lo sblocco del dispositivo), oppure con un codice
 - consultazione offline con i dati dell'ultima volta
 - account genitore con più figli, più account salvati e passaggio dall'uno all'altro (anche tenendo premuta la scheda Tu), con una dissolvenza tra i dati di un account e quelli dell'altro
-- account BCW: account Classeviva abbinati con un solo accesso, impostazioni e orario sincronizzati tra i dispositivi, scollegamento dagli account BCW anche dal lato Classeviva
+- account BCW: account Classeviva abbinati con un solo accesso, impostazioni e orario sincronizzati tra i dispositivi (scegliendo cosa sincronizzare), scollegamento dagli account BCW anche dal lato Classeviva
 - modalità demo con dati di esempio, anche con un account già collegato (uscendo si torna all'account)
 - notifiche per nuovi voti, comunicazioni, note, assenze e compiti, da attivare in Impostazioni › Notifiche
 - impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account
@@ -106,7 +106,9 @@ La scheda Orario contiene l'orario settimanale, che si compila a mano o si gener
 
 - due viste: Lista (la settimana in alto e il giorno in grande con le lezioni in una lista segmentata) e Giorno (le ore della giornata, a blocchi pieni nella tinta; su schermi larghi l'intera settimana)
 - in cima la settimana è una fila di pulsanti, come nella Dashboard; scorrendo di lato si passa al giorno prima o dopo
-- si apre su oggi finché c'è un evento da finire, altrimenti sul primo giorno successivo con eventi (finite le lezioni di oggi, o nel fine settimana); il pulsante Oggi riporta a oggi
+- si apre su oggi finché c'è un evento da finire, altrimenti sul primo giorno successivo con eventi (finite le lezioni di oggi, o nel fine settimana); a quel giorno riportano anche il pulsante accanto al giorno in grande ("Oggi", "Domani" o il giorno della settimana), Alt+T e un nuovo tocco sulla scheda Orario
+- accanto al giorno in grande, attivandola in Impostazioni › Orario, la percentuale e la barra di avanzamento della giornata: la parte passata della durata complessiva delle lezioni (ondulata mentre la giornata è in corso)
+- la scheda Orario si può nascondere da Impostazioni › Orario (l'orario resta salvato e sincronizzato)
 - oggi una scheda in cima mostra la lezione in corso (quanto manca, con l'avanzamento) e quella dopo, oppure la prossima lezione
 - toccando un evento si vedono i dettagli e si aggiungono note, file e foto, per un solo giorno o per ogni settimana
 - le verifiche segnate dai docenti su Classeviva compaiono da sole sulla lezione della materia e si possono nascondere; altre verifiche si segnano a mano, per un giorno o per ogni settimana
@@ -128,7 +130,7 @@ L'orario è salvato nel browser, separato per ogni account (il documento in `loc
 
 Il layout dell'app adattato a uno schermo largo, come le app Google sul web: in alto la barra con il logo, la barra di ricerca, Aggiorna, Impostazioni e l'avatar dell'account (che apre il menu degli account); a sinistra la barra di navigazione espansa con tutte le sezioni e i contatori delle cose da leggere o giustificare (si riduce alle sole icone con il pulsante in alto); la pagina in un pannello con gli angoli ampi. Pagine a due colonne (Dashboard con la settimana o il mese e i prossimi giorni accanto al giorno, Orario, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca e impostazioni con elenco e dettaglio affiancati, elenchi in più colonne. In Bacheca, Agenda e Materiale la ricerca della pagina sta nel contenuto. Nelle pagine a più colonne le barre di scorrimento non compaiono, così le colonne mantengono la loro larghezza.
 
-Scorciatoie: ⌘F (Ctrl+F) per cercare; con Alt (⌥ su Mac) Alt+1…9 per le sezioni (1 Dashboard, 2 Orario, 3 Voti, 4 Tu, 5 Bacheca, 6 Note, 7 Assenze, 8 Agenda, 9 Materiale), Alt+R per aggiornare, Alt+Maiusc+T per andare a domani nella Dashboard, Alt+T per tornare a oggi e Alt+N per un nuovo evento nell'Orario, Invio per uscire da Modifica orario.
+Scorciatoie: ⌘F (Ctrl+F) per cercare; con Alt (⌥ su Mac) Alt+1…9 per le sezioni (1 Dashboard, 2 Orario, 3 Voti, 4 Tu, 5 Bacheca, 6 Note, 7 Assenze, 8 Agenda, 9 Materiale), Alt+R per aggiornare, Alt+Maiusc+T per andare a domani nella Dashboard, Alt+T per tornare al giorno predefinito e Alt+N per un nuovo evento nell'Orario (con la scheda Orario nascosta Alt+1…3 per Dashboard, Voti e Tu), Invio per uscire da Modifica orario.
 
 Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, uguale a quello dell'app per iPhone, con la barra di navigazione in basso e quattro schede (tra 600 e 840 pixel le schede stanno in una barra laterale).
 

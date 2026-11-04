@@ -1758,6 +1758,17 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .day-hero h2 { font-size: 40px; line-height: 48px; font-weight: 500; letter-spacing: -.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .day-hero p { font-size: 16px; line-height: 22px; font-weight: 500; color: var(--on-surface-variant); }
 .day-jump { flex: none; animation: fab-in var(--spring-dur) var(--spring); }
+/* Orario: a destra del nome del giorno l'avanzamento della giornata (percentuale e indicatore
+   lineare, al massimo 240 px). Il nome tiene la sua larghezza (si rimpicciolisce solo se non ci
+   sta, `fitDayTitles`); senza spazio per la barra resta la percentuale. */
+.day-hero-title { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.day-hero-title h2 { flex: 0 1 auto; min-width: 0; }
+.day-progress { flex: 1 1 0; min-width: 46px; max-width: 240px; display: flex; align-items: center; gap: 10px; container-type: inline-size; }
+.day-progress .dp-percent { flex: none; font-size: 17px; line-height: 22px; font-weight: 600; color: var(--on-surface-variant); }
+.day-progress.running .dp-percent { color: var(--primary); }
+.day-progress .dp-bar { flex: 1; min-width: 56px; }
+.day-progress .dp-full { display: block; height: 4px; margin-block: 4px; border-radius: 2px; background: var(--primary); }
+@container (width < 112px) { .day-progress .dp-bar { display: none; } }
 .chip-flow { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip-flow.center { justify-content: center; }
 

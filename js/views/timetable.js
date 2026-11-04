@@ -15,8 +15,8 @@ import {
   addDays, addMonths, dayKey, esc, fmt, isSameDay, isToday, isTomorrow, isYesterday, isWeekend, startOfDay, startOfMonth, startOfWeek, plural,
 } from '../util.js';
 import {
-  Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, defaultTimetableDay, displayTitle, duration, entryColor,
-  isBreak, roundHalfAway, timeRange,
+  Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, dayProgress, defaultTimetableDay, displayTitle, duration,
+  entryColor, isBreak, roundHalfAway, timeRange,
 } from '../timetable.js';
 import {
   detailSheet, editorSheet, generatorSheet, hiddenTestsSheet, seriesSheet, deleteEntryDialog, timetableSheetActions,
@@ -41,6 +41,30 @@ function select(ctx, day) {
   if (startOfMonth(target).getTime() !== startOfMonth(s.selected).getTime()) s.monthDir = s.dir;
   s.selected = target;
   s.scrollToHour = true;
+}
+
+/**
+ * Il giorno predefinito dell'orario (`defaultTimetableDay`: oggi finché c'è un evento non ancora
+ * finito, poi il primo giorno successivo con eventi). È il giorno di apertura e quello a cui
+ * riportano il pulsante accanto al giorno in grande (o nella barra), Alt+T e un nuovo tocco sulla
+ * scheda. Il giorno mostrato non cambia da solo quando finisce l'ultimo evento, il pulsante sì
+ * (la pagina si ridisegna ogni 30 secondi).
+ */
+function defaultDay(ctx) {
+  return defaultTimetableDay(ctx.model.timetable);
+}
+
+/** Nome del giorno predefinito sul pulsante che ci riporta: "Oggi", "Domani" o "Lunedì". */
+function jumpTitle(day) {
+  return isToday(day) || isTomorrow(day) ? fmt.relativeDayName(day) : fmt.weekdayLong(day);
+}
+
+/** Il pulsante del giorno predefinito, se il giorno scelto è un altro. */
+function jumpButton(ctx, selected) {
+  const target = defaultDay(ctx);
+  if (isSameDay(selected, target)) return null;
+  const title = jumpTitle(target);
+  return { title, action: 'tt-jump', help: `Vai a ${title.toLowerCase()} (Alt+T)`, label: `Vai a ${title.toLowerCase()}` };
 }
 
 /** Vista effettiva: in modifica sempre Giorno; il mese c'è nella Dashboard. */
@@ -101,9 +125,11 @@ export const timetable = {
     const isDraft = !!store.draft;
 
     const actions = [];
-    if (s.editing) {
-      if (!isToday(day)) actions.push({ text: 'Oggi', action: 'tt-today', help: 'Vai a oggi (Alt+T)' });
-    } else {
+    // Il pulsante del giorno predefinito sta accanto al giorno in grande; nella modifica e nella
+    // vista Giorno degli schermi larghi, che non hanno il giorno in grande, nella barra.
+    const jump = s.editing || (ctx.wide && mode === 'day') ? jumpButton(ctx, day) : null;
+    if (jump) actions.push({ text: jump.title, action: jump.action, help: jump.help });
+    if (!s.editing) {
       // Passa all'altra vista: l'icona è quella della vista in cui si va.
       const dayLabel = ctx.wide ? 'Vista Settimana' : 'Vista Giorno';
       actions.push(mode === 'day'
@@ -156,15 +182,15 @@ export const timetable = {
     };
   },
 
-  /** Nuovo tocco sulla scheda: oggi. */
+  /** Nuovo tocco sulla scheda: il giorno predefinito. */
   reselect(ctx) {
-    select(ctx, new Date());
+    select(ctx, defaultDay(ctx));
   },
 
   actions: {
     ...timetableSheetActions,
     'tt-select': (ctx, el) => select(ctx, new Date(Number(el.dataset.time))),
-    'tt-today': (ctx) => select(ctx, new Date()),
+    'tt-jump': (ctx) => select(ctx, defaultDay(ctx)),
     'tt-pick': (ctx) => ctx.openDatePicker({ selection: ttState(ctx).selected, onPick: (day) => select(ctx, day) }),
     'tt-day-shift': (ctx, el) => {
       if (ttState(ctx).editing) return;
@@ -373,11 +399,31 @@ function nowCard(content) {
     ${following}</button>`;
 }
 
+/**
+ * A destra del nome del giorno, a che punto è la giornata (Impostazioni › Orario › Barra di
+ * avanzamento della giornata): la percentuale e l'indicatore lineare di Material 3, ondulato mentre
+ * la giornata è in corso (come la lezione della card "Adesso"), piatto prima dell'inizio e a giornata
+ * finita. Oggi segue l'orologio (la pagina si ridisegna ogni 30 secondi); un giorno passato è al
+ * 100%, uno futuro allo 0%. Senza spazio per la barra resta la percentuale.
+ */
+function dayProgressView(ctx, content) {
+  if (!ctx.prefs.showsDayProgress || content.isDraft) return '';
+  const day = content.day;
+  const minute = isToday(day) ? TimeOfDay.of(new Date()) : (day < startOfDay(new Date()) ? 24 * 60 : 0);
+  const progress = dayProgress(content.entries.filter((e) => !isBreak(e)), minute);
+  if (!progress) return '';
+  const running = progress.elapsed > 0 && !progress.finished;
+  // Giornata finita: la traccia attiva piena, senza onda.
+  const bar = progress.finished ? '<span class="dp-full"></span>' : wavyProgress(progress.elapsed, progress.total, { decorative: true });
+  return `<div class="day-progress ${running ? 'running' : ''}" role="progressbar" aria-label="Avanzamento della giornata" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}" aria-valuetext="${progress.percent}%">
+    <span class="dp-percent numeral">${progress.percent}%</span><span class="dp-bar">${bar}</span></div>`;
+}
+
 export function dayList(ctx, content) {
   const store = ctx.model.timetable;
   const day = content.day;
   const showsTests = ctx.prefs.timetableShowsTests;
-  const header = dayHero(day, { jump: isToday(day) ? null : { title: 'Oggi', action: 'tt-today', help: 'Vai a oggi (Alt+T)' }, chips: dayChips(ctx, content) });
+  const header = dayHero(day, { jump: jumpButton(ctx, day), chips: dayChips(ctx, content), progress: dayProgressView(ctx, content) });
   const now = isToday(day) && !content.isDraft ? nowCard(content) : '';
   const unmatched = showsTests && content.unmatchedTests.length
     ? listGroup(content.unmatchedTests.map((t) => segCell(registerTestRow(store, t, { unmatched: true }))), { header: 'Verifiche senza lezione in orario', background: 'color-mix(in srgb, var(--fair-container) 45%, var(--surface-container))' })

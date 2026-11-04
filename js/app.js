@@ -96,6 +96,33 @@ window.bcw = app;
 
 const tabs = ['dashboard', 'timetable', 'grades', 'you'];
 
+/** Le schede visibili: senza l'Orario se è nascosto (Impostazioni › Orario › Mostra la scheda Orario). */
+function visibleTabs() {
+  return model.preferences.showsTimetableTab ? tabs : tabs.filter((tab) => tab !== 'timetable');
+}
+
+/**
+ * Scorciatoia Alt+N di una sezione: le destinazioni principali sono numerate come compaiono (con
+ * l'Orario nascosto 1 Dashboard, 2 Voti, 3 Tu, come ⌘1–⌘3 nell'app), le altre hanno la loro.
+ */
+function sectionShortcut(key) {
+  const index = visibleTabs().indexOf(key);
+  if (index >= 0) return String(index + 1);
+  return tabs.includes(key) ? null : sections[key]?.shortcut ?? null;
+}
+
+/**
+ * Con la scheda Orario nascosta l'Orario non si apre (un indirizzo `#/timetable`, l'ultima sezione
+ * aperta) e, se è nascosta mentre è aperta, si passa alla Dashboard, come nell'app.
+ */
+function leaveHiddenTimetable() {
+  if (model.preferences.showsTimetableTab || app.nav.current !== 'timetable') return;
+  delete app.nav.stacks.timetable;
+  app.nav.current = 'dashboard';
+  app.nav.stacks.dashboard ??= ['dashboard'];
+  syncHash(true);
+}
+
 function parsePath(path) {
   const parts = path.replace(/^#?\/?/, '').split('/').filter(Boolean);
   const name = parts[0] && routes[parts[0]] ? parts[0] : 'dashboard';
@@ -193,6 +220,7 @@ function scrollToTop() {
 const pageScroller = () => root.querySelector('.page.active .page-scroll');
 
 export function selectSection(key) {
+  if (key === 'timetable' && !model.preferences.showsTimetableTab) key = 'dashboard';
   saveScroll();
   app.menu = null;
   app.railOpen = false;
@@ -410,7 +438,10 @@ function render() {
   let html;
   if (model.phase === 'launching') html = '<div class="launch"></div>';
   else if (model.phase === 'signedOut') html = renderSignedOut();
-  else html = renderSignedIn();
+  else {
+    leaveHiddenTimetable();
+    html = renderSignedIn();
+  }
   html += renderOverlays();
   const leaving = captureAxisPages();
   const known = new Set(root.querySelectorAll(`${SLIDE_CONTAINERS}, ${STATE_POPS}, ${DAY_JUMP}, ${PAGE_FIXED}, .page`));
@@ -422,6 +453,7 @@ function render() {
   swapReusedScrolls(scrolls);
   restoreScroll();
   drawCharts(root);
+  fitDayTitles();
   positionMenu();
   const pending = app.afterRender.splice(0);
   for (const fn of pending) {
@@ -506,6 +538,23 @@ function settleNewSlides(known, jumpDays) {
   // ricerca della Dashboard la pagina resta e la settimana, ridisegnata, non sale da sola.
   for (const node of root.querySelectorAll(PAGE_FIXED)) {
     if (!known.has(node) && known.has(node.closest('.page'))) cancel(node);
+  }
+}
+
+/**
+ * Il giorno in grande (Dashboard, Orario) che non ci sta si rimpicciolisce fino al 70%, come
+ * `minimumScaleFactor(0.7)` nell'app, invece di finire subito con i puntini: accanto ci sono il
+ * pulsante del giorno predefinito e, nell'Orario, l'avanzamento della giornata. Il morph toglie la
+ * dimensione scritta qui, quindi si rimisura a ogni disegno (prima che la pagina si veda).
+ */
+function fitDayTitles() {
+  for (const title of root.querySelectorAll('.day-hero h2')) {
+    title.style.removeProperty('font-size');
+    const full = title.scrollWidth;
+    const room = title.clientWidth;
+    if (!room || full <= room) continue;
+    const size = parseFloat(getComputedStyle(title).fontSize);
+    title.style.fontSize = `${(Math.max(0.7, room / full) * size).toFixed(2)}px`;
   }
 }
 
@@ -679,8 +728,10 @@ function renderNavBar() {
     return `<button class="nav-item ${selected ? 'selected' : ''}" data-action="select-section" data-key-name="${key}" ${key === 'you' ? 'data-longpress="account-switcher"' : ''} aria-label="${label}" aria-current="${selected ? 'page' : 'false'}">
       <span class="nav-indicator">${icon(selected && s.iconSelected ? s.iconSelected : s.icon)}${badgeCount ? `<span class="badge">${badgeCount}</span>` : ''}</span><span class="nav-label">${label}</span></button>`;
   };
-  // La ricerca sta nella barra in cima alla Dashboard, come nelle app Google.
-  return `<nav class="nav-bar" aria-label="Schede">${item('dashboard', 'Dashboard')}${item('timetable', 'Orario')}${item('grades', 'Voti')}${item('you', 'Tu', badge)}</nav>`;
+  // La ricerca sta nella barra in cima alla Dashboard, come nelle app Google. L'Orario si può
+  // nascondere (Impostazioni › Orario).
+  const timetable = model.preferences.showsTimetableTab ? item('timetable', 'Orario') : '';
+  return `<nav class="nav-bar" aria-label="Schede">${item('dashboard', 'Dashboard')}${timetable}${item('grades', 'Voti')}${item('you', 'Tu', badge)}</nav>`;
 }
 
 // MARK: Schermi larghi
@@ -727,11 +778,13 @@ function renderDesktop(ctx, page) {
 function renderRail() {
   const current = app.nav.current;
   const groups = sectionGroups.map((group, index) => {
-    const rows = group.sections.map((key) => {
+    const keys = index ? group.sections : group.sections.filter((key) => visibleTabs().includes(key));
+    const rows = keys.map((key) => {
       const s = sections[key];
       const badge = sectionBadge(model, key);
       const selected = current === key;
-      return `<button class="rail-item ${selected ? 'selected' : ''}" data-action="select-section" data-key-name="${key}" title="${s.shortcut ? `${s.title} (Alt+${s.shortcut})` : s.title}" aria-current="${selected ? 'page' : 'false'}">
+      const shortcut = sectionShortcut(key);
+      return `<button class="rail-item ${selected ? 'selected' : ''}" data-action="select-section" data-key-name="${key}" title="${shortcut ? `${s.title} (Alt+${shortcut})` : s.title}" aria-current="${selected ? 'page' : 'false'}">
         <span class="rail-indicator">${icon(selected && s.iconSelected ? s.iconSelected : s.icon)}${badge ? `<span class="badge">${badge}</span>` : ''}</span><span class="rail-label">${esc(s.title)}</span>${badge ? `<span class="rail-count">${badge}</span>` : ''}</button>`;
     }).join('');
     return `<div class="rail-group">${group.title ? `<h2>${esc(group.title)}</h2>` : ''}${index ? '<hr>' : ''}${rows}</div>`;
@@ -1317,8 +1370,6 @@ installViewerGestures(root, app);
 
 // MARK: - Tastiera
 
-const shortcutSections = Object.entries(sections).filter(([, s]) => s.shortcut);
-
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     if (app.menu) app.menu = null;
@@ -1354,11 +1405,11 @@ document.addEventListener('keydown', (event) => {
   if (!event.altKey || event.metaKey || event.ctrlKey) return;
   const digit = event.code.startsWith('Digit') ? event.code.slice(5) : null;
   if (digit) {
-    const match = shortcutSections.find(([, s]) => s.shortcut === digit);
+    const match = Object.keys(sections).find((key) => sectionShortcut(key) === digit);
     if (match) {
       event.preventDefault();
-      selectSection(app.wide ? match[0] : stackKeyFor(match[0]));
-      if (!app.wide && !tabs.includes(match[0])) navigate(match[0]);
+      selectSection(app.wide ? match : stackKeyFor(match));
+      if (!app.wide && !tabs.includes(match)) navigate(match);
     }
     return;
   }
@@ -1368,10 +1419,10 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (typing) return;
-  // Alt+Maiusc+T: domani nella Dashboard; Alt+T: oggi e Alt+N: nuovo evento nell'Orario.
+  // Alt+Maiusc+T: domani nella Dashboard; Alt+T: il giorno predefinito e Alt+N: nuovo evento nell'Orario.
   let shortcut = null;
   if (route === 'dashboard' && event.code === 'KeyT' && event.shiftKey) shortcut = 'day-tomorrow';
-  if (route === 'timetable' && event.code === 'KeyT' && !event.shiftKey) shortcut = 'tt-today';
+  if (route === 'timetable' && event.code === 'KeyT' && !event.shiftKey) shortcut = 'tt-jump';
   if (route === 'timetable' && event.code === 'KeyN' && !event.shiftKey) shortcut = 'tt-new';
   if (shortcut) {
     event.preventDefault();
