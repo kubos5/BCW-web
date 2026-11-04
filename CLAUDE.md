@@ -30,7 +30,18 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   riceve il token). Sincronizzazione (`CloudSync`): impostazioni di `SYNCED_PREFERENCES` con unione a tre vie (validate prima
   di applicarle), orario per account (vince il lato cambiato, entrambi = questo dispositivo, la prima volta il server) con
   i file caricati prima dell'orario; `Preferences.onPersist` e `TimetableStore.onSaved` avvisano, `applyRemote` non
-  avvisa. Per provarla in locale: BCW-api con `npm start` e il suo indirizzo in Server BCW.
+  avvisa. Una chiave che l'ultima sincronizzazione non conosceva conta come cambiata solo se il server non ce l'ha (come
+  nell'app: il valore predefinito di un browser appena aggiornato non cancella la scelta fatta su un altro dispositivo).
+  Da sincronizzare (3.2.1, come nell'app): Impostazioni › Account › Da sincronizzare (`syncChoicesSection`, solo con
+  l'account BCW) sceglie per questo browser le voci `SyncCategory` di `cloud.js`: Impostazioni, Aspetto (anche chiaro o
+  scuro), Compiti fatti, Orario (niente "Icona dell'app": `appIconColor` resta sul server per gli altri dispositivi);
+  `Preferences.unsyncedCategories` è locale, `syncCategoryOf(key)` dà la voce di ogni chiave (le nuove vanno in
+  Impostazioni). `CloudSync` toglie le chiavi spente da ciò che invia e applica (`syncedKeys`) e non carica né scarica
+  l'orario (`syncsTimetable`); `categoryChanged` toglie le chiavi spente dall'ultima sincronizzazione, così
+  riaccendendole vince l'account BCW; riaccendendo l'orario si allinea come sempre. In Impostazioni › Orario ›
+  Sincronizzazione lo stesso interruttore dell'orario ("Sincronizza l'orario", non nella demo).
+  Per provarla in locale: BCW-api con `npm start` e il suo indirizzo in Server BCW (provata così la 3.2.1: voci spente,
+  cambi dal server e riaccensione).
 - Design dell'app iOS 3.0 (Material 3 Expressive, senza Liquid Glass) e solo componenti di https://m3.material.io. Il Mac non
   c'è più: il layout degli schermi larghi è un adattamento libero di quello dell'app.
 - Design Material 3 Expressive: colori come variabili CSS (`--primary`, `--surface-container…`, `--good/--fair/--poor/
@@ -39,7 +50,8 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   `…Fill`); forme in `js/shapes.js` (`shape(name)` dentro un `.shaped`); logo come testo (`js/logo.js`: "BCW" in Google
   Sans Flex e la linea in `--brand`), così segue il tema scelto nell'app; il favicon si ridisegna con `--brand`
   (`Theme.updateFavicon()`). Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
-- Larghezze: sotto 600 px barra di navigazione in basso con quattro schede (Dashboard, Orario, Voti, Tu); la ricerca è la
+- Larghezze: sotto 600 px barra di navigazione in basso con quattro schede (Dashboard, Orario, Voti, Tu; tre con l'Orario
+  nascosto, vedi Orario); la ricerca è la
   barra in cima alla Dashboard (`page.searchBar`; `openSearch()` / `app.searching`: i risultati di `views/search.js`
   prendono il posto della pagina e la barra di navigazione si nasconde). 600–839 le stesse schede in una barra laterale.
   Le pagine principali delle schede hanno il titolo grande (34 px) nella riga dei pulsanti; quelle aperte da un'altra il
@@ -76,7 +88,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   elementi annullate (altrimenti ripartirebbero). Lista e Giorno dell'Orario sui telefoni hanno contenitori diversi
   (`.view-swap`, chiave per vista, assi `tt-day`/`tt-grid`) e si scambiano con la dissolvenza, non di lato; tornando
   alla Lista si riparte dall'alto (`tt-mode`).
-- Componenti dell'app: `dayHero` (giorno in grande e chip), `statusChip`, `segmentedSection` + `segCell`, `listGroup`
+- Componenti dell'app: `dayHero` (giorno in grande, pulsante del giorno predefinito, chip e `progress` a destra del nome;
+  il nome che non ci sta si rimpicciolisce fino al 70% con `fitDayTitles()` in `app.js`, come `minimumScaleFactor`
+  nell'app, rimisurato a ogni disegno), `statusChip`, `segmentedSection` + `segCell`, `listGroup`
   (anche con `background`), `dateBadge`, `connectedGroup`, `primaryTabs`, `statTile` con `corners`, menu del FAB
   (`page.fabMenu`, voci con un'azione) e barra degli strumenti flottante (`floatingToolbar`, vivace nella modifica
   dell'orario, che nasconde la barra di navigazione).
@@ -90,7 +104,22 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   Giorno iniziale (`defaultTimetableDay(store)`, stessa regola dell'app iOS e dei widget): oggi se c'è ancora un evento
   non finito (fine > adesso), altrimenti il primo dei 7 giorni successivi con eventi, se no oggi; contano solo gli eventi
   dell'orario salvato (non intervalli, bozza o verifiche di Classeviva). Si sceglie alla prima apertura della scheda in
-  una sessione; "Oggi" e un nuovo tocco sulla scheda portano a oggi.
+  una sessione. Dalla 3.2.1 (come l'app) è il giorno predefinito ovunque: il pulsante accanto al giorno in grande (nella
+  modifica e nella vista Giorno degli schermi larghi nella barra; sui telefoni la vista Giorno non ce l'ha, come
+  nell'app) si chiama come quel giorno ("Oggi", "Domani", "Lunedì", `jumpTitle`) e ci porta (`tt-jump`, anche Alt+T),
+  come un nuovo tocco sulla scheda. Il giorno mostrato non cambia da solo quando finisce l'ultimo evento, il pulsante sì
+  (ridisegno ogni 30 s). Il selettore della data ha ancora "Oggi".
+  Avanzamento della giornata (`dayProgress(spans, minute)` in `timetable.js`, come `DayProgress` dell'app; Impostazioni ›
+  Orario › "Barra di avanzamento della giornata", `showsDayProgress`, spenta di serie e sincronizzata): la parte passata
+  della durata complessiva degli eventi (senza intervalli, sovrapposizioni unite, ferma negli spazi), percentuale per
+  difetto (100 solo a giornata finita); giorni passati 100%, futuri 0%; non con la bozza. Nella Lista a destra del nome
+  del giorno (`dayProgressView`): percentuale (`--primary` mentre la giornata è in corso) e `wavyProgress` (piatta a 0%,
+  piena e piatta `.dp-full` a 100%), al massimo 240 px; senza spazio resta la percentuale (`@container` sotto 112 px).
+  Scheda Orario nascosta (`showsTimetableTab`, Impostazioni › Orario › Scheda, sincronizzata come impostazione):
+  `visibleTabs()` in `app.js` per la barra di navigazione e la barra laterale; `leaveHiddenTimetable()` porta alla
+  Dashboard se l'Orario è aperto (anche da `#/timetable` o dall'ultima sezione salvata) e `selectSection('timetable')`
+  va alla Dashboard. Scorciatoie (`sectionShortcut`): le destinazioni principali numerate come compaiono (Alt+1–3 con
+  l'Orario nascosto, come ⌘1–⌘3 nell'app), le altre sezioni tengono la loro.
 - Cambi di sessione (account, demo) con `model.changeSession(fn)`: dissolvenza, cambio dei dati e ritorno quando ci
   sono (al massimo 3 s). La demo non è un account: si apre anche con un account collegato e uscendo si torna a quello.
 - `dom.js`: i nodi con `data-key` scomparsi vanno tolti prima di quelli nuovi; spostare un nodo gli toglie il fuoco.

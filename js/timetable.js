@@ -1277,6 +1277,34 @@ export function defaultTimetableDay(store, now = new Date()) {
   return today;
 }
 
+// MARK: - Avanzamento della giornata
+
+/**
+ * A che punto è la giornata dell'orario (barra accanto al giorno in grande, come `DayProgress`
+ * nell'app): la parte già passata della durata complessiva degli eventi. Con 5 ore di lezione e
+ * un'ora e mezza passata, il 30%. Gli eventi sovrapposti contano una volta sola; negli spazi tra
+ * un evento e l'altro (intervalli, ore libere) l'avanzamento resta fermo. Come per il giorno
+ * predefinito contano gli eventi dell'utente, non gli intervalli.
+ *
+ * @param {{start: number, end: number}[]} spans gli eventi del giorno, senza intervalli.
+ * @param {number} minute il minuto attuale per oggi; per un giorno passato 24 × 60, per uno futuro 0.
+ * @returns `{ elapsed, total, percent, finished }` (minuti; percentuale per difetto, 100 solo a
+ *   giornata finita), oppure `null` se il giorno non ha eventi.
+ */
+export function dayProgress(spans, minute) {
+  const merged = [];
+  const sorted = spans.filter((s) => s.end > s.start).sort((a, b) => a.start - b.start || a.end - b.end);
+  for (const span of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
+    else merged.push({ start: span.start, end: span.end });
+  }
+  const total = merged.reduce((sum, b) => sum + b.end - b.start, 0);
+  if (total <= 0) return null;
+  const elapsed = merged.reduce((sum, b) => sum + Math.max(0, Math.min(b.end, minute) - b.start), 0);
+  return { elapsed, total, percent: Math.floor((elapsed * 100) / total), finished: elapsed >= total };
+}
+
 // MARK: - Contenuto di una giornata
 
 /**

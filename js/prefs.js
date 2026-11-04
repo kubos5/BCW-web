@@ -23,7 +23,10 @@ const defaults = {
   completedHomework: [],
   timetableMode: 'list',
   timetableShowsTests: false,
+  showsTimetableTab: true,
+  showsDayProgress: false,
   newsNotifications: [],
+  unsyncedCategories: [],
 };
 
 const APPEARANCE_KEYS = ['accentColor', 'colorStyle', 'contrast', 'corners', 'motion', 'roundedText'];
@@ -85,6 +88,27 @@ export class Preferences {
   get showUpcomingDays() { return this.values.showUpcomingDays; }
 
   get timetableShowsTests() { return this.values.timetableShowsTests; }
+  /** La scheda Orario nella barra di navigazione (Impostazioni › Orario). */
+  get showsTimetableTab() { return this.values.showsTimetableTab !== false; }
+  /** Barra di avanzamento della giornata accanto al giorno in grande dell'Orario (spenta di serie). */
+  get showsDayProgress() { return this.values.showsDayProgress === true; }
+
+  /**
+   * La voce si sincronizza con l'account BCW (Impostazioni › Account › Da sincronizzare,
+   * `SyncCategory` in `cloud.js`). La scelta vale solo per questo browser.
+   */
+  syncs(category) { return !this.unsyncedCategories.includes(category); }
+
+  get unsyncedCategories() {
+    const list = this.values.unsyncedCategories;
+    return Array.isArray(list) ? list : [];
+  }
+
+  setSyncs(category, enabled) {
+    const list = this.unsyncedCategories.filter((c) => c !== category);
+    if (!enabled) list.push(category);
+    this.set('unsyncedCategories', list.sort());
+  }
 
   /** Colori, angoli, animazioni e caratteri sono quelli di BCW (il tema chiaro/scuro non conta). */
   get isDefaultAppearance() {

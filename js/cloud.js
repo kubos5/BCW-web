@@ -5,6 +5,10 @@
 // e l'app vi accede come a quelli salvati nel browser. Impostazioni e orario sono documenti
 // con una versione: chi salva invia la versione da cui è partito e, se nel frattempo un altro
 // dispositivo ha salvato, riceve il documento attuale e unisce le modifiche.
+//
+// Le voci spente in Impostazioni › Account › Da sincronizzare (`SyncCategory`) restano fuori:
+// le loro impostazioni non partono e non arrivano (sul server restano i valori degli altri
+// dispositivi), l'orario non si carica né si scarica.
 
 import { BlobStore, fetchWithTimeout, loadConfig, normalizeProxyURL } from './api.js';
 import { TimetableStore } from './timetable.js';
@@ -146,8 +150,30 @@ export function accountFromServer(remote) {
 export const SYNCED_PREFERENCES = [
   'averageMode', 'weightedAverage', 'targetAverage', 'dashboardMode', 'hideCompletedHomework', 'showUpcomingDays',
   'completedHomework', 'collapsedSections', 'timetableMode', 'timetableShowsTests', 'titleAbbreviation',
+  'showsTimetableTab', 'showsDayProgress',
   'appearance', 'accentColor', 'colorStyle', 'contrast', 'corners', 'motion', 'roundedText',
 ];
+
+/**
+ * Cosa si sincronizza con l'account BCW (Impostazioni › Account › Da sincronizzare), scelto per
+ * questo browser (`Preferences.unsyncedCategories`). Come nell'app, senza "Icona dell'app": il
+ * web non ce l'ha, e le sue scelte restano sul server per gli altri dispositivi.
+ */
+export const SyncCategory = {
+  settings: { id: 'settings', title: 'Impostazioni', subtitle: 'Voti, Dashboard e Orario', icon: 'tune' },
+  appearance: { id: 'appearance', title: 'Aspetto', subtitle: 'Colori, tema chiaro o scuro, angoli, animazioni e testo', icon: 'palette' },
+  homework: { id: 'homework', title: 'Compiti fatti', subtitle: 'Compiti segnati come fatti', icon: 'checkCircle' },
+  timetable: { id: 'timetable', title: 'Orario', subtitle: 'Eventi, colori, note e file di ogni account abbinato', icon: 'timetable' },
+};
+
+const APPEARANCE_KEYS = new Set(['appearance', 'accentColor', 'colorStyle', 'contrast', 'corners', 'motion', 'roundedText']);
+
+/** La voce di un'impostazione sincronizzata; quelle nuove o sconosciute stanno in Impostazioni. */
+export function syncCategoryOf(key) {
+  if (APPEARANCE_KEYS.has(key)) return 'appearance';
+  if (key === 'completedHomework') return 'homework';
+  return 'settings';
+}
 
 const oneOf = (...allowed) => (v) => allowed.includes(v);
 const isBool = (v) => typeof v === 'boolean';
@@ -164,6 +190,8 @@ const validators = {
   collapsedSections: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   timetableMode: oneOf('list', 'day'),
   timetableShowsTests: isBool,
+  showsTimetableTab: isBool,
+  showsDayProgress: isBool,
   titleAbbreviation: oneOf('automatic', 'always', 'never'),
   appearance: oneOf('system', 'light', 'dark'),
   accentColor: (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v),
@@ -311,7 +339,15 @@ export class CloudSync {
 
   // MARK: Impostazioni
 
-  localSettings() { return pick(this.model.preferences.values, SYNCED_PREFERENCES); }
+  /** La chiave si sincronizza (la sua voce di "Da sincronizzare" è accesa). */
+  syncsKey(key) { return this.model.preferences.syncs(syncCategoryOf(key)); }
+
+  /** Le impostazioni sincronizzate, senza quelle delle voci spente. */
+  get syncedKeys() { return SYNCED_PREFERENCES.filter((key) => this.syncsKey(key)); }
+
+  get syncsTimetable() { return this.model.preferences.syncs('timetable'); }
+
+  localSettings() { return pick(this.model.preferences.values, this.syncedKeys); }
 
   settingsChanged() {
     if (!this.enabled || this.applying) return;
@@ -323,11 +359,36 @@ export class CloudSync {
   applySettings(values) {
     this.applying = true;
     try {
-      this.model.preferences.applyRemote(validSettings(pick(values, SYNCED_PREFERENCES)));
+      this.model.preferences.applyRemote(validSettings(pick(values, this.syncedKeys)));
     } finally {
       this.applying = false;
     }
     this.model.settingsApplied?.();
+  }
+
+  /**
+   * Una voce di "Da sincronizzare" è stata accesa o spenta. Spegnendo un gruppo di impostazioni
+   * le sue chiavi escono dall'ultima sincronizzazione, così riaccendendolo questo browser prende
+   * i valori dell'account BCW (come al primo accesso). Riaccendendo l'orario si allinea come
+   * sempre: vince il lato cambiato, e se sono cambiati entrambi questo browser.
+   */
+  categoryChanged(category, enabled) {
+    if (!this.enabled) return;
+    if (category === 'timetable') {
+      if (!enabled) return;
+      for (const account of this.model.accounts) this.pullTimetable(account.id);
+      return;
+    }
+    if (enabled) {
+      this.pullSettings();
+      return;
+    }
+    const st = this.state.settings;
+    if (!st.snapshot) return;
+    const snapshot = JSON.parse(st.snapshot);
+    for (const key of Object.keys(snapshot)) if (syncCategoryOf(key) === category) delete snapshot[key];
+    st.snapshot = JSON.stringify(snapshot);
+    this.saveState();
   }
 
   /**
@@ -339,8 +400,16 @@ export class CloudSync {
     const before = st.snapshot ? JSON.parse(st.snapshot) : null;
     let remote = fetchFirst ? await this.request('GET', '/sync/settings') : { data: st.remote, version: st.version };
     for (let attempt = 0; attempt < 3; attempt++) {
+      const keys = this.syncedKeys;
       const local = this.localSettings();
-      const changed = before ? SYNCED_PREFERENCES.filter((k) => !same(local[k], before[k])) : null;
+      // Una chiave che l'ultima sincronizzazione non conosceva (un'impostazione arrivata con un
+      // aggiornamento, o una voce di "Da sincronizzare" riaccesa) conta come cambiata solo se il
+      // server non ce l'ha: altrimenti il valore di questo browser cancellerebbe quello scelto su
+      // un altro dispositivo (come `CloudSync.syncSettings` nell'app).
+      const isChanged = (k) => (k in before
+        ? !same(local[k], before[k])
+        : local[k] !== undefined && remote.data?.[k] === undefined);
+      const changed = before ? keys.filter(isChanged) : null;
       let merged;
       if (!remote.version || !remote.data) {
         merged = { ...(remote.data ?? {}), ...local };
@@ -350,7 +419,7 @@ export class CloudSync {
         return;
       } else {
         merged = { ...remote.data, ...pick(local, changed) };
-        if (!same(pick(merged, SYNCED_PREFERENCES), local)) this.applySettings(merged);
+        if (!same(pick(merged, keys), local)) this.applySettings(merged);
         if (!changed.length) {
           this.finishSettings(remote.version, remote.data);
           return;
@@ -377,12 +446,12 @@ export class CloudSync {
   isCloudAccount(id) { return this.model.isCloud && this.model.accounts.some((a) => a.id === id); }
 
   timetableChanged(owner) {
-    if (!this.enabled || this.applying || !this.isCloudAccount(owner)) return;
+    if (!this.enabled || this.applying || !this.syncsTimetable || !this.isCloudAccount(owner)) return;
     this.schedule(`timetable:${owner}`, () => this.syncTimetable(owner, false), 2000);
   }
 
   pullTimetable(id) {
-    if (!this.isCloudAccount(id)) return Promise.resolve();
+    if (!this.syncsTimetable || !this.isCloudAccount(id)) return Promise.resolve();
     return this.run(`timetable:${id}`, () => this.syncTimetable(id, true));
   }
 
@@ -392,6 +461,7 @@ export class CloudSync {
    * un orario.
    */
   async syncTimetable(id, fetchFirst) {
+    if (!this.syncsTimetable || !this.isCloudAccount(id)) return;
     const st = this.state.timetables[id] ?? { version: 0, hash: null };
     const neverSynced = !st.version && st.hash == null;
     let remote = fetchFirst ? await this.request('GET', `/sync/timetable/${id}`) : { data: undefined, version: st.version };
