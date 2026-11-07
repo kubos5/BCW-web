@@ -83,12 +83,8 @@ export const dashboard = {
   },
 
   /** Nuovo tocco sulla scheda: in cima, poi a domani. */
+  /** Nuovo tocco sulla scheda, già in cima (`selectSection`): la giornata di domani. */
   reselect(ctx) {
-    const scroller = ctx.pageScroller();
-    if (scroller && scroller.scrollTop > 2) {
-      scroller.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
     select(ctx, addDays(new Date(), 1));
   },
 

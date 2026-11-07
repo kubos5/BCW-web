@@ -22,6 +22,19 @@
       var meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.content = dark ? theme.dark : theme.light;
     }
+    // Prima apertura (stessa regola di `isFirstRun` in js/onboarding.js): BCW parte in bianco e
+    // nero, e i colori arrivano scegliendoli nell'introduzione.
+    if (localStorage.getItem('bcw.onboardingCompleted') !== '1') {
+      var accounts = JSON.parse(localStorage.getItem('bcw.accounts') || '[]');
+      var firstRun = !(accounts && accounts.length) && !localStorage.getItem('bcw.cloud.session')
+        && !JSON.parse(localStorage.getItem('bcw.demoMode') || 'null');
+      if (firstRun) {
+        html.setAttribute('data-mono', '');
+        var mono = document.querySelector('meta[name="theme-color"]');
+        var monoDark = prefs.appearance === 'dark' || (prefs.appearance !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        if (mono) mono.content = monoDark ? '#0b0b0b' : '#fbfbfb';
+      }
+    }
     // Favicon nel colore del marchio del tema scelto (lo aggiorna poi js/theme.js).
     var brand = getComputedStyle(html).getPropertyValue('--brand').trim();
     var icon = document.querySelector('link[rel="icon"][type="image/svg+xml"]');

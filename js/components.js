@@ -467,16 +467,14 @@ export function axisPage(name, dir, key, content, { cls = '' } = {}) {
 /**
  * Il giorno in grande (Dashboard e Orario): "Domani" o il giorno della settimana, la data sotto,
  * a destra il pulsante per tornare al giorno predefinito (`jump`: `{ title, action, help, label }`)
- * e sotto i chip di stato. `progress` va a destra del nome del giorno (l'avanzamento della
- * giornata nell'Orario). Il nome che non ci sta si rimpicciolisce (`fitDayTitles` in `app.js`).
+ * e sotto i chip di stato. Il nome che non ci sta si rimpicciolisce (`fitDayTitles` in `app.js`).
  */
-export function dayHero(day, { jump = null, chips = [], progress = '' } = {}) {
+export function dayHero(day, { jump = null, chips = [] } = {}) {
   const relative = isTodayLike(day);
   const title = relative ? fmt.relativeDayName(day) : fmt.weekdayLong(day);
   const subtitle = relative ? fmt.longDay(day) : fmt.dayMonthYear(day);
   const button = jump ? `<button class="btn s tonal day-jump" data-action="${jump.action}" title="${esc(jump.help ?? jump.title)}"${jump.label ? ` aria-label="${esc(jump.label)}"` : ''}>${icon('today')}<span>${esc(jump.title)}</span></button>` : '';
-  const heading = progress ? `<div class="day-hero-title"><h2>${esc(title)}</h2>${progress}</div>` : `<h2>${esc(title)}</h2>`;
-  return `<div class="day-hero"><div class="day-hero-row"><div class="day-hero-text">${heading}<p>${esc(subtitle)}</p></div>${button}</div>
+  return `<div class="day-hero"><div class="day-hero-row"><div class="day-hero-text"><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></div>${button}</div>
     ${chips.length ? `<div class="chip-flow">${chips.join('')}</div>` : ''}</div>`;
 }
 

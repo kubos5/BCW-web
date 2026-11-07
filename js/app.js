@@ -21,6 +21,7 @@ import { shape } from './shapes.js';
 import { logo } from './logo.js';
 import { routes, sections, sectionGroups, commonActions, sectionBadge } from './views/index.js';
 import { renderLogin, loginActions } from './views/login.js';
+import { isFirstRun, newOnboarding, renderOnboarding, animateMorphShapes, onboardingActions } from './onboarding.js';
 
 // MARK: - Stato
 
@@ -200,6 +201,21 @@ function restoreScroll() {
   }
 }
 
+/**
+ * Stato di una pagina aperta sopra un'altra (`ctx.pageState`), come lo `@State` di una pagina
+ * nell'app: si cancella quando la pagina esce dalla pila (indietro, nuovo tocco sulla scheda,
+ * indirizzo cambiato), così ad esempio i voti ipotetici di una materia spariscono uscendo.
+ */
+const pageStateKey = (path, name) => `page:${path}|${name}`;
+
+function forgetPages(paths) {
+  const prefixes = paths.filter(Boolean).map((path) => `page:${path}|`);
+  if (!prefixes.length) return;
+  for (const key of [...app.viewState.keys()]) {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) app.viewState.delete(key);
+  }
+}
+
 export function navigate(path) {
   saveScroll();
   const key = app.nav.current;
@@ -245,19 +261,30 @@ export function selectSection(key) {
     app.nav.lastSection = key;
   }
   if (app.nav.current === key) {
-    const stack = app.nav.stacks[key];
-    if (stack && stack.length > 1) {
-      // Toccando di nuovo la scheda attiva si torna alla sua pagina principale…
+    // Nuovo tocco sulla scheda aperta (3.3, come nell'app): il primo porta in cima la pagina in
+    // vista, anche una aperta dentro la scheda; il successivo, già in cima, torna alla pagina
+    // principale e poi fa l'azione della scheda (Dashboard: domani; Orario: il giorno con il
+    // prossimo evento; Voti: la media dell'anno). Una pagina può saltare il primo passo
+    // (`reselectSkipsTop`: la vista Giorno dell'Orario parte già scorsa alla prima ora).
+    const stack = app.nav.stacks[key] ?? [key];
+    const view = routes[parsePath(currentPath()).name];
+    const ctx = makeContext();
+    const scroller = root.querySelector('.page.active .page-scroll, .page.active .split-main');
+    const skipsTop = stack.length === 1 && view?.reselectSkipsTop?.(ctx);
+    if (scroller && scroller.scrollTop > 2 && !skipsTop) {
+      scroller.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (stack.length > 1) {
+      forgetPages(stack.slice(1));
       app.nav.stacks[key] = [key];
-    } else {
-      // …e, se ci si è già, la pagina decide (in cima, oggi, domani…).
-      const view = routes[key];
-      const ctx = makeContext();
-      if (view?.reselect) view.reselect(ctx);
-      else scrollToTop();
+      syncHash();
       app.update();
       return;
     }
+    if (view?.reselect) view.reselect(ctx);
+    app.update();
+    return;
   }
   app.nav.current = key;
   app.nav.stacks[key] ??= [key];
@@ -270,7 +297,7 @@ export function back() {
   const stack = app.nav.stacks[app.nav.current];
   if (!stack || stack.length < 2) return;
   saveScroll();
-  stack.pop();
+  forgetPages([stack.pop()]);
   syncHash(true);
   app.update();
 }
@@ -281,6 +308,8 @@ function resetNavigation(path) {
     path = 'dashboard';
   }
   const key = stackKeyFor(path);
+  // La pagina che resta aperta (es. passando da schermo stretto a largo) tiene il suo stato.
+  forgetPages(Object.values(app.nav.stacks).flatMap((stack) => stack.slice(1)).filter((p) => p !== path));
   app.nav.current = key;
   app.nav.stacks = { [key]: path === key ? [key] : [key, path] };
 }
@@ -289,8 +318,12 @@ window.addEventListener('popstate', () => {
   const path = parsePath(location.hash).path;
   const stack = app.nav.stacks[app.nav.current];
   const index = stack?.lastIndexOf(path) ?? -1;
-  if (index >= 0) stack.length = index + 1;
-  else resetNavigation(path);
+  if (index >= 0) {
+    forgetPages(stack.slice(index + 1));
+    stack.length = index + 1;
+  } else {
+    resetNavigation(path);
+  }
   app.update();
 });
 
@@ -313,6 +346,12 @@ function makeContext() {
     state(key, init) {
       if (!app.viewState.has(key)) app.viewState.set(key, typeof init === 'function' ? init() : { ...init });
       return app.viewState.get(key);
+    },
+    /** Stato della pagina aperta, cancellato quando la pagina esce dalla pila (`forgetPages`). */
+    pageState(name, init) {
+      const key = pageStateKey(route.path, name);
+      if (!app.viewState.has(key)) app.viewState.set(key, typeof init === 'function' ? init() : { ...init });
+      return { key, state: app.viewState.get(key) };
     },
     /** Esegue un'operazione asincrona una sola volta per chiave (come `.task(id:)`). */
     task(key, fn) {
@@ -340,6 +379,7 @@ function makeContext() {
     afterRender: (fn) => app.afterRender.push(fn),
     /** Scorre un'area senza colorare la barra superiore (scorrimenti fatti dall'app). */
     scrollQuietly,
+    revealTheme,
     toast: showToast,
   };
 }
@@ -437,6 +477,9 @@ function render() {
   }
   let html;
   if (model.phase === 'launching') html = '<div class="launch"></div>';
+  // L'introduzione copre tutto (sotto non serve disegnare accesso o app: la fine li mostra con il
+  // cerchio dei colori); fogli e dialoghi le stanno sopra.
+  else if (app.onboarding) html = renderOnboarding(makeContext());
   else if (model.phase === 'signedOut') html = renderSignedOut();
   else {
     leaveHiddenTimetable();
@@ -447,13 +490,18 @@ function render() {
   const known = new Set(root.querySelectorAll(`${SLIDE_CONTAINERS}, ${STATE_POPS}, ${DAY_JUMP}, ${PAGE_FIXED}, .page`));
   const jumpDays = new Set([...root.querySelectorAll(DAY_JUMP)].map((jump) => jump.closest('[data-axis]')));
   const scrolls = captureScrolls();
+  const navTabs = captureNavTabs();
+  const flips = captureFlips();
   morph(root, html);
+  animateNavTabs(navTabs);
   animateAxisExits(leaving);
   settleNewSlides(known, jumpDays);
   swapReusedScrolls(scrolls);
   restoreScroll();
   drawCharts(root);
   fitDayTitles();
+  fitLoginTitles();
+  animateMorphShapes(root);
   positionMenu();
   const pending = app.afterRender.splice(0);
   for (const fn of pending) {
@@ -461,6 +509,111 @@ function render() {
   }
   updateBarState();
   fitKeyboard();
+  playFlips(flips);
+}
+
+// MARK: Cerchio dei colori
+
+/**
+ * Cambio di colori con un cerchio che si allarga da `point` (come `ThemeReveal` nell'app): con le
+ * View Transitions il browser tiene una fotografia della pagina di prima, `changes` cambia colori
+ * e contenuto sotto, e la pagina nuova compare in un cerchio che cresce fino all'angolo più
+ * lontano (curva "emphasized" di Material 3, 1,15 s). Intanto i tocchi si fermano sulla
+ * fotografia. Con le animazioni ridotte è una dissolvenza; senza View Transitions cambia e basta.
+ */
+let revealing = false;
+
+async function revealTheme(point, changes) {
+  const html = document.documentElement;
+  let applied = false;
+  const apply = async () => {
+    if (applied) return;
+    applied = true;
+    await changes();
+    applyTheme();
+    render();
+  };
+  if (revealing || typeof document.startViewTransition !== 'function') {
+    await apply();
+    return;
+  }
+  revealing = true;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches || html.dataset.motion === 'reduced';
+  const x = point?.x ?? window.innerWidth / 2;
+  const y = point?.y ?? window.innerHeight / 2;
+  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y)) + 8;
+  html.classList.add('theme-reveal');
+  html.classList.toggle('reduced-reveal', reduced);
+  try {
+    const transition = document.startViewTransition(apply);
+    if (!reduced) {
+      transition.ready.then(() => html.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 1150, easing: 'cubic-bezier(.42, 0, .18, 1)', pseudoElement: '::view-transition-new(root)' },
+      )).catch(() => {});
+    }
+    await transition.finished;
+  } catch {
+    await apply();
+  } finally {
+    html.classList.remove('theme-reveal', 'reduced-reveal');
+    revealing = false;
+  }
+}
+
+// MARK: Spostamenti con la molla
+
+/**
+ * Elementi che cambiano posto tra un disegno e l'altro (`data-flip="id"`), animati con la tecnica
+ * FLIP: dopo il morph ognuno parte da dove era e arriva al suo posto con la molla, come le viste di
+ * SwiftUI che cambiano disposizione. `data-flip-mode="scale"` anima anche la misura (la scritta
+ * del logo che si rimpicciolisce), `move` solo la posizione; un elemento `move` che va a capo
+ * prima o dopo (`wraps`) invece di scorrere sparisce e ricompare a movimento quasi finito, come
+ * la dissolvenza in sequenza di Material 3. Con le animazioni ridotte cambiano e basta.
+ */
+function captureFlips() {
+  const flips = new Map();
+  for (const el of root.querySelectorAll('[data-flip]')) {
+    flips.set(el.dataset.flip, { rect: el.getBoundingClientRect(), wraps: el.classList.contains('wraps') });
+  }
+  return flips;
+}
+
+function playFlips(before) {
+  if (!before.size) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'reduced') return;
+  const style = getComputedStyle(document.documentElement);
+  const timing = { duration: parseFloat(style.getPropertyValue('--spring-dur')) || 435, easing: style.getPropertyValue('--spring').trim() || 'ease-out' };
+  for (const el of root.querySelectorAll('[data-flip]')) {
+    const old = before.get(el.dataset.flip);
+    if (!old || !old.rect.width) continue;
+    const now = el.getBoundingClientRect();
+    if (!now.width) continue;
+    const dx = old.rect.left - now.left;
+    const dy = old.rect.top - now.top;
+    const scale = el.dataset.flipMode === 'scale' ? old.rect.width / now.width : 1;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(scale - 1) < 0.01) continue;
+    if (el.dataset.flipMode === 'move' && (old.wraps || el.classList.contains('wraps'))) {
+      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 230, delay: 220, easing: style.getPropertyValue('--effects').trim() || 'ease-out', fill: 'backwards' });
+      continue;
+    }
+    el.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, transformOrigin: '0 0' },
+      { transform: 'none', transformOrigin: '0 0' },
+    ], timing);
+  }
+}
+
+/**
+ * Il titolo dell'accesso che non sta su una riga va a capo (al massimo tre): sotto il logo
+ * centrato, accanto al logo piccolo allineato a sinistra e centrato sul logo (`wraps`). Il morph
+ * toglie la classe, quindi si rimisura a ogni disegno.
+ */
+function fitLoginTitles() {
+  for (const title of root.querySelectorAll('.login-header .logo-subtitle')) {
+    const line = parseFloat(getComputedStyle(title).lineHeight) || 22;
+    title.classList.toggle('wraps', title.getBoundingClientRect().height > line * 1.5);
+  }
 }
 
 // MARK: Transizione ad asse condiviso
@@ -543,8 +696,8 @@ function settleNewSlides(known, jumpDays) {
 
 /**
  * Il giorno in grande (Dashboard, Orario) che non ci sta si rimpicciolisce fino al 70%, come
- * `minimumScaleFactor(0.7)` nell'app, invece di finire subito con i puntini: accanto ci sono il
- * pulsante del giorno predefinito e, nell'Orario, l'avanzamento della giornata. Il morph toglie la
+ * `minimumScaleFactor(0.7)` nell'app, invece di finire subito con i puntini: accanto c'è il
+ * pulsante del giorno predefinito. Il morph toglie la
  * dimensione scritta qui, quindi si rimisura a ogni disegno (prima che la pagina si veda).
  */
 function fitDayTitles() {
@@ -722,6 +875,7 @@ function renderMobile(ctx, page) {
 function renderNavBar() {
   const current = app.nav.current;
   const badge = model.unreadNoticesCount;
+  if (!app.medium) return floatingNavBar(current, badge);
   const item = (key, label, badgeCount = 0) => {
     const s = sections[key];
     const selected = current === key;
@@ -732,6 +886,59 @@ function renderNavBar() {
   // nascondere (Impostazioni › Orario).
   const timetable = model.preferences.showsTimetableTab ? item('timetable', 'Orario') : '';
   return `<nav class="nav-bar" aria-label="Schede">${item('dashboard', 'Dashboard')}${timetable}${item('grades', 'Voti')}${item('you', 'Tu', badge)}</nav>`;
+}
+
+/**
+ * Telefoni (3.3, come nell'app): barra di navigazione flottante di Material 3 Expressive, una
+ * pillola sospesa sul contenuto con i nomi delle schede. Quella aperta è una pillola piena nel
+ * colore primario con l'icona, che scivola da una scheda all'altra con la molla (`animateNavTabs`).
+ * Il badge di Tu sta accanto al nome e si sposta con la scheda.
+ */
+function floatingNavBar(current, badge) {
+  const item = (key, label, badgeCount = 0) => {
+    const s = sections[key];
+    const selected = current === key;
+    return `<button class="nav-tab ${selected ? 'selected' : ''}" data-key="tab-${key}" data-action="select-section" data-key-name="${key}" ${key === 'you' ? 'data-longpress="account-switcher"' : ''} aria-label="${label}${badgeCount ? `, ${badgeCount} da leggere` : ''}" aria-current="${selected ? 'page' : 'false'}">
+      ${selected ? `<span class="nav-pill" data-key="pill" aria-hidden="true"></span><span class="nav-tab-icon" data-key="icon">${icon(s.iconSelected ?? s.icon)}</span>` : ''}<span class="nav-label" data-key="label">${label}</span>${badgeCount ? `<span class="badge" data-key="badge">${badgeCount}</span>` : ''}</button>`;
+  };
+  const timetable = model.preferences.showsTimetableTab ? item('timetable', 'Orario') : '';
+  return `<nav class="nav-bar floating" aria-label="Schede">${item('dashboard', 'Dashboard')}${timetable}${item('grades', 'Voti')}${item('you', 'Tu', badge)}</nav>`;
+}
+
+/** Posizione delle schede della barra flottante prima di un disegno. */
+function captureNavTabs() {
+  const bar = root.querySelector('.nav-bar.floating');
+  if (!bar) return null;
+  const tabs = new Map([...bar.querySelectorAll('.nav-tab')].map((tab) => [tab.dataset.keyName, tab.getBoundingClientRect()]));
+  return { selected: bar.querySelector('.nav-tab.selected')?.dataset.keyName ?? null, tabs };
+}
+
+/**
+ * Cambiando scheda la pillola scivola dalla scheda di prima a quella nuova allargandosi, e le
+ * altre schede scorrono al loro posto (FLIP con la molla, come `matchedGeometryEffect` nell'app).
+ * Con le animazioni ridotte cambia e basta.
+ */
+function animateNavTabs(before) {
+  const bar = root.querySelector('.nav-bar.floating');
+  const selected = bar?.querySelector('.nav-tab.selected');
+  if (!before || !selected || before.selected == null || before.selected === selected.dataset.keyName) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'reduced') return;
+  const style = getComputedStyle(document.documentElement);
+  const timing = { duration: parseFloat(style.getPropertyValue('--spring-dur')) || 435, easing: style.getPropertyValue('--spring').trim() || 'ease-out' };
+  for (const tab of bar.querySelectorAll('.nav-tab')) {
+    const old = before.tabs.get(tab.dataset.keyName);
+    if (!old) continue;
+    const dx = old.left - tab.getBoundingClientRect().left;
+    if (Math.abs(dx) > 0.5) tab.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], timing);
+  }
+  const from = before.tabs.get(before.selected);
+  const itemBefore = before.tabs.get(selected.dataset.keyName);
+  const pill = selected.querySelector('.nav-pill');
+  if (!from || !itemBefore || !pill) return;
+  pill.animate([
+    { left: `${from.left - itemBefore.left}px`, width: `${from.width}px` },
+    { left: '0px', width: `${selected.getBoundingClientRect().width}px` },
+  ], timing);
 }
 
 // MARK: Schermi larghi
@@ -890,7 +1097,8 @@ function applyTheme() {
 function applyThemeColor() {
   const mode = model.preferences.get('appearance');
   const dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  const color = Theme.surface(dark);
+  // In bianco e nero (introduzione) la barra del browser segue la superficie grigia.
+  const color = document.documentElement.hasAttribute('data-mono') ? (dark ? '#0b0b0b' : '#fbfbfb') : Theme.surface(dark);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta && meta.content !== color) meta.content = color;
   Theme.updateFavicon();
@@ -1044,7 +1252,7 @@ function accountMenuItems(ctx) {
   return items;
 }
 
-const allActions = { ...shellActions, ...viewerActions(app), ...datePickerActions(app), ...commonActions, ...loginActions };
+const allActions = { ...shellActions, ...viewerActions(app), ...datePickerActions(app), ...commonActions, ...loginActions, ...onboardingActions };
 for (const view of Object.values(routes)) Object.assign(allActions, view.actions ?? {});
 
 function dispatch(name, el, event) {
@@ -1387,7 +1595,7 @@ document.addEventListener('keydown', (event) => {
     app.update();
     return;
   }
-  if (model.phase !== 'signedIn' || Lock.isLocked || app.sheet || app.dialog || app.datePicker) return;
+  if (model.phase !== 'signedIn' || Lock.isLocked || app.sheet || app.dialog || app.datePicker || app.onboarding) return;
   const typing = event.target.closest?.('input, textarea, select');
   if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.code === 'KeyF') {
     // Ctrl+F (⌘F): mette il cursore nel campo di ricerca.
@@ -1475,6 +1683,10 @@ async function start() {
   resetNavigation(initial ?? (app.wide && saved && sections[saved] ? saved : 'dashboard'));
   syncHash(true);
   model.bootstrap();
+  // Prima apertura: l'introduzione, in bianco e nero finché non si sceglie un colore (il bianco e
+  // nero l'ha già messo `js/theme-boot.js`, prima del primo disegno).
+  if (isFirstRun()) app.onboarding = newOnboarding();
+  else document.documentElement.removeAttribute('data-mono');
   if (model.preferences.get('useLock') && model.phase === 'signedIn') Lock.lock();
   Reminders.start();
   render();

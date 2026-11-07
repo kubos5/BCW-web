@@ -20,7 +20,7 @@ import { esc, fmt, GradeFormat, sentenceCased, nameCased, startOfDay } from '../
 import { proxySheet } from './login.js';
 import { BCWServer, SyncCategory } from '../cloud.js';
 
-export const VERSION = '3.2.1';
+export const VERSION = '3.3';
 
 // MARK: - Mattoni del modulo
 
@@ -83,8 +83,8 @@ function accentPicker(ctx) {
     ${accent !== DEFAULT_ACCENT ? `<button class="btn xs text" data-action="pref-accent" data-value="${DEFAULT_ACCENT}">${icon('refresh')}<span>Colore di BCW</span></button>` : ''}</div></div>`;
 }
 
-/** Piccola anteprima dei componenti con i colori e le forme scelti. */
-function themePreview() {
+/** Piccola anteprima dei componenti con i colori e le forme scelti (anche nell'introduzione). */
+export function themePreview() {
   return `<div class="list-item theme-preview" aria-hidden="true">
     <span class="tp-shape shaped">${shape('cookie9Sided')}<span>${icon('palette')}</span></span>
     <span class="tp-body"><strong>Anteprima</strong><small>Pulsanti, schede e forme</small>
@@ -144,8 +144,27 @@ function aboutSection(ctx) {
   });
 }
 
+/** Rivedere l'introduzione (3.3, come nell'app). */
+function onboardingSection() {
+  return section([buttonRow("Rivedi l'introduzione", 'ob-replay', 'sparkles')]);
+}
+
+/** Il codice di BCW su GitHub e il profilo dell'autore (3.3, come nell'app). */
+function githubSection() {
+  const items = [
+    ['BCW', "L'app per iPhone e iPad (repository principale)", 'github', 'https://github.com/kubos5/BCW/'],
+    ['BCW-web', 'La versione web', 'globe', 'https://github.com/kubos5/BCW-web/'],
+    ['BCW-api', 'Il server degli account BCW', 'server', 'https://github.com/kubos5/BCW-api/'],
+    ['kubos5', "Il profilo dell'autore su GitHub", 'person', 'https://github.com/kubos5/'],
+  ];
+  return section(items.map(([title, subtitle, iconName, href]) => listItem({
+    title, subtitle, href, leading: `<span class="form-icon">${icon(iconName)}</span>`, trailing: icon('externalLink', { cls: 'small trailing-icon' }),
+    attrs: ' title="Apre GitHub in una nuova scheda"',
+  })), { header: 'Su GitHub' });
+}
+
 function generalPane(ctx) {
-  return securitySection(ctx) + dataSection() + serverSection() + aboutSection(ctx);
+  return securitySection(ctx) + dataSection() + serverSection() + aboutSection(ctx) + onboardingSection() + githubSection();
 }
 
 function gradesPane(ctx) {
@@ -181,10 +200,14 @@ function timetablePane(ctx) {
   }) + section([
     row('Allineamento', select(Object.values(Alignment).map((a) => [a.id, a.shortTitle]), store.alignment, 'tt-alignment', { label: 'Allineamento' }), { iconName: Alignment[store.alignment].icon }),
     toggleRow('Mostra le verifiche nella lista', p.timetableShowsTests, 'pref-tt-tests', { iconName: 'test' }),
-    toggleRow('Barra di avanzamento della giornata', p.showsDayProgress, 'pref-tt-progress', { iconName: 'timeline', subtitle: 'Accanto al giorno in grande, nella vista Lista' }),
   ], {
     header: 'Vista e allineamento',
-    footer: 'Con "Mostra le verifiche" la vista Lista segna le verifiche di Classeviva e quelle segnate a mano; si vedono sempre nel dettaglio dell\'evento e nella vista Giorno. Quelle nascoste, e le regole per nasconderle in automatico, sono in Verifiche nascoste (menu dell\'orario). L\'allineamento vale per tutto l\'orario e per la modalità di modifica (pulsante + dell\'orario › Modifica orario). Automatico: gli eventi iniziano all\'ora o alla mezz\'ora e durano 30 minuti o un\'ora; passando all\'automatico gli eventi non allineati vengono allineati, dopo una conferma. Libero: qualsiasi orario e durata. Gli intervalli si posizionano sempre liberamente.',
+    footer: 'Di serie la vista Lista segna le verifiche di Classeviva e quelle segnate a mano; spegnendo "Mostra le verifiche" restano nel dettaglio dell\'evento e nella vista Giorno. Quelle nascoste, e le regole per nasconderle in automatico, sono in Verifiche nascoste (menu dell\'orario). L\'allineamento vale per tutto l\'orario e per la modalità di modifica (pulsante + dell\'orario › Modifica orario). Automatico: gli eventi iniziano all\'ora o alla mezz\'ora e durano 30 minuti o un\'ora; passando all\'automatico gli eventi non allineati vengono allineati, dopo una conferma. Libero: qualsiasi orario e durata. Gli intervalli si posizionano sempre liberamente.',
+  }) + section([
+    toggleRow("Card dell'evento in corso", p.timetableShowsNowCard, 'pref-tt-now-card', { iconName: 'schedule', subtitle: "In cima all'orario di oggi" }),
+  ], {
+    header: 'Oggi',
+    footer: "La card in cima all'orario di oggi mostra l'evento in corso con il tempo che manca, o il prossimo. Nell'app per iPhone ha anche il pulsante per avviare o fermare l'attività in diretta, che senza la card si avvia comunque da sola.",
   }) + section([
     buttonRow("Esporta un backup dell'orario", 'tt-export', 'upload', { disabled: !hasOwner }),
     buttonRow('Importa un backup…', 'tt-import', 'download', { disabled: !hasOwner }),
@@ -463,7 +486,7 @@ export const settings = {
     'appearance-reset': (ctx) => ctx.prefs.resetAppearance(),
     'pref-tt-tests': (ctx, el) => ctx.prefs.set('timetableShowsTests', el.checked),
     'pref-tt-tab': (ctx, el) => ctx.prefs.set('showsTimetableTab', el.checked),
-    'pref-tt-progress': (ctx, el) => ctx.prefs.set('showsDayProgress', el.checked),
+    'pref-tt-now-card': (ctx, el) => ctx.prefs.set('timetableShowsNowCard', el.checked),
     'pref-sync-category': (ctx, el) => {
       const category = el.dataset.kind;
       if (!SyncCategory[category] || ctx.prefs.syncs(category) === el.checked) return;
@@ -826,12 +849,18 @@ function pinSheet() {
 
 // MARK: - Account
 
-/** Popup degli account (dal pulsante in Tu o tenendo premuta la scheda Tu). */
+/** Popup degli account (dall'avatar della Dashboard, dal pulsante in Tu o tenendo premuta la scheda Tu). */
 export function accountSwitcherSheet() {
   return {
     id: 'account-switcher',
     closesOnSessionChange: true,
-    render: (ctx) => ({ title: 'Account', size: 'medium', body: `<div class="form sheet-form">${accountsSection(ctx, { showsHeader: false })}</div>` }),
+    // Con l'account BCW anche l'uscita (3.3, come nell'app), con la conferma di Impostazioni › Account.
+    render: (ctx) => ({
+      title: 'Account', size: 'medium',
+      body: `<div class="form sheet-form">${accountsSection(ctx, { showsHeader: false })}${ctx.model.isCloud ? section([
+        buttonRow('Esci da BCW', 'cloud-sign-out', 'logout', { destructive: true }),
+      ], { footer: `Hai effettuato l'accesso con l'account BCW ${ctx.model.cloudUser?.username ?? ''}.` }) : ''}</div>`,
+    }),
   };
 }
 

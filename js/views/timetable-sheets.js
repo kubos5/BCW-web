@@ -3,16 +3,16 @@
 // lezioni registrate e verifiche nascoste con le regole per nasconderle in automatico.
 
 import {
-  emptyState, select, segmented, stepper, toggle, pill, listGroup, listItem, button, iconButton, loadingIndicator,
+  emptyState, select, segmented, stepper, toggle, pill, listGroup, listItem, button, iconButton, loadingIndicator, collapsible, chevron,
 } from '../components.js';
 import { icon } from '../icons.js';
 import { data } from '../dom.js';
 import { esc, fmt, isToday, isTomorrow, startOfDay, addDays } from '../util.js';
 import {
-  PASTEL_ID, TimeOfDay, Weekday, alignedPieces, builtInPalettes, cloneEntry, colorDescription, defaultColor,
+  PASTEL_ID, TimeOfDay, Weekday, builtInPalettes, cloneEntry, colorDescription, defaultColor,
   displayTitle, duration, dynamicHex, entryColor, generateEntries, generationRange, hexString, isAutoAligned, isBreak,
   isBuiltInPalette, makeEntry, matchKey, newID, normalized, order, paletteColor, paletteSamples, parseHex, rulesCount,
-  emptyRules, seriesPositions, subjectTint, timeRange, matchTests, fileExtension,
+  emptyRules, seriesPositions, subjectTint, timeRange, matchTests, fileExtension, LiveActivityChoice, shiftedEntry,
 } from '../timetable.js';
 import { registerTestRow } from './timetable.js';
 
@@ -332,6 +332,10 @@ function renderEditor(ctx, id) {
   details.push(listGroup([`<button class="list-item color-row" data-action="tt-ed-color" data-sheet="${id}"><span class="form-icon">${icon('palette')}</span><span class="li-text"><strong>Colore</strong></span>
     <span class="trailing">${esc(colorDescription(d.color, store))}</span><span class="swatch-dot" style="background:${entryColor(d, store)}"></span>${icon('chevronRight', { cls: 'trailing-icon' })}</button>`]));
   details.push(field('Nota per ogni settimana', `<textarea class="text-input" rows="2" data-input="tt-ed-field" data-sheet="${id}" data-field="note">${esc(d.note)}</textarea>`));
+  // Attività in diretta dell'app per iPhone (3.3): segue l'impostazione del telefono, sempre o mai.
+  // Una voce con il menu, come nell'app ("Segui default" in un gruppo a tre veniva troncato).
+  details.push(listGroup([formRow('Attività in diretta', select([['default', 'Segui default'], ...Object.values(LiveActivityChoice).map((c) => [c.id, c.title])],
+    d.liveActivity ?? 'default', 'tt-ed-live', { label: 'Attività in diretta', params: { sheet: id } }), { iconName: 'lockClock' })], { footer: liveActivityFooter(d) }));
 
   const body = `<div class="sheet-pad stack gap-20 editor">
     <div class="stack gap-12">${kind}${titleField}</div>
@@ -340,6 +344,23 @@ function renderEditor(ctx, id) {
     ${s.isNew ? '' : `<button class="btn tonal danger-text wide" data-action="tt-ed-delete" data-sheet="${id}">${icon('trash')}<span>Elimina evento</span></button>`}
   </div>`;
   return { title, size: 'large', trailing, body };
+}
+
+/** Cosa fa la scelta dell'attività in diretta, nell'app per iPhone (il web non ce l'ha). */
+function liveActivityFooter(d) {
+  const what = isBreak(d) ? "l'intervallo" : "l'evento";
+  switch (d.liveActivity) {
+    case 'show':
+      return isBreak(d)
+        ? "Nell'app per iPhone l'intervallo compare nell'attività in diretta anche con l'avvio automatico spento."
+        : "Nell'app per iPhone l'attività in diretta segue questo evento anche con l'avvio automatico spento: parte mezz'ora prima.";
+    case 'hide':
+      return isBreak(d)
+        ? "Nell'app per iPhone l'attività in diretta salta l'intervallo: al suo posto resta la lezione o il tempo che manca alla successiva."
+        : "Nell'app per iPhone l'attività in diretta salta questo evento: se è tra altri eventi, al suo posto mostra il tempo che manca al successivo.";
+    default:
+      return `Come in Impostazioni › Orario › Attività in diretta dell'app per iPhone: con l'avvio automatico ${what} compare nella schermata di blocco e nella Dynamic Island.`;
+  }
 }
 
 function saveEditor(ctx, id) {
@@ -360,11 +381,12 @@ function saveEditor(ctx, id) {
     const others = store.sameNameEntries(s.original);
     const o = s.original;
     const differs = o.title !== d.title || o.subjectId !== d.subjectId || o.teacher !== d.teacher || o.room !== d.room || o.note !== d.note ||
+      (o.liveActivity ?? null) !== (d.liveActivity ?? null) ||
       (JSON.stringify(o.color) !== JSON.stringify(d.color) && d.color?.type !== 'series');
     if (others.length && differs) {
       ctx.confirm({
         title: `Applicare le modifiche anche agli altri eventi «${displayTitle(o)}»?`,
-        message: 'Nome, materia, docente, aula, colore e nota verranno aggiornati in tutti gli eventi con lo stesso nome. Orari, giorni e colori delle palette applicate a una giornata restano invariati.',
+        message: 'Nome, materia, docente, aula, colore, nota e attività in diretta verranno aggiornati in tutti gli eventi con lo stesso nome. Orari, giorni e colori delle palette applicate a una giornata restano invariati.',
         actions: [
           { label: `Applica a tutti (${others.length + 1})`, run: () => commit(true) },
           { label: 'Solo a questo evento', run: () => commit(false) },
@@ -512,6 +534,122 @@ function renderSeries(ctx, id) {
   return { title: 'Colora una giornata', size: 'large', trailing, body, footer };
 }
 
+// MARK: - Sposta gli orari
+
+/**
+ * Sposta più eventi insieme di un numero di minuti (Modifica orario › Sposta gli orari, 3.3, come
+ * `TimetableShiftSheet` nell'app): un valore per tutti i giorni e uno per ogni giorno; aprendo un
+ * giorno si scelgono gli eventi da spostare, con l'orario nuovo accanto. Gli intervalli si possono
+ * lasciare dove sono. La durata non cambia e gli eventi restano nella giornata. Con l'allineamento
+ * automatico, se una lezione non cadrebbe più su un'ora o una mezz'ora, un avviso dice che
+ * l'orario passa all'allineamento libero.
+ */
+export function shiftSheet(ctx, startWeekday) {
+  const id = nextID('tt-shift');
+  const store = ctx.model.timetable;
+  sheetState(ctx, id, () => ({
+    // Il valore in cima vale per tutti i giorni; `minutes` ha solo i giorni cambiati a mano.
+    common: 5, minutes: {}, excluded: new Set(), includesBreaks: true,
+    // Il giorno che si stava modificando è aperto: si vedono subito i nuovi orari.
+    expanded: new Set(shiftWeekdays(store).includes(startWeekday) ? [startWeekday] : []),
+  }));
+  return { id, onClose: () => forget(ctx, id), render: (c) => renderShift(c, id) };
+}
+
+const SHIFT_LIMIT = 720;
+const shiftWeekdays = (store) => [1, 2, 3, 4, 5, 6, 7].filter((w) => store.entries(w, false).length);
+const shiftSelectable = (s, e) => s.includesBreaks || !isBreak(e);
+const signedMinutes = (v) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : '0');
+
+/** Gli eventi che si spostano, con i loro minuti. */
+function shiftMoves(store, s) {
+  const moves = new Map();
+  for (const weekday of shiftWeekdays(store)) {
+    const delta = s.minutes[weekday] ?? s.common;
+    if (!delta) continue;
+    for (const e of store.entries(weekday, false)) if (shiftSelectable(s, e) && !s.excluded.has(e.id)) moves.set(e.id, delta);
+  }
+  return moves;
+}
+
+/** Con l'allineamento automatico una lezione può stare solo alle ore e alle mezz'ore. */
+function shiftLeavesAutomatic(store, moves) {
+  if (store.alignment !== 'automatic') return false;
+  return store.timetable.entries.some((e) => !isBreak(e) && moves.get(e.id) && shiftedEntry(e, moves.get(e.id)).start % 30 !== 0);
+}
+
+/**
+ * Minuti con il segno, tra i pulsanti − e +: si possono anche scrivere (il segno si cambia
+ * toccandolo, come nell'app). `weekday` assente = il valore per tutti i giorni.
+ */
+function minutesField(value, { sheet, weekday = null, large = false }) {
+  const params = { sheet, weekday };
+  return `<span class="minutes-field ${large ? 'large' : ''}">
+    <button class="icon-btn tonal ${large ? '' : 'small'}" data-action="tt-shift-step"${data({ ...params, delta: -5 })}${value <= -SHIFT_LIMIT ? ' disabled' : ''} aria-label="Prima" title="5 minuti prima">${icon('minus')}</button>
+    <span class="mf-value numeral"><button class="mf-sign ${value ? '' : 'zero'}" data-action="tt-shift-sign"${data(params)} aria-label="${value < 0 ? 'Prima' : 'Dopo'}" title="Cambia il verso">${value < 0 ? '−' : '+'}</button><input class="mf-input" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${value ? Math.abs(value) : ''}" placeholder="0" maxlength="3" data-input="tt-shift-type" data-focus="tt-shift-focus"${data(params)} aria-label="Minuti">${large ? '<span class="mf-unit">min</span>' : ''}</span>
+    <button class="icon-btn tonal ${large ? '' : 'small'}" data-action="tt-shift-step"${data({ ...params, delta: 5 })}${value >= SHIFT_LIMIT ? ' disabled' : ''} aria-label="Dopo" title="5 minuti dopo">${icon('plus')}</button></span>`;
+}
+
+function renderShift(ctx, id) {
+  const s = sheetState(ctx, id, {});
+  const store = ctx.model.timetable;
+  const moves = shiftMoves(store, s);
+  const leaves = shiftLeavesAutomatic(store, moves);
+  const days = new Set(store.timetable.entries.filter((e) => moves.has(e.id)).map((e) => e.weekday)).size;
+  const summary = moves.size
+    ? `${moves.size === 1 ? '1 evento' : `${moves.size} eventi`} in ${days === 1 ? '1 giorno' : `${days} giorni`}`
+    : 'Nessun evento da spostare';
+  const shortcuts = [-15, -10, -5, 5, 10, 15].map((v) => `<button class="shift-shortcut ${s.common === v ? 'selected' : ''}" data-action="tt-shift-shortcut"${data({ sheet: id, value: v })} aria-pressed="${s.common === v}" aria-label="${signedMinutes(v)} minuti">${signedMinutes(v)}</button>`).join('');
+  const hero = `<div class="shift-hero"><small>TUTTI I GIORNI</small>${minutesField(s.common, { sheet: id, large: true })}
+    <div class="shift-shortcuts">${shortcuts}</div><p>${esc(summary)}</p></div>`;
+  const notice = leaves
+    ? `<div class="shift-notice">${icon('alignFree')}<p>L'orario usa l'allineamento automatico, con gli eventi alle ore e alle mezz'ore. Con questi minuti passerà all'allineamento libero.</p></div>` : '';
+  const rows = shiftWeekdays(store).map((weekday) => {
+    const entries = store.entries(weekday, false).filter((e) => shiftSelectable(s, e));
+    const chosen = entries.filter((e) => !s.excluded.has(e.id)).length;
+    const open = s.expanded.has(weekday);
+    const delta = s.minutes[weekday] ?? s.common;
+    const count = chosen === entries.length ? (entries.length === 1 ? '1 evento' : `${entries.length} eventi`) : `${chosen} di ${entries.length}`;
+    const items = entries.map((e) => {
+      const on = !s.excluded.has(e.id);
+      const moved = shiftedEntry(e, delta);
+      const moving = on && moved.start !== e.start;
+      return `<button class="shift-entry ${on ? 'on' : ''}" data-action="tt-shift-entry"${data({ sheet: id, entry: e.id })} aria-pressed="${on}" aria-label="${esc(`${displayTitle(e)}, ${timeRange(e)}`)}">
+        <span class="shift-check">${icon(on ? 'checkCircleFill' : 'circle')}</span><span class="series-bar" style="background:${entryColor(e, store)}"></span>
+        <span class="li-text"><strong>${esc(displayTitle(e))}</strong><small class="numeral-mono"><span class="${moving ? 'old' : ''}">${timeRange(e)}</span>${moving ? `${icon('chevronRight', { cls: 'small' })}<span class="new">${timeRange(moved)}</span>` : ''}</small></span></button>`;
+    }).join('');
+    return `<div class="shift-day" data-key="shift-day-${weekday}"><div class="shift-day-head">
+      <button class="shift-day-toggle" data-action="tt-shift-day"${data({ sheet: id, weekday })} aria-expanded="${open}" title="${open ? 'Nasconde gli eventi' : 'Mostra gli eventi'}">${chevron(!open, { rotateUp: true })}
+        <span class="li-text"><strong>${esc(Weekday.names[weekday - 1])}</strong><small>${esc(count)}</small></span></button>
+      ${minutesField(delta, { sheet: id, weekday })}</div>
+      ${collapsible(open, `<div class="shift-entries">${items}</div>`)}</div>`;
+  });
+  const body = `<div class="sheet-pad stack gap-20">${hero}
+    ${listGroup([toggleRow('Sposta anche gli intervalli', s.includesBreaks, 'tt-shift-breaks', { iconName: 'coffee', params: { sheet: id } })])}
+    ${notice}
+    ${listGroup(rows, { header: 'Giorno per giorno', footer: 'Ogni giorno ha i suoi minuti. Tocca un giorno per vedere i nuovi orari e scegliere quali eventi spostare. La durata degli eventi non cambia.' })}</div>`;
+  const trailing = `<button class="btn filled xs" data-action="tt-shift-apply" data-sheet="${id}"${moves.size ? '' : ' disabled'}>${icon('check')}<span>Sposta</span></button>`;
+  return { title: 'Sposta gli orari', size: 'large', trailing, body };
+}
+
+/** Un campo dei minuti con il fuoco non si ridisegna: lo si lascia prima di cambiare il valore. */
+function leaveMinutesField() {
+  if (document.activeElement?.classList?.contains('mf-input')) document.activeElement.blur();
+}
+
+/** Cambia i minuti di un giorno o, senza giorno, quelli di tutti (che tornano a valere ovunque). */
+function setShiftMinutes(s, weekday, value) {
+  const v = Math.min(SHIFT_LIMIT, Math.max(-SHIFT_LIMIT, value));
+  if (weekday) {
+    s.minutes[weekday] = v;
+  } else {
+    s.common = v;
+    s.minutes = {};
+  }
+}
+
+const shiftValue = (s, weekday) => (weekday ? (s.minutes[weekday] ?? s.common) : s.common);
+
 // MARK: - Generatore
 
 export function generatorSheet(ctx) {
@@ -524,14 +662,23 @@ export function generatorSheet(ctx) {
   return { id, render: (c) => renderGenerator(c, id), onClose: () => forget(ctx, id) };
 }
 
-function renderGenerator(ctx, id) {
-  const s = sheetState(ctx, id, {});
-  const store = ctx.model.timetable;
-  const g = s.settings;
+/**
+ * Nota sotto le ore di lezione: con ore fuori dalle mezz'ore BCW tiene gli orari esatti e,
+ * applicando la bozza, l'orario passa all'allineamento libero (3.3, come nell'app).
+ */
+export function generationHoursFooter(store, g) {
   const alignedSettings = g.firstHourStart % 30 === 0 && (g.hourLength === 30 || g.hourLength === 60);
-  const hoursFooter = store.alignment === 'automatic' && !alignedSettings
-    ? "L'orario usa l'allineamento automatico: con questi orari le lezioni verranno spostate all'ora o alla mezz'ora più vicina. Per tenere gli orari esatti passa all'allineamento libero in Modifica orario."
+  return store.alignment === 'automatic' && !alignedSettings
+    ? "Con questi orari BCW tiene gli orari esatti: applicando la bozza l'orario passerà da solo dall'allineamento automatico a quello libero, che si cambia in Modifica orario."
     : "Classeviva registra solo in quale ora della giornata si svolge una lezione: l'orario si ricava da qui.";
+}
+
+/**
+ * Le impostazioni della generazione (ore di lezione e intervalli), nel foglio e nell'introduzione
+ * (`TimetableGenerationFields` nell'app). `id` è la chiave dello stato (`sheet:<id>`, con
+ * `settings`) che le azioni `tt-gen-…` cambiano.
+ */
+export function generationFields(ctx, id, g, { footer = generationHoursFooter(ctx.model.timetable, g) } = {}) {
   // Come nell'app: in alto il nome con il pulsante per toglierlo, sotto inizio e durata.
   const breaks = g.breaks.map((b, i) => `<div class="list-item gen-break">
     <div class="gen-break-head"><span class="form-icon">${icon('coffee')}</span><span class="li-text"><strong>Intervallo ${i + 1}</strong></span>
@@ -540,48 +687,61 @@ function renderGenerator(ctx, id) {
       ${stepper(b.duration, { action: `tt-gen-break-dur" data-sheet="${id}" data-index="${i}`, min: 5, max: 60, step: 5, format: (v) => `${v} min` })}</div></div>`);
   breaks.push(`<button class="list-item form-button" data-action="tt-gen-break-add" data-sheet="${id}"><span class="form-icon">${icon('coffee')}</span><span class="li-text"><strong>Aggiungi intervallo</strong></span></button>`);
   if (g.breaks.length) breaks.push(`<button class="list-item form-button danger" data-action="tt-gen-break-clear" data-sheet="${id}"><span class="form-icon">${icon('trash')}</span><span class="li-text"><strong>Rimuovi gli intervalli</strong></span></button>`);
-  const body = `<div class="sheet-pad stack gap-20">
-    ${listGroup([
+  return `${listGroup([
     formRow("Inizio della prima ora", timeInput(g.firstHourStart, 'tt-gen-first', { sheet: id })),
     formRow("Durata di un'ora", stepper(g.hourLength, { action: `tt-gen-length" data-sheet="${id}`, min: 30, max: 120, step: 5, format: (v) => `${v} min` })),
     formRow('Lezioni da esaminare', select([[2, 'Ultime 2 settimane'], [4, 'Ultime 4 settimane'], [6, 'Ultime 6 settimane'], [10, 'Ultime 10 settimane'], [0, "Tutto l'anno"]], g.weeks, 'tt-gen-weeks', { label: 'Lezioni da esaminare', params: { sheet: id } })),
-  ], { header: 'Ore di lezione', footer: hoursFooter })}
-    ${listGroup(breaks, { header: 'Intervalli', footer: 'Facoltativi: compaiono sopra le lezioni nei giorni in cui c\'è scuola a quell\'ora, senza cambiarne la durata. Per toglierne uno usa il pulsante rosso accanto.' })}
+  ], { header: 'Ore di lezione', footer })}
+    ${listGroup(breaks, { header: 'Intervalli', footer: 'Facoltativi: compaiono sopra le lezioni nei giorni in cui c\'è scuola a quell\'ora, senza cambiarne la durata. Per toglierne uno usa il pulsante rosso accanto.' })}`;
+}
+
+function renderGenerator(ctx, id) {
+  const s = sheetState(ctx, id, {});
+  const body = `<div class="sheet-pad stack gap-20">
+    ${generationFields(ctx, id, s.settings)}
     <div class="stack gap-8"><button class="btn filled m wide" data-action="tt-gen-run" data-sheet="${id}"${s.generating ? ' disabled' : ''}>${s.generating ? loadingIndicator({ size: 'small' }) : icon('wand')}<span>Crea l'anteprima</span></button>
-      <p class="list-footer">BCW guarda in quale ora della giornata si è svolta ogni materia, settimana per settimana, e tiene quelle che si ripetono (le settimane recenti contano di più, supplenze e recuperi isolati vengono ignorati). Vedrai l'orario in anteprima, con i bordi tratteggiati, prima di applicarlo.</p></div></div>`;
+      <p class="list-footer">BCW guarda in quale ora della giornata si è svolta ogni materia, settimana per settimana, e tiene quelle che si ripetono (le settimane recenti contano di più, supplenze e recuperi isolati vengono ignorati). Vedrai l'orario in anteprima prima di applicarlo.</p></div></div>`;
   return { title: "Genera l'orario", size: 'large', body };
+}
+
+/**
+ * Scarica le lezioni registrate e ne ricava una bozza dell'orario (`makeTimetableDraft`
+ * nell'app), sempre con gli orari esatti delle ore indicate: se non stanno nell'allineamento
+ * automatico, applicandola l'orario passa a quello libero (`applyDraft`). Prima le lezioni
+ * venivano spostate all'ora o alla mezz'ora più vicina. Usata dal foglio e dall'introduzione.
+ */
+export async function makeTimetableDraft(model, settings) {
+  const { from, to } = generationRange(settings);
+  let lessons;
+  try {
+    lessons = await model.fetchLessons(from, to);
+  } catch (error) {
+    throw new Error(`Non riesco a scaricare le lezioni: ${error.message}`);
+  }
+  const result = generateEntries(lessons, settings);
+  if (!result.entries.length) {
+    throw new Error(lessons.length
+      ? 'Le lezioni registrate sono troppo poche o troppo irregolari per ricavare un orario. Prova a esaminare un periodo più lungo.'
+      : 'Non ci sono lezioni registrate nel periodo scelto. Riprova più avanti o esamina un periodo più lungo.');
+  }
+  return { entries: result.entries, settings: { ...settings, breaks: settings.breaks.map((b) => ({ ...b })) }, analyzedDays: result.analyzedDays, from, to };
 }
 
 async function runGenerator(ctx, id) {
   const s = sheetState(ctx, id, {});
   const store = ctx.model.timetable;
-  const settings = s.settings;
   s.generating = true;
   ctx.update();
-  const { from, to } = generationRange(settings);
-  let lessons;
+  let draft;
   try {
-    lessons = await ctx.model.fetchLessons(from, to);
+    draft = await makeTimetableDraft(ctx.model, s.settings);
   } catch (error) {
     s.generating = false;
-    ctx.confirm({ title: "Impossibile creare l'orario", message: `Non riesco a scaricare le lezioni: ${error.message}`, confirmLabel: 'OK', cancelLabel: null });
+    ctx.confirm({ title: "Impossibile creare l'orario", message: error.message, confirmLabel: 'OK', cancelLabel: null });
     return;
   }
-  const result = generateEntries(lessons, settings);
-  let entries = result.entries;
-  if (store.alignment === 'automatic') entries = entries.flatMap(alignedPieces);
   s.generating = false;
-  if (!entries.length) {
-    ctx.confirm({
-      title: "Impossibile creare l'orario",
-      message: lessons.length
-        ? 'Le lezioni registrate sono troppo poche o troppo irregolari per ricavare un orario. Prova a esaminare un periodo più lungo.'
-        : 'Non ci sono lezioni registrate nel periodo scelto. Riprova più avanti o esamina un periodo più lungo.',
-      confirmLabel: 'OK', cancelLabel: null,
-    });
-    return;
-  }
-  store.setDraft({ entries, settings: { ...settings, breaks: settings.breaks.map((b) => ({ ...b })) }, analyzedDays: result.analyzedDays, from, to });
+  store.setDraft(draft);
   ctx.closeSheet();
 }
 
@@ -809,6 +969,9 @@ export const timetableSheetActions = {
     if (s.weekdays.has(w)) s.weekdays.delete(w); else s.weekdays.add(w);
     if (s.weekdays.size) s.draft.weekday = Math.min(...s.weekdays);
   },
+  'tt-ed-live': (ctx, el) => {
+    sheetState(ctx, el.dataset.sheet, {}).draft.liveActivity = LiveActivityChoice[el.value] ? el.value : null;
+  },
   'tt-ed-day': (ctx, el) => {
     const s = sheetState(ctx, el.dataset.sheet, {});
     s.draft.weekday = Number(el.value);
@@ -955,6 +1118,57 @@ export const timetableSheetActions = {
   'tt-series-clear': (ctx, el) => {
     const s = sheetState(ctx, el.dataset.sheet, {});
     ctx.model.timetable.applyPalette(null, [...s.chosen]);
+    ctx.closeSheet();
+  },
+
+  // Sposta gli orari
+  'tt-shift-step': (ctx, el) => {
+    const s = sheetState(ctx, el.dataset.sheet, {});
+    const weekday = Number(el.dataset.weekday) || null;
+    leaveMinutesField();
+    navigator.vibrate?.(4);
+    setShiftMinutes(s, weekday, shiftValue(s, weekday) + Number(el.dataset.delta));
+  },
+  // Toccando i minuti si scrive un valore nuovo: il numero di prima è già selezionato.
+  'tt-shift-focus': (ctx, el) => { requestAnimationFrame(() => { if (document.activeElement === el) el.select(); }); },
+  'tt-shift-sign': (ctx, el) => {
+    const s = sheetState(ctx, el.dataset.sheet, {});
+    const weekday = Number(el.dataset.weekday) || null;
+    setShiftMinutes(s, weekday, -shiftValue(s, weekday));
+  },
+  'tt-shift-type': (ctx, el) => {
+    const s = sheetState(ctx, el.dataset.sheet, {});
+    const weekday = Number(el.dataset.weekday) || null;
+    const digits = el.value.replace(/\D/g, '');
+    if (digits !== el.value) el.value = digits;
+    const typed = Math.min(Number(digits) || 0, SHIFT_LIMIT);
+    setShiftMinutes(s, weekday, shiftValue(s, weekday) < 0 ? -typed : typed);
+  },
+  'tt-shift-shortcut': (ctx, el) => {
+    leaveMinutesField();
+    navigator.vibrate?.(4);
+    setShiftMinutes(sheetState(ctx, el.dataset.sheet, {}), null, Number(el.dataset.value));
+  },
+  'tt-shift-breaks': (ctx, el) => { sheetState(ctx, el.dataset.sheet, {}).includesBreaks = el.checked; },
+  'tt-shift-day': (ctx, el) => {
+    const s = sheetState(ctx, el.dataset.sheet, {});
+    const weekday = Number(el.dataset.weekday);
+    if (s.expanded.has(weekday)) s.expanded.delete(weekday);
+    else s.expanded.add(weekday);
+  },
+  'tt-shift-entry': (ctx, el) => {
+    const s = sheetState(ctx, el.dataset.sheet, {});
+    navigator.vibrate?.(4);
+    if (s.excluded.has(el.dataset.entry)) s.excluded.delete(el.dataset.entry);
+    else s.excluded.add(el.dataset.entry);
+  },
+  'tt-shift-apply': (ctx, el) => {
+    const s = sheetState(ctx, el.dataset.sheet, {});
+    const store = ctx.model.timetable;
+    const moves = shiftMoves(store, s);
+    if (!moves.size) return;
+    navigator.vibrate?.(10);
+    store.shift(moves, { freeAlignment: shiftLeavesAutomatic(store, moves) });
     ctx.closeSheet();
   },
 

@@ -19,16 +19,6 @@ function loginState(ctx) {
   }));
 }
 
-/** Indirizzo da mostrare per un server ("host/percorso"). */
-function hostOf(base) {
-  try {
-    const url = new URL(base);
-    return (url.host + url.pathname).replace(/\/$/, '');
-  } catch {
-    return base;
-  }
-}
-
 /** Telefono con la tastiera aperta (un campo del login attivo): disposizione compatta. */
 function keyboardOpen(ctx, s) {
   return s.focused && !ctx.wide && matchMedia('(pointer: coarse)').matches;
@@ -51,13 +41,7 @@ export function renderLogin(ctx, { adding }) {
   if (adding) subtitle = model.isCloud ? 'Abbina un account Classeviva' : 'Aggiungi un account';
   else if (linkingFirst) subtitle = `Ciao, ${model.cloudUser?.username ?? ''}`;
 
-  const header = compact
-    ? `<div class="login-header compact">${logo('logo')}<span class="logo-subtitle">${esc(subtitle)}</span></div>`
-    : `<div class="login-header">
-      ${adding ? '' : loginArt()}
-      ${logo('logo')}
-      <span class="logo-subtitle">${esc(subtitle)}</span>
-    </div>`;
+  const header = loginHeader(subtitle, { compact, art: !adding });
   const intro = linkingFirst && !compact
     ? '<p class="login-intro">Abbina il tuo primo account Classeviva: con il tuo account BCW entrerai in tutti gli account abbinati, su ogni dispositivo.</p>'
     : '';
@@ -65,9 +49,24 @@ export function renderLogin(ctx, { adding }) {
   return `<div class="login ${adding ? 'adding' : ''} ${compact ? 'compact' : ''}" data-blank-blur>${header}${modeToggle(mode, options)}${intro}${form}${compact ? '' : footerArea(ctx, mode, options)}</div>`;
 }
 
+/**
+ * Intestazione dell'accesso (3.3, come nell'app): un solo logo nelle due disposizioni. Con la
+ * tastiera chiusa la barra sta sotto la scritta (come nell'introduzione e nell'icona) e il titolo
+ * sotto, con lo stesso vuoto sopra e sotto la barra; con la tastiera aperta il logo si rimpicciolisce,
+ * la barra va a destra e il titolo accanto. Scritta, barra e titolo si spostano con la molla
+ * (`data-flip`); un titolo che va a capo in una delle due disposizioni (`wraps`, da
+ * `fitLoginTitles` in `app.js`) cambia allineamento, quindi sparisce e ricompare a movimento quasi
+ * finito invece di scorrere.
+ */
+function loginHeader(title, { compact = false, art = true } = {}) {
+  return `<div class="login-header ${compact ? 'compact' : ''}" data-key="login-header">
+    ${art && !compact ? loginArt() : ''}${logo('logo', { stacked: !compact, flip: 'login-logo' })}
+    <span class="logo-subtitle" data-key="login-title" data-flip="login-title" data-flip-mode="move">${esc(title)}</span></div>`;
+}
+
 /** Forme di Material 3 Expressive che ruotano lentamente dietro al logo. */
 function loginArt() {
-  return `<span class="login-art" aria-hidden="true">${shape('softBurst', 'a')}${shape('cookie9Sided', 'b')}${shape('pill', 'c')}</span>`;
+  return `<span class="login-art" data-key="login-art" aria-hidden="true">${shape('softBurst', 'a')}${shape('cookie9Sided', 'b')}${shape('pill', 'c')}</span>`;
 }
 
 /**
@@ -107,11 +106,10 @@ function wideLogin(ctx, s, mode, options) {
       </div>
       <div class="login-main">${modeToggle(mode, options)}${form}</div>
     </div>
-    <div class="login-legal">
+    ${options.linkingFirst ? '' : `<div class="login-legal">
       <span>BCW non è affiliata a Gruppo Spaggiari Parma.</span>
-      ${options.linkingFirst ? `<span>Account BCW: ${esc(model.cloudUser?.username ?? '')}</span>` : ''}
       ${serverLine(mode)}
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -181,34 +179,39 @@ function footerText(ctx, mode) {
     : 'Usa le stesse credenziali di Classeviva. Restano solo in questo browser e vengono inviate esclusivamente ai server di Classeviva.';
 }
 
-/** Server a cui va l'accesso: il server BCW per gli account BCW, il proxy per Classeviva. */
+/**
+ * Il collegamento per cambiare server, senza l'indirizzo (3.3, come nell'app): il server BCW per gli
+ * account BCW e, solo nel web, il proxy per Classeviva (senza un proxy funzionante l'accesso non
+ * parte, e prima di entrare le Impostazioni non ci sono).
+ */
 function serverLine(mode) {
   if (mode === 'bcw') {
-    return `<p class="proxy-line">${icon('cloud')}<span>Server BCW: ${esc(BCWServer.isConfigured ? hostOf(BCWServer.base) : 'non impostato')}</span><span class="proxy-edit">·<button class="link-button" data-action="cloud-server-sheet">Modifica</button></span></p>`;
+    return `<button class="link-button proxy-line" type="button" data-action="cloud-server-sheet">${icon('cloud')}<span>Usa un altro server BCW</span></button>`;
   }
-  return `<p class="proxy-line">${icon('server')}<span>Server: ${esc(hostOf(Proxy.base))}</span><span class="proxy-edit">·<button class="link-button" data-action="proxy-sheet">Modifica</button></span></p>`;
+  return `<button class="link-button proxy-line" type="button" data-action="proxy-sheet">${icon('server')}<span>Usa un altro proxy</span></button>`;
 }
 
-function footer(ctx, mode, { adding, linkingFirst }, { hidden = false } = {}) {
+/** Le note in basso, ridotte al minimo: l'affiliazione e il collegamento per cambiare server. */
+function footer(mode, { hidden = false } = {}) {
   return `<div class="login-footer ${hidden ? 'inactive' : ''}"${hidden ? ' aria-hidden="true"' : ''}>
-      <p>${esc(footerText(ctx, mode))}</p>
-      ${adding ? '' : '<p>BCW non è affiliata a Gruppo Spaggiari Parma.</p>'}
+      <p>BCW non è affiliata a Gruppo Spaggiari Parma.</p>
       ${serverLine(mode)}
-      ${linkingFirst ? `<p>Account BCW: ${esc(ctx.model.cloudUser?.username ?? '')}</p>` : ''}
     </div>`;
 }
 
 /**
- * Note in basso. Con il gruppo Classeviva/Account BCW occupano sempre l'altezza delle più lunghe
- * e sono allineate in alto: cambiando scelta il resto della pagina (centrato) non si sposta.
+ * Note in basso. Con un accesso già fatto (aggiunta di un account, primo account da abbinare,
+ * account BCW dalle Impostazioni) nessuna. Con il gruppo Classeviva/Account BCW occupano sempre
+ * l'altezza delle più lunghe e sono allineate in alto: cambiando scelta il resto della pagina
+ * (centrato) non si sposta. La spiegazione di ogni modulo resta nel pannello degli schermi larghi.
  */
 function footerArea(ctx, mode, options) {
-  if (options.adding || options.linkingFirst) return footer(ctx, mode, options);
-  return `<div class="login-footer-area">${['classeviva', 'bcw'].map((m) => footer(ctx, m, options, { hidden: m !== mode })).join('')}</div>`;
+  if (options.adding || options.linkingFirst) return '';
+  return `<div class="login-footer-area">${['classeviva', 'bcw'].map((m) => footer(m, { hidden: m !== mode })).join('')}</div>`;
 }
 
 /** Avviso mostrato quando all'indirizzo del proxy non risponde il proxy di BCW. */
-function proxyWarning() {
+export function proxyWarning() {
   if (Proxy.status !== 'missing' && Proxy.status !== 'unreachable') return '';
   const text = Proxy.status === 'missing'
     ? 'Questo sito è pubblicato senza il proxy che inoltra le richieste a Classeviva (succede con hosting statici come GitHub Pages). Crea un Cloudflare Worker gratuito con il file proxy/cloudflare-worker.js e inserisci qui il suo indirizzo.'
@@ -256,8 +259,8 @@ export function cloudLoginSheet({ register = false } = {}) {
       return {
         title: '',
         size: 'login-sheet',
-        body: `<div class="login adding"><div class="login-header">${logo('logo')}<span class="logo-subtitle">${s.register ? 'Crea un account BCW' : 'Accedi con un account BCW'}</span></div>
-          ${bcwForm(ctx, s)}${footer(ctx, 'bcw', { adding: true })}</div>`,
+        body: `<div class="login adding">${loginHeader(s.register ? 'Crea un account BCW' : 'Accedi con un account BCW', { art: false })}
+          ${bcwForm(ctx, s)}</div>`,
       };
     },
   };
@@ -331,7 +334,7 @@ async function signIn(ctx, ident) {
 }
 
 /** Dopo l'accesso con l'account BCW propone di abbinare gli account già salvati nel browser. */
-function offerLinking(ctx, candidates) {
+export function offerLinking(ctx, candidates) {
   const names = candidates.map((a) => a.name).join(', ');
   const one = candidates.length === 1;
   setTimeout(() => ctx.confirm({

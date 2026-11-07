@@ -13,6 +13,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   Azioni delegate via `data-action` / `data-input` / `data-change` / `data-context` / `data-longpress` / `data-dblclick`;
   ogni vista esporta `actions`. `ctx.afterRender(fn)` esegue codice dopo il disegno (es. scorrere a un'ora).
 - Stato locale delle viste con `ctx.state(key, init)`; operazioni asincrone una tantum con `ctx.task(key, fn)`.
+  Stato di una pagina aperta sopra un'altra con `ctx.pageState(nome, init)` (`{ key, state }`): si cancella quando la
+  pagina esce dalla pila (`forgetPages` in `back`, nuovo tocco sulla scheda, `popstate`, `resetNavigation`), come lo
+  `@State` di una pagina nell'app (es. i voti ipotetici di una materia).
   Fogli: `openSheet` (sostituisce), `pushSheet` (sopra, chiudendo si torna indietro); i fogli dell'Orario tengono lo
   stato in `sheet:<id>` e lo cancellano in `onClose`. `confirm({ actions })` per dialoghi con più scelte.
 - Proxy predefinito in `config.json` (`{"proxy": "https://…", "api": "https://…"}`, letto una volta da `loadConfig()`);
@@ -42,20 +45,34 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   Sincronizzazione lo stesso interruttore dell'orario ("Sincronizza l'orario", non nella demo).
   Per provarla in locale: BCW-api con `npm start` e il suo indirizzo in Server BCW (provata così la 3.2.1: voci spente,
   cambi dal server e riaccensione).
-- Design dell'app iOS 3.0 (Material 3 Expressive, senza Liquid Glass) e solo componenti di https://m3.material.io. Il Mac non
-  c'è più: il layout degli schermi larghi è un adattamento libero di quello dell'app.
+- Design dell'app iOS (3.3; Material 3 Expressive, senza Liquid Glass) e solo componenti di https://m3.material.io. Il Mac non
+  c'è più: il layout degli schermi larghi è un adattamento libero di quello dell'app. Quello che il web non ha (widget,
+  attività in diretta, Liquid Glass, icona dell'app) resta nell'app: i suoi valori salvati (es. `liveActivity` degli
+  eventi, `appIconColor`) si conservano.
 - Design Material 3 Expressive: colori come variabili CSS (`--primary`, `--surface-container…`, `--good/--fair/--poor/
   --neutral` con `-container`, `--subject-N`); alias brevi `--bg`, `--card`, `--ink`, `--ink2`, `--accent`. Font Google
   Sans Flex in `fonts/` (asse ROND per i titoli). Icone Material Symbols Rounded incorporate in `js/icons.js` (varianti
-  `…Fill`); forme in `js/shapes.js` (`shape(name)` dentro un `.shaped`); logo come testo (`js/logo.js`: "BCW" in Google
-  Sans Flex e la linea in `--brand`), così segue il tema scelto nell'app; il favicon si ridisegna con `--brand`
-  (`Theme.updateFavicon()`). Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
-- Larghezze: sotto 600 px barra di navigazione in basso con quattro schede (Dashboard, Orario, Voti, Tu; tre con l'Orario
-  nascosto, vedi Orario); la ricerca è la
+  `…Fill`; icone che non sono Material Symbols, come `github`, con il loro riquadro in `viewBoxes`); forme in
+  `js/shapes.js` (`shape(name)` dentro un `.shaped`); logo come testo (`js/logo.js`: "BCW" in Google Sans Flex e la linea
+  in `--brand`; `stacked` con la barra sotto, come nell'introduzione e nell'icona dell'app), così segue il tema scelto
+  nell'app; il favicon si ridisegna con `--brand` (`Theme.updateFavicon()`). Icona dell'app installata (`icons/icon.svg`
+  e i PNG): come l'icona dell'app per iPhone dalla 3.3, la scritta e la barra sotto nei ruoli del tema Mattone
+  (sfondo `primary-container`, scritta `on-surface`, barra `brand`), dai tracciati di `AppIcon.icon` dell'app. Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
+- Larghezze: sotto 600 px barra di navigazione flottante (3.3, come nell'app: `floatingNavBar` in `app.js`, una pillola
+  di 56 px sospesa sul contenuto, 14 px sopra il bordo o 10 px dentro lo spazio sicuro, con i nomi delle quattro schede:
+  Dashboard, Orario, Voti, Tu; tre con l'Orario nascosto, vedi Orario). La scheda aperta è una pillola piena nel primario
+  con l'icona; cambiando scheda la pillola scivola con la molla (`captureNavTabs`/`animateNavTabs`, FLIP con le Web
+  Animations; le altre schede stanno sopra la pillola, così i nomi restano leggibili). Le pagine lasciano libero
+  `--nav-space` in fondo e il FAB sta sopra la barra. La ricerca è la
   barra in cima alla Dashboard (`page.searchBar`; `openSearch()` / `app.searching`: i risultati di `views/search.js`
   prendono il posto della pagina e la barra di navigazione si nasconde). 600–839 le stesse schede in una barra laterale.
   Le pagine principali delle schede hanno il titolo grande (34 px) nella riga dei pulsanti; quelle aperte da un'altra il
   titolo piccolo e la freccia. Le Impostazioni si aprono dall'ingranaggio di Tu.
+  Nuovo tocco sulla scheda (o sulla sezione) aperta (`selectSection`, 3.3 come nell'app): il primo porta in cima la pagina
+  in vista, anche una aperta dentro la scheda; il successivo, già in cima, torna alla pagina principale e poi fa
+  `view.reselect` (Dashboard: domani; Orario: il giorno predefinito; Voti: la media dell'anno se era scelto un periodo).
+  `reselectSkipsTop` salta il primo passo (vista Giorno dell'Orario, già scorsa all'ora; Voti sugli schermi larghi).
+  Il popup degli account (`accountSwitcherSheet`) con l'account BCW ha anche "Esci da BCW".
 - Da 840 px (come le app Google sul web): barra superiore con logo, ricerca generale (fuori dalla `.page`, così non perde il
   fuoco), Aggiorna, Impostazioni e avatar (menu degli account); barra di navigazione espansa con tutte le sezioni
   (riducibile; tra 840 e 1000 si apre sopra il contenuto); pagina in un pannello con angoli ampi; ricerche di pagina nel
@@ -64,6 +81,14 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   disposizione compatta in alto (logo piccolo e titolo su una riga, gruppo Classeviva/Account BCW, campi, Accedi);
   il titolo sta sulla linea di base del logo, alzato perché il centro del testo visibile coincida con quello di "BCW"
   (metriche di Google Sans Flex nel commento del CSS; misurare con `measureText` e la linea di base, non con le scatole).
+  Dalla 3.3 un'intestazione sola nelle due disposizioni (`loginHeader`): con la tastiera chiusa il logo ha la barra sotto
+  (`stacked`, parte alta 0,31 sotto la linea di base) e tra la barra e le maiuscole del titolo lo stesso vuoto che tra la
+  scritta e la barra (13,6 px); aperta, la barra va a destra. Scritta, barra e titolo hanno `data-flip`: `playFlips` in
+  `app.js` li porta dalla posizione di prima a quella nuova con la molla (FLIP); un titolo che va a capo (`wraps`, da
+  `fitLoginTitles`, al massimo tre righe: centrato sotto il logo, a sinistra accanto al logo piccolo) invece di scorrere
+  sparisce e ricompare a movimento quasi finito. Note in basso ridotte: con un accesso già fatto (aggiunta di un account,
+  primo account da abbinare, account BCW dalle Impostazioni) nessuna, altrimenti l'affiliazione e "Usa un altro server
+  BCW" o, solo nel web, "Usa un altro proxy" (senza indirizzo); le spiegazioni restano nel pannello largo.
   Il gruppo ha `data-keep-focus` (toccarlo non toglie il fuoco: i campi dei due moduli hanno le stesse chiavi
   `f-user`/`f-pass`, quindi il cursore resta e cambia solo il valore); `data-blank-blur` chiude la tastiera toccando
   lo spazio vuoto; le note dei due moduli occupano sempre l'altezza delle più lunghe. Safari (e Chrome su Android) non
@@ -88,7 +113,7 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   elementi annullate (altrimenti ripartirebbero). Lista e Giorno dell'Orario sui telefoni hanno contenitori diversi
   (`.view-swap`, chiave per vista, assi `tt-day`/`tt-grid`) e si scambiano con la dissolvenza, non di lato; tornando
   alla Lista si riparte dall'alto (`tt-mode`).
-- Componenti dell'app: `dayHero` (giorno in grande, pulsante del giorno predefinito, chip e `progress` a destra del nome;
+- Componenti dell'app: `dayHero` (giorno in grande, pulsante del giorno predefinito e chip;
   il nome che non ci sta si rimpicciolisce fino al 70% con `fitDayTitles()` in `app.js`, come `minimumScaleFactor`
   nell'app, rimisurato a ogni disegno), `statusChip`, `segmentedSection` + `segCell`, `listGroup`
   (anche con `background`), `dateBadge`, `connectedGroup`, `primaryTabs`, `statTile` con `corners`, menu del FAB
@@ -109,12 +134,32 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   nell'app) si chiama come quel giorno ("Oggi", "Domani", "Lunedì", `jumpTitle`) e ci porta (`tt-jump`, anche Alt+T),
   come un nuovo tocco sulla scheda. Il giorno mostrato non cambia da solo quando finisce l'ultimo evento, il pulsante sì
   (ridisegno ogni 30 s). Il selettore della data ha ancora "Oggi".
-  Avanzamento della giornata (`dayProgress(spans, minute)` in `timetable.js`, come `DayProgress` dell'app; Impostazioni ›
-  Orario › "Barra di avanzamento della giornata", `showsDayProgress`, spenta di serie e sincronizzata): la parte passata
-  della durata complessiva degli eventi (senza intervalli, sovrapposizioni unite, ferma negli spazi), percentuale per
-  difetto (100 solo a giornata finita); giorni passati 100%, futuri 0%; non con la bozza. Nella Lista a destra del nome
-  del giorno (`dayProgressView`): percentuale (`--primary` mentre la giornata è in corso) e `wavyProgress` (piatta a 0%,
-  piena e piatta `.dp-full` a 100%), al massimo 240 px; senza spazio resta la percentuale (`@container` sotto 112 px).
+  La barra di avanzamento della giornata della 3.2.1 non c'è più (tolta anche nell'app, 3.3): `showsDayProgress` si
+  toglie dalle preferenze e non si sincronizza (sul server resta).
+  Verifiche nella Lista accese di serie (3.3, `timetableShowsTests`): un browser che arriva dalla 3.2.1 (preferenze
+  senza `timetableShowsNowCard`) con `false`, il vecchio valore di serie salvato con gli altri, passa ad accese.
+  Card "Adesso" (`nowCard`): le ore uguali di seguito sono una lezione sola (`timetableLayout(…, { splitAtBreaks: true })`,
+  blocchi), con una barra fino alla fine dell'ultima; toccandola si apre l'ora in corso. Si nasconde da Impostazioni ›
+  Orario › Oggi (`timetableShowsNowCard`, sincronizzata come impostazione).
+  Nella Lista le ore di un gruppo non hanno più la linea tratteggiata: la barretta arriva al bordo verso le ore accanto
+  (`join-up`/`join-down`, margini negativi) e forma una barra a segmenti con 4 px di stacco.
+  Anteprima della bozza (3.3, al posto del bordo tratteggiato): pillole più piene nella tinta (`.tt-run.draft`,
+  `.tt-block.draft`, `.tt-seg.draft`), che compaiono a scaglioni (`draft-in`, `--draft-delay`), con un'onda al posto della
+  barretta (maschera SVG ripetuta) e un'onda di luce (`draftSheen`: ritardo dall'ora di inizio, così sembra una sola onda
+  che scende lungo la giornata). Applicando la classe `draft` sparisce dagli stessi elementi e angoli, spazi e barretta
+  si assestano con la molla. In alto `draftHeader` (contenitore terziario, forma che ruota), in basso `draftToolbar`
+  (barra vivace, modalità temporanea con `hidesNav`: Rigenera, Scarta, Applica). La bozza tiene gli orari esatti
+  (`makeTimetableDraft` in `timetable-sheets.js`, comune al foglio e all'introduzione); con ore fuori dalle mezz'ore
+  `applyDraft` passa all'allineamento libero (`draftNeedsFreeAlignment`, detto nell'intestazione e sotto le ore).
+  Sposta gli orari (3.3, `shiftSheet`, dalla barra della modifica, dove non c'è più la palette, che resta nel menu
+  dell'orario): minuti per tutti i giorni (scorciatoie ±5/10/15 o scritti; il segno si cambia toccandolo) e per ogni giorno
+  (`minutes`, solo quelli cambiati a mano; cambiando il valore in cima si azzerano), eventi da togliere aprendo un giorno,
+  interruttore per gli intervalli; `store.shift(minuti per id, { freeAlignment })` con `shiftedEntry` (stessa durata,
+  dentro la giornata). Con l'allineamento automatico e una lezione che non cadrebbe più alla mezz'ora, un avviso e
+  l'orario passa a quello libero.
+  Attività in diretta per evento (3.3, `liveActivity`: `null` = segue l'impostazione dell'iPhone, `show`, `hide`;
+  `LiveActivityChoice`): il web non ha attività in diretta ma conserva il campo (un valore sconosciuto vale `null`),
+  lo mostra nell'editor ("Attività in diretta", con la spiegazione per l'app) e lo propaga agli eventi con lo stesso nome.
   Scheda Orario nascosta (`showsTimetableTab`, Impostazioni › Orario › Scheda, sincronizzata come impostazione):
   `visibleTabs()` in `app.js` per la barra di navigazione e la barra laterale; `leaveHiddenTimetable()` porta alla
   Dashboard se l'Orario è aperto (anche da `#/timetable` o dall'ultima sezione salvata) e `selectSection('timetable')`
@@ -135,5 +180,25 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   `--spring*` per il movimento e `"ROND" var(--rond)` per i titoli.
 - Anteprima dei file in `js/viewer.js` (`openFile(file)`): immagini con zoom relativo alla dimensione adattata
   (`zoom`, `fit`), schermo intero (`full`), apertura in una nuova scheda e Scarica.
+- Voti (3.3): "E se prendessi…" (`gradeSimulator` in `views/grades.js`, come `GradeSimulator` nell'app): voti ipotetici
+  (`newHypothetical`, `GradeBook.adding`: datati oggi, nel periodo scelto o nell'ultimo) sulla media della materia e su
+  quella generale o del periodo. Nei Voti comprimibile, dopo l'andamento, con la materia di ogni voto tra tutte quelle
+  dell'anno (`model.subjects`, più quelle dei soli voti); nella pagina della materia aperto, dopo l'obiettivo, con
+  `ctx.pageState` (sparisce uscendo). Le azioni (`sim-…`) trovano lo stato con `data-sim`.
+- Introduzione (3.3, `js/onboarding.js`, come nell'app): alla prima apertura (`isFirstRun`: niente
+  `bcw.onboardingCompleted`, account, account BCW né demo; chi aggiorna non la vede) e da Impostazioni › Generale ›
+  Rivedi l'introduzione. Sta in `app.onboarding` (non nello stato delle viste, che si azzera cambiando sessione) e copre
+  tutto: sotto non si disegna altro, fogli e dialoghi le stanno sopra. Passaggi: accoglienza, colori, tema e contrasto,
+  forme e movimento, vista della Dashboard, funzioni, Classeviva, account BCW, orario dalle lezioni (con la scheda Orario
+  e un account; bozza tenuta nella pagina, `weekGlance`), fine con i coriandoli di forme. Bianco e nero: `data-mono` su
+  `<html>` (blocchi `:root[data-mono]` in fondo al CSS, che battono anche il tema generato), messo già da
+  `js/theme-boot.js` con la stessa regola; tocca solo i ruoli di M3. Cerchio dei colori: `revealTheme(punto, changes)` in
+  `app.js` (`ctx.revealTheme`) con le View Transitions (la pagina nuova in un `circle()` che cresce, 1,15 s, curva
+  "emphasized"; dissolvenza con le animazioni ridotte; senza View Transitions cambia e basta): scegliere un colore,
+  chiaro o scuro, riaprire e finire l'introduzione. Forme che si trasformano (`animateMorphShapes`, dopo ogni disegno):
+  180 punti per forma, ricavati a mano dai tracciati di `shapes.js` (`getPointAtLength` costava 0,2 s per forma),
+  interpolati con una molla; gli SVG hanno `data-morph-skip`. Le pagine usano `axisPage` (asse condiviso) e
+  `.stagger` (comparsa a scaglioni); gli interruttori riusano le azioni delle Impostazioni.
 - Per provare usare "Prova la demo" (`js/demo.js`, dati deterministici generati nel browser); nell'Orario "Genera"
-  crea la bozza dalle lezioni della demo.
+  crea la bozza dalle lezioni della demo. Per rivedere la prima apertura: cancellare `bcw.onboardingCompleted` (e gli
+  account) dal `localStorage`; nelle prove automatiche impostarlo prima di aprire la pagina.

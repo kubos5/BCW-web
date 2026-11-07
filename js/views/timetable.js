@@ -4,7 +4,7 @@
 // flottante, il menu del pulsante +, la bozza generata dalle lezioni e i colori delle palette.
 
 import {
-  pill, emptyState, button, iconButton, statusBanner, listGroup, segCell, statusChip, axisPage, dayHero, wavyProgress,
+  pill, emptyState, button, statusBanner, listGroup, segCell, statusChip, axisPage, dayHero, wavyProgress,
   floatingToolbar, toolbarButton, toolbarSeparator,
 } from '../components.js';
 import { calendarBar } from '../calendar-bar.js';
@@ -15,11 +15,11 @@ import {
   addDays, addMonths, dayKey, esc, fmt, isSameDay, isToday, isTomorrow, isYesterday, isWeekend, startOfDay, startOfMonth, startOfWeek, plural,
 } from '../util.js';
 import {
-  Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, dayProgress, defaultTimetableDay, displayTitle, duration,
-  entryColor, isBreak, roundHalfAway, timeRange,
+  Alignment, TimeOfDay, TimetableMode, Weekday, alignedPieces, dayContent, defaultTimetableDay, displayTitle, duration,
+  entryColor, isBreak, roundHalfAway, timeRange, timetableLayout,
 } from '../timetable.js';
 import {
-  detailSheet, editorSheet, generatorSheet, hiddenTestsSheet, seriesSheet, deleteEntryDialog, timetableSheetActions,
+  detailSheet, editorSheet, generatorSheet, hiddenTestsSheet, seriesSheet, shiftSheet, deleteEntryDialog, timetableSheetActions,
 } from './timetable-sheets.js';
 
 // MARK: - Stato
@@ -97,14 +97,28 @@ export function requestAlignment(ctx, value) {
 
 // MARK: - Pagina
 
-/** Barra degli strumenti della modifica (vivace, al posto della barra di navigazione). */
+/**
+ * Barra degli strumenti della modifica (vivace, al posto della barra di navigazione):
+ * allineamento, spostamento degli orari, nuovo intervallo e "Fine". Come nell'app dalla 3.3, i
+ * colori della giornata stanno nel menu dell'orario.
+ */
 function editToolbar(ctx) {
   const store = ctx.model.timetable;
   const align = Object.values(Alignment).map((a) => toolbarButton(a.icon, { action: 'tt-align-pick', params: { value: a.id }, label: a.title, selected: store.alignment === a.id })).join('');
   return floatingToolbar(`${align}${toolbarSeparator()}
+    ${toolbarButton('schedule', { action: 'tt-shift', label: 'Sposta gli orari' })}
     ${toolbarButton('coffee', { action: 'tt-new-break', label: 'Nuovo intervallo' })}
-    ${toolbarButton('palette', { action: 'tt-series', label: 'Colora la giornata' })}
     <button class="btn filled tb-done" data-action="tt-done" title="Esci dalla modifica (↩)">${icon('check')}<span>Fine</span></button>`, { vibrant: true, label: "Modifica dell'orario" });
+}
+
+/**
+ * Barra degli strumenti dell'anteprima della bozza (vivace, modalità temporanea al posto della
+ * barra di navigazione, come `TimetableDraftToolbar` nell'app): rigenera, scarta, applica.
+ */
+function draftToolbar() {
+  return floatingToolbar(`${toolbarButton('tune', { action: 'tt-generate', label: 'Cambia le impostazioni e rigenera' })}
+    ${toolbarButton('trash', { action: 'tt-draft-discard', label: "Scarta l'anteprima" })}${toolbarSeparator()}
+    <button class="btn filled tb-done" data-action="tt-draft-apply" title="Applica l'orario generato">${icon('check')}<span>Applica</span></button>`, { vibrant: true, label: "Anteprima dell'orario" });
 }
 
 export const timetable = {
@@ -146,15 +160,17 @@ export const timetable = {
         { title: 'Nuovo evento', icon: 'plus', action: 'tt-new' },
       ],
     };
-    const toolbar = s.editing ? editToolbar(ctx) : null;
+    // Modifica e anteprima della bozza sono modalità temporanee: la loro barra degli strumenti
+    // prende il posto della barra di navigazione.
+    const toolbar = s.editing ? editToolbar(ctx) : (isDraft ? draftToolbar() : null);
     const title = s.editing ? 'Modifica orario' : 'Orario';
     const content = dayContent(model, day, { splitAtBreaks: mode !== 'day' });
     const capsule = mode === 'day' && content.unmatchedTests.length ? unmatchedCapsule(content.unmatchedTests) : '';
-    const extras = draftBanner(ctx) + (s.editing ? editHint(ctx) : '') + capsule;
+    const extras = draftHeader(ctx) + (s.editing ? editHint(ctx) : '') + capsule;
     const bar = calendarBar(ctx, { selected: day, action: 'tt-select', shiftAction: 'tt-week-shift', pickAction: 'tt-pick', dir: s.weekDir });
 
     if (ctx.wide) {
-      return { title, actions, fabMenu, toolbar, ...wideLayout(ctx, mode, content, extras, bar) };
+      return { title, actions, fabMenu, toolbar, hidesNav: s.editing || isDraft, ...wideLayout(ctx, mode, content, extras, bar) };
     }
 
     // Telefoni: in alto la settimana, ferma; sotto il giorno (Lista) o la sua giornata (Giorno).
@@ -177,15 +193,19 @@ export const timetable = {
       body,
       fabMenu,
       toolbar,
-      hidesNav: s.editing,
+      hidesNav: s.editing || isDraft,
       refresh: () => model.refreshAll(),
     };
   },
 
-  /** Nuovo tocco sulla scheda: il giorno predefinito. */
+  /**
+   * Nuovo tocco sulla scheda: il primo porta in cima la Lista, il successivo (già in cima) al giorno
+   * predefinito. Nella vista Giorno, che parte già scorsa alla prima ora, subito al giorno.
+   */
   reselect(ctx) {
     select(ctx, defaultDay(ctx));
   },
+  reselectSkipsTop: (ctx) => effectiveMode(ctx) === 'day',
 
   actions: {
     ...timetableSheetActions,
@@ -229,6 +249,10 @@ export const timetable = {
       s.scrollToHour = true;
     },
     'tt-generate': (ctx) => ctx.openSheet(generatorSheet(ctx)),
+    'tt-shift': (ctx) => {
+      if (ctx.model.timetable.draft || ctx.model.timetable.isEmpty) return;
+      ctx.openSheet(shiftSheet(ctx, Weekday.of(ttState(ctx).selected)));
+    },
     'tt-hidden-tests': (ctx) => ctx.openSheet(hiddenTestsSheet(ctx)),
     'tt-series': (ctx, el) => {
       const weekday = el?.dataset?.weekday ? Number(el.dataset.weekday) : Weekday.of(ttState(ctx).selected);
@@ -379,53 +403,43 @@ function dayChips(ctx, content) {
 
 /**
  * In cima all'orario di oggi: la lezione in corso (quanto manca, con l'avanzamento ondulato) e
- * quella dopo, oppure la prossima lezione con il tempo che manca. Sparisce finite le lezioni.
+ * quella dopo, oppure la prossima lezione con il tempo che manca. Le ore uguali di seguito contano
+ * come una lezione sola, come nell'app (3.3, anche nell'attività in diretta e nei widget): due ore
+ * di Italiano sono "fino alle 12:00" con una barra sola, poi la materia dopo. Come nella Lista, un
+ * intervallo sul passaggio tra due ore uguali le tiene separate. Toccandola si apre l'ora in corso
+ * del gruppo, con le sue note e i suoi file. Sparisce finite le lezioni; si nasconde da
+ * Impostazioni › Orario › Oggi (`timetableShowsNowCard`).
  */
 function nowCard(content) {
   const minute = TimeOfDay.of(new Date());
-  const lessons = content.entries.filter((e) => !isBreak(e)).sort((a, b) => a.start - b.start);
-  const current = lessons.findLast((e) => e.start <= minute && minute < e.end);
-  const next = lessons.find((e) => e.start >= (current?.end ?? minute) && e.id !== current?.id && e.start > minute);
+  const lessons = timetableLayout(content.entries, { splitAtBreaks: true }).clusters
+    .flatMap((c) => c.blocks.map((p) => p.block))
+    .sort((a, b) => a.start - b.start);
+  const current = lessons.findLast((b) => b.start <= minute && minute < b.end);
+  const next = lessons.find((b) => b.start >= (current?.end ?? minute) && b.id !== current?.id && b.start > minute);
   const shown = current ?? next;
   if (!shown) return '';
+  const title = displayTitle(shown.entries[0]);
   const detail = [current ? `Fino alle ${TimeOfDay.string(shown.end)} · ancora ${TimeOfDay.duration(shown.end - minute)}` : `Alle ${TimeOfDay.string(shown.start)}`];
-  if (shown.room) detail.push(shown.room);
-  const following = current && next ? `<span class="now-next">${icon('chevronRight')}<span>Poi ${esc(displayTitle(next))} alle ${TimeOfDay.string(next.start)}</span></span>` : '';
-  return `<button class="now-card" data-action="tt-open"${data({ id: shown.id, time: content.day.getTime() })} data-key="now-${shown.id}">
+  const room = shown.entries.find((e) => e.room)?.room;
+  if (room) detail.push(room);
+  const opened = shown.entries.findLast((e) => e.start <= minute) ?? shown.entries[0];
+  const following = current && next ? `<span class="now-next">${icon('chevronRight')}<span>Poi ${esc(displayTitle(next.entries[0]))} alle ${TimeOfDay.string(next.start)}</span></span>` : '';
+  return `<button class="now-card" data-action="tt-open"${data({ id: opened.id, time: content.day.getTime() })} data-key="now-${shown.id}">
     <span class="now-top"><span class="now-text"><small>${current ? 'ADESSO' : `TRA ${esc(TimeOfDay.duration(shown.start - minute).toUpperCase())}`}</small>
-      <strong>${esc(displayTitle(shown))}</strong><span>${esc(detail.join(' · '))}</span></span>
+      <strong>${esc(title)}</strong><span>${esc(detail.join(' · '))}</span></span>
       <span class="now-art shaped">${shape(current ? 'cookie12Sided' : 'sunny')}${icon(current ? 'timetableFill' : 'schedule')}</span></span>
-    ${current ? wavyProgress(minute - shown.start, duration(shown), { label: 'Avanzamento della lezione' }) : ''}
+    ${current ? wavyProgress(minute - shown.start, shown.end - shown.start, { label: 'Avanzamento della lezione' }) : ''}
     ${following}</button>`;
-}
-
-/**
- * A destra del nome del giorno, a che punto è la giornata (Impostazioni › Orario › Barra di
- * avanzamento della giornata): la percentuale e l'indicatore lineare di Material 3, ondulato mentre
- * la giornata è in corso (come la lezione della card "Adesso"), piatto prima dell'inizio e a giornata
- * finita. Oggi segue l'orologio (la pagina si ridisegna ogni 30 secondi); un giorno passato è al
- * 100%, uno futuro allo 0%. Senza spazio per la barra resta la percentuale.
- */
-function dayProgressView(ctx, content) {
-  if (!ctx.prefs.showsDayProgress || content.isDraft) return '';
-  const day = content.day;
-  const minute = isToday(day) ? TimeOfDay.of(new Date()) : (day < startOfDay(new Date()) ? 24 * 60 : 0);
-  const progress = dayProgress(content.entries.filter((e) => !isBreak(e)), minute);
-  if (!progress) return '';
-  const running = progress.elapsed > 0 && !progress.finished;
-  // Giornata finita: la traccia attiva piena, senza onda.
-  const bar = progress.finished ? '<span class="dp-full"></span>' : wavyProgress(progress.elapsed, progress.total, { decorative: true });
-  return `<div class="day-progress ${running ? 'running' : ''}" role="progressbar" aria-label="Avanzamento della giornata" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}" aria-valuetext="${progress.percent}%">
-    <span class="dp-percent numeral">${progress.percent}%</span><span class="dp-bar">${bar}</span></div>`;
 }
 
 export function dayList(ctx, content) {
   const store = ctx.model.timetable;
   const day = content.day;
   const showsTests = ctx.prefs.timetableShowsTests;
-  const header = dayHero(day, { jump: jumpButton(ctx, day), chips: dayChips(ctx, content), progress: dayProgressView(ctx, content) });
-  const now = isToday(day) && !content.isDraft ? nowCard(content) : '';
-  const unmatched = showsTests && content.unmatchedTests.length
+  const header = dayHero(day, { jump: jumpButton(ctx, day), chips: dayChips(ctx, content) });
+  const now = isToday(day) && !content.isDraft && ctx.prefs.timetableShowsNowCard ? nowCard(content) : '';
+  const unmatched = showsTests && content.unmatchedTests.length && !content.isDraft
     ? listGroup(content.unmatchedTests.map((t) => segCell(registerTestRow(store, t, { unmatched: true }))), { header: 'Verifiche senza lezione in orario', background: 'color-mix(in srgb, var(--fair-container) 45%, var(--surface-container))' })
     : '';
 
@@ -448,9 +462,10 @@ export function dayList(ctx, content) {
     else rows.push(item);
   }
   const items = rows.map((row) => {
-    if (row.type === 'pause') return breakRow(ctx, row.entry, day, content.isDraft);
+    if (row.type === 'pause') return breakRow(ctx, row.entry, day, content.isDraft, content.layout.span);
     if (row.type === 'gap') return `<div class="tt-gap"><hr><span>Libero · ${esc(TimeOfDay.duration(row.end - row.start))}</span><hr></div>`;
-    return `<div class="tt-run">${row.clusters.map((cluster) => {
+    // In anteprima le righe sono pillole staccate, che applicando si uniscono in una lista.
+    return `<div class="tt-run ${content.isDraft ? 'draft' : ''}">${row.clusters.map((cluster) => {
       if (cluster.columns === 1) return blockCard(ctx, cluster.blocks[0].block, content, { compact: false });
       const columns = [];
       for (let c = 0; c < cluster.columns; c++) {
@@ -470,12 +485,19 @@ function badgesLine(badge) {
   return parts.length ? `<div class="tt-badges">${parts.join('')}</div>` : '';
 }
 
-/** Uno o più eventi uguali accostati: un blocco unico, diviso in righe. */
+/**
+ * Uno o più eventi uguali accostati: un blocco unico, diviso in righe. Come nell'app dalla 3.3, le
+ * ore di un gruppo non hanno un separatore (prima una linea tratteggiata): la barretta della tinta
+ * arriva al bordo tra un'ora e l'altra (`join-up`/`join-down`), così le ore formano una barra a
+ * segmenti con 4 px di stacco, e ogni ora ha il suo orario a sinistra. In anteprima il blocco è una
+ * pillola più piena nella tinta, con un'onda al posto della barretta e l'onda di luce (`draftSheen`).
+ */
 function blockCard(ctx, block, content, { compact }) {
   const store = ctx.model.timetable;
   const showsTests = ctx.prefs.timetableShowsTests;
   const day = content.day;
   const minute = isToday(day) && !content.isDraft ? TimeOfDay.of(new Date()) : null;
+  const count = block.entries.length;
   const rows = block.entries.map((entry, index) => {
     const badge = content.badges.get(entry.id) ?? {};
     const isTest = showsTests && badge.isTest;
@@ -484,8 +506,9 @@ function blockCard(ctx, block, content, { compact }) {
     const details = [entry.teacher, entry.room].filter(Boolean);
     if (!compact && duration(entry) !== 60) details.push(TimeOfDay.duration(duration(entry)));
     const attrs = `data-action="tt-open"${data({ id: entry.id, time: day.getTime() })}${content.isDraft ? '' : ` data-context="tt-entry"`}`;
+    const joins = `${index ? 'follow join-up' : ''} ${index < count - 1 ? 'join-down' : ''}`;
     if (compact) {
-      return `<button class="tt-entry compact ${index ? 'follow' : ''}" style="--tint:${tint}" ${attrs}>
+      return `<button class="tt-entry compact ${joins}" style="--tint:${tint}" ${attrs}>
         <span class="tt-bar"></span><span class="tt-entry-body">
         <span class="tt-time">${timeRange(entry)}</span>
         <strong class="tt-title">${esc(displayTitle(entry))}</strong>
@@ -493,20 +516,42 @@ function blockCard(ctx, block, content, { compact }) {
         ${entry.teacher || entry.room ? `<span class="tt-details">${esc([entry.teacher, entry.room].filter(Boolean).join(' · '))}</span>` : ''}
         ${badgesLine(badge)}</span></button>`;
     }
-    return `<button class="tt-entry ${index ? 'follow' : ''}" style="--tint:${tint}" ${attrs}>
+    return `<button class="tt-entry ${joins}" style="--tint:${tint}" ${attrs}>
       <span class="tt-times"><strong class="numeral-mono">${TimeOfDay.string(entry.start)}</strong><small class="numeral-mono">${TimeOfDay.string(entry.end)}</small></span>
       <span class="tt-bar"></span>
       <span class="tt-entry-body"><span class="tt-title-row"><strong class="tt-title">${esc(displayTitle(entry))}</strong>${ongoing ? pill('In corso', { color: tint, filled: true, cls: 'bold' }) : ''}${isTest ? pill('Verifica', { cls: 'bold' }) : ''}</span>
       ${details.length ? `<span class="tt-details">${esc(details.join(' · '))}</span>` : ''}
       ${badgesLine(badge)}</span></button>`;
   }).join('');
-  return `<div class="tt-block ${content.isDraft ? 'draft' : ''}" style="--tint:${entryColor(block.entries[0], store)}" data-key="blk-${block.id}">${rows}</div>`;
+  const draft = content.isDraft ? draftSheen(block.start) : '';
+  return `<div class="tt-block ${content.isDraft ? 'draft' : ''}" style="--tint:${entryColor(block.entries[0], store)}${content.isDraft ? `;${draftDelay(block.start, content.layout.span)}` : ''}" data-key="blk-${block.id}">${rows}${draft}</div>`;
+}
+
+// MARK: - Anteprima della bozza
+
+/**
+ * Come nell'app (3.3, al posto del bordo tratteggiato): gli eventi dell'anteprima sono pillole
+ * nella loro tinta, con un'onda di luce che scende lungo la giornata. La fase dipende dall'ora di
+ * inizio (nell'app dalla posizione sullo schermo), così tutti gli eventi insieme sembrano una sola
+ * onda: 3,4 s per passaggio, un evento un'ora più in basso la vede arrivare circa 0,14 s dopo.
+ */
+const SHEEN_PERIOD = 3.4;
+
+function draftSheen(start) {
+  const delay = (start / 420) % SHEEN_PERIOD - SHEEN_PERIOD;
+  return `<span class="draft-sheen" style="animation-delay:${delay.toFixed(3)}s" aria-hidden="true"></span>`;
+}
+
+/** Comparsa a scaglioni lungo la giornata, come `draftBlock` nell'app (35 ms per ora). */
+function draftDelay(start, span) {
+  const index = Math.max(0, Math.round((start - (span?.start ?? start)) / 60));
+  return `--draft-delay:${Math.min(index, 12) * 35}ms`;
 }
 
 /** Intervallo nella lista: una pillola con l'orario tra due linee ondulate, nello sfondo. */
-function breakRow(ctx, entry, day, isDraft) {
+function breakRow(ctx, entry, day, isDraft, span) {
   const tint = entryColor(entry, ctx.model.timetable);
-  return `<button class="tt-break ${isDraft ? 'draft' : ''}" style="--tint:${tint}" data-action="tt-open"${data({ id: entry.id, time: day.getTime() })}${isDraft ? '' : ' data-context="tt-entry"'} data-key="brk-${entry.id}">
+  return `<button class="tt-break ${isDraft ? 'draft' : ''}" style="--tint:${tint}${isDraft ? `;${draftDelay(entry.start, span)}` : ''}" data-action="tt-open"${data({ id: entry.id, time: day.getTime() })}${isDraft ? '' : ' data-context="tt-entry"'} data-key="brk-${entry.id}">
     <span class="wavy-line"></span><span class="tt-break-label">${icon('coffeeFill', { cls: 'small' })}${esc(displayTitle(entry))} · ${timeRange(entry)}</span><span class="wavy-line"></span></button>`;
 }
 
@@ -525,17 +570,22 @@ export function registerTestRow(store, test, { unmatched = false, hidden = false
 
 // MARK: - Barre: bozza, modifica, verifiche senza lezione
 
-function draftBanner(ctx) {
-  const draft = ctx.model.timetable.draft;
+/**
+ * Sopra l'anteprima (`TimetableDraftHeader` nell'app): da dove viene l'orario, con una forma che
+ * ruota lentamente, nel contenitore terziario. Applica, Scarta e Rigenera stanno nella barra
+ * degli strumenti in basso (`draftToolbar`). Con ore fuori dalle mezz'ore lo dice: applicando
+ * l'orario passa all'allineamento libero.
+ */
+function draftHeader(ctx) {
+  const store = ctx.model.timetable;
+  const draft = store.draft;
   if (!draft) return '';
   const lessons = draft.entries.filter((e) => !isBreak(e)).length;
-  return `<div class="tt-draft-banner">
-    <div class="row gap-12 align-start"><span class="tt-draft-icon">${icon('wand')}</span>
-      <div class="grow"><strong>Anteprima dell'orario generato</strong>
-      <p>${plural(lessons, '1 lezione ricavata', '# lezioni ricavate')} da ${plural(draft.analyzedDays, '1 giorno', '# giorni')} di registro (${esc(fmt.shortDay(draft.from))} – ${esc(fmt.shortDay(draft.to))}). ${lessons === 1 ? 'Controllala prima di applicarla.' : 'Controllale prima di applicarle.'}</p></div></div>
-    <div class="row gap-8">${button('Applica', { action: 'tt-draft-apply', iconName: 'check', style: 'filled', cls: 'xs' })}
-      ${button('Scarta', { action: 'tt-draft-discard', iconName: 'x', style: 'tonal', cls: 'xs' })}<span class="flex"></span>
-      ${iconButton('tune', { action: 'tt-generate', label: 'Cambia le impostazioni e rigenera', cls: 'small tonal' })}</div></div>`;
+  return `<div class="tt-draft-header" data-key="tt-draft-header">
+    <span class="tt-draft-art shaped">${shape('sunny')}${icon('wand')}</span>
+    <div class="grow"><strong>Anteprima dell'orario</strong>
+      <p>${plural(lessons, '1 lezione ricavata', '# lezioni ricavate')} da ${plural(draft.analyzedDays, '1 giorno', '# giorni')} di registro (${esc(fmt.shortDay(draft.from))} – ${esc(fmt.shortDay(draft.to))})</p>
+      ${store.draftNeedsFreeAlignment ? "<p class=\"tt-draft-free\">Orari esatti: applicando, l'orario passa all'allineamento libero.</p>" : ''}</div></div>`;
 }
 
 /** Istruzioni della modifica (nel contenitore terziario): l'allineamento si sceglie nella barra degli strumenti. */
@@ -617,6 +667,7 @@ function dayColumn(ctx, day, dayIndex, count, { canEdit, multiple, selected, hh 
     for (const placed of cluster.blocks) {
       placed.block.entries.forEach((entry, index) => {
         segments.push(segment(ctx, entry, content, {
+          blockStart: placed.block.start,
           left: `calc(${(placed.column / cluster.columns) * 100}% + 2px)`,
           width: `calc(${100 / cluster.columns}% - 4px)`,
           roundsTop: index === 0, roundsBottom: index === placed.block.entries.length - 1,
@@ -639,7 +690,7 @@ function dayColumn(ctx, day, dayIndex, count, { canEdit, multiple, selected, hh 
   return `<div class="tt-col ${multiple && isSel ? 'selected' : ''} ${content.isDraft ? 'draft' : ''}" data-day-index="${dayIndex}" data-time="${day.getTime()}"${canEdit ? ' data-dblclick="tt-col-dbl"' : ''}>${segments.join('')}${empty}</div>`;
 }
 
-function segment(ctx, entry, content, { left, width, roundsTop, roundsBottom, dayIndex, canEdit, hh }) {
+function segment(ctx, entry, content, { left, width, roundsTop, roundsBottom, dayIndex, canEdit, hh, blockStart = entry.start }) {
   const store = ctx.model.timetable;
   const badge = content.badges.get(entry.id) ?? {};
   const tint = entryColor(entry, store);
@@ -658,10 +709,14 @@ function segment(ctx, entry, content, { left, width, roundsTop, roundsBottom, da
   }
   const cls = ['tt-seg', isBreak(entry) ? 'break' : 'lesson', roundsTop ? 'rt' : 'follow', roundsBottom ? 'rb' : '', content.isDraft ? 'draft' : ''].join(' ');
   const attrs = data({ id: entry.id, time: content.day.getTime(), dayIndex });
+  // In anteprima: comparsa a scaglioni (un'ora dopo l'altra, come nell'app), onda di luce e onda
+  // sul bordo al posto del colore pieno.
+  const draft = content.isDraft ? `;--draft-delay:${(Math.floor(blockStart / 60) % 12) * 35}ms` : '';
+  const decor = content.isDraft && !isBreak(entry) ? `${draftSheen(entry.start)}<span class="tt-seg-wave" aria-hidden="true"></span>` : '';
   // In modifica niente menu tenendo premuto (come nell'app): col dito si apriva sopra il
   // trascinamento appena cominciato, che restava attivo senza vedersi.
-  return `<button class="${cls}" style="--tint:${tint};top:${top}px;height:${height}px;left:${left};width:${width}" data-action="tt-open"${attrs}${content.isDraft || canEdit ? '' : ' data-context="tt-entry"'}${canEdit ? ' data-seg="1"' : ''} aria-label="${esc(`${title}, ${timeRange(entry)}`)}" data-key="seg-${entry.id}">
-    ${label}${canEdit ? '<span class="tt-resize" data-resize="1"><i></i></span>' : ''}</button>`;
+  return `<button class="${cls}" style="--tint:${tint};top:${top}px;height:${height}px;left:${left};width:${width}${draft}" data-action="tt-open"${attrs}${content.isDraft || canEdit ? '' : ' data-context="tt-entry"'}${canEdit ? ' data-seg="1"' : ''} aria-label="${esc(`${title}, ${timeRange(entry)}`)}" data-key="seg-${entry.id}">
+    ${decor}${label}${canEdit ? '<span class="tt-resize" data-resize="1"><i></i></span>' : ''}</button>`;
 }
 
 /** Doppio tocco/clic su un'ora vuota in modifica: nuovo evento a quell'ora. */
