@@ -76,7 +76,8 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   `view.reselect` (Dashboard: domani; Orario: il giorno predefinito; Voti: la media dell'anno se era scelto un periodo).
   `reselectSkipsTop` salta il primo passo (vista Giorno dell'Orario, già scorsa all'ora; Voti sugli schermi larghi).
   Il popup degli account (`accountSwitcherSheet`) con l'account BCW ha anche "Esci da BCW".
-- Da 840 px (come le app Google sul web): barra superiore con logo, ricerca generale (fuori dalla `.page`, così non perde il
+- Da 840 px (come le app Google sul web): barra superiore con logo (un link all'indirizzo base, `goHome()`: Dashboard
+  dall'inizio, chiude ricerca e pagine aperte; con Ctrl/⌘/Maiusc resta un link, `data-spa`), ricerca generale (fuori dalla `.page`, così non perde il
   fuoco), Aggiorna, Impostazioni e avatar (menu degli account); barra di navigazione espansa con tutte le sezioni
   (riducibile; tra 840 e 1000 si apre sopra il contenuto); pagina in un pannello con angoli ampi; ricerche di pagina nel
   contenuto (`localSearchField`); Impostazioni e Bacheca con elenco e dettaglio affiancati.

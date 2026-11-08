@@ -293,6 +293,33 @@ export function selectSection(key) {
   app.update();
 }
 
+/** L'indirizzo base del sito, senza percorso dell'app (`#/…`). */
+const homeURL = () => `${location.pathname}${location.search}`;
+
+/**
+ * Il logo in alto a sinistra: la Dashboard dall'inizio, all'indirizzo base. Chiude ricerca, menu e
+ * pagine aperte nelle altre sezioni; se la Dashboard è già aperta fa come un nuovo tocco (in cima).
+ */
+export function goHome() {
+  if (app.nav.current === 'dashboard' && (app.nav.stacks.dashboard?.length ?? 1) === 1 && !app.searching
+    && !app.viewState.get('search')?.query) {
+    selectSection('dashboard');
+    return;
+  }
+  saveScroll();
+  app.menu = null;
+  app.railOpen = false;
+  app.fabOpen = false;
+  app.searching = false;
+  const search = app.viewState.get('search');
+  if (search) search.query = '';
+  resetNavigation('dashboard');
+  app.nav.lastSection = 'dashboard';
+  try { localStorage.setItem('bcw.section', 'dashboard'); } catch { /* ignorato */ }
+  if (location.hash) history.pushState(null, '', homeURL());
+  app.update();
+}
+
 export function back() {
   const stack = app.nav.stacks[app.nav.current];
   if (!stack || stack.length < 2) return;
@@ -1003,7 +1030,7 @@ function renderDesktop(ctx, page) {
     <header class="top-bar">
       <div class="top-lead">
         <button class="icon-btn" data-action="toggle-rail" aria-label="${app.railIsCollapsed ? 'Espandi la barra di navigazione' : 'Riduci la barra di navigazione'}" title="${app.railIsCollapsed ? 'Espandi' : 'Riduci'}">${icon('menuOpen', { cls: app.railIsCollapsed ? 'flipped' : '' })}</button>
-        ${logo('top-logo')}</div>
+        <a class="top-home" href="${esc(homeURL())}" data-action="go-home" data-spa aria-label="BCW, vai alla Dashboard" title="Dashboard">${logo('top-logo')}</a></div>
       <div class="top-search" data-key="global-search">${globalSearchField()}</div>
       <div class="top-actions">${refresh}${settings}${accountAvatar('account-menu', 36)}</div>
     </header>
@@ -1164,6 +1191,7 @@ const shellActions = {
     navigator.vibrate?.(4);
   },
   'select-section': (ctx, el) => selectSection(el.dataset.keyName),
+  'go-home': () => goHome(),
   'nav-back': () => back(),
   'navigate': (ctx, el) => navigate(el.dataset.to),
   'toggle-rail': () => {
@@ -1308,7 +1336,10 @@ root.addEventListener('click', (event) => {
   }
   const el = event.target.closest('[data-action]');
   if (!el || !root.contains(el) || el.disabled) return;
-  if (el.tagName === 'A' && el.getAttribute('href')) return;
+  // I link restano link; quelli con `data-spa` (il logo) li apre l'app, tranne con Ctrl/⌘/Maiusc
+  // (nuova scheda o finestra).
+  if (el.tagName === 'A' && el.getAttribute('href')
+    && (!('spa' in el.dataset) || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
   event.preventDefault();
   dispatch(el.dataset.action, el, event);
 });
