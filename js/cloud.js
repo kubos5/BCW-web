@@ -149,8 +149,8 @@ export function accountFromServer(remote) {
  */
 export const SYNCED_PREFERENCES = [
   'averageMode', 'weightedAverage', 'targetAverage', 'dashboardMode', 'hideCompletedHomework', 'showUpcomingDays',
-  'completedHomework', 'collapsedSections', 'timetableMode', 'timetableShowsTests', 'titleAbbreviation',
-  'showsTimetableTab', 'showsDayProgress',
+  'completedHomework', 'collapsedSections', 'timetableMode', 'timetableShowsTests', 'timetableShowsNowCard',
+  'titleAbbreviation', 'showsTimetableTab',
   'appearance', 'accentColor', 'colorStyle', 'contrast', 'corners', 'motion', 'roundedText',
 ];
 
@@ -190,8 +190,8 @@ const validators = {
   collapsedSections: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   timetableMode: oneOf('list', 'day'),
   timetableShowsTests: isBool,
+  timetableShowsNowCard: isBool,
   showsTimetableTab: isBool,
-  showsDayProgress: isBool,
   titleAbbreviation: oneOf('automatic', 'always', 'never'),
   appearance: oneOf('system', 'light', 'dark'),
   accentColor: (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v),

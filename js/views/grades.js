@@ -3,12 +3,13 @@
 
 import {
   chipRow, filterChip, averageRing, gradeBadge, subjectTag, detailRow, collapsible, chevron, statusBanner, emptyState,
-  sectionHeader, gradeColor, gradeColorValue, subjectColor, stepper, listGroup, statusChip, connectedGroup, primaryTabs, axisPage,
+  sectionHeader, gradeColor, gradeColorValue, gradeTone, subjectColor, stepper, listGroup, statusChip, connectedGroup, primaryTabs, axisPage,
+  select, button,
 } from '../components.js';
 import { chartPlaceholder } from '../charts.js';
 import { icon } from '../icons.js';
 import { shape } from '../shapes.js';
-import { GradeBook } from '../gradebook.js';
+import { GradeBook, newHypothetical } from '../gradebook.js';
 import { esc, fmt, GradeFormat, byName, groupBy, startOfMonth } from '../util.js';
 
 function bookState(ctx, key) {
@@ -51,12 +52,29 @@ export const grades = {
       s.section === 'recent' ? recentList(ctx, book, s, 'grades') : subjectList(ctx, book, s));
     const hero = averageHero(book, s.period, { size: ctx.wide ? 168 : 188 });
     const trend = trendCard(book, s.period, s.subject);
+    // "E se prendessi…" (3.3), comprimibile: nei Voti starebbe sopra l'elenco.
+    const simulator = gradeSimulator(ctx, book, { period: s.period, suggestedSubject: s.subject, collapsible: true });
     const lists = `<div class="stack gap-16">${tabs}${filters(book, s)}${list}</div>`;
     if (ctx.wide) {
-      return { title: 'Voti', actions, refresh, split: { sideWidth: 380, side: hero + trend, main: banner + lists } };
+      return { title: 'Voti', actions, refresh, split: { sideWidth: 380, side: hero + trend + simulator, main: banner + lists } };
     }
-    return { title: 'Voti', actions, refresh, body: `<div class="stack gap-24">${banner}${hero}${trend}${lists}</div>` };
+    return { title: 'Voti', actions, refresh, body: `<div class="stack gap-24">${banner}${hero}${trend}${simulator}${lists}</div>` };
   },
+
+  /**
+   * Nuovo tocco sulla scheda Voti, già in cima: la media dell'anno se era scelto un periodo. Sugli
+   * schermi larghi (voti accanto alla media, come sull'iPad) il periodo torna subito all'anno e la
+   * colonna dei voti torna in cima.
+   */
+  reselect(ctx) {
+    const s = bookState(ctx, 'grades');
+    if (s.period != null) {
+      navigator.vibrate?.(4);
+      s.period = null;
+    }
+    if (ctx.wide) ctx.scrollToTop();
+  },
+  reselectSkipsTop: (ctx) => ctx.wide && !ctx.route.param,
 
   actions: {
     'grades-section': (ctx, el) => {
@@ -105,6 +123,7 @@ export const grades = {
       const s = ctx.state('goal', { upcoming: 1 });
       s.upcoming = Math.min(5, Math.max(1, s.upcoming + Number(el.dataset.delta)));
     },
+    // Le azioni di "E se prendessi…" si aggiungono in fondo al file (`simulatorActions`).
   },
 };
 
@@ -279,7 +298,7 @@ export function subjectDetail(ctx, subjectId) {
     signature: `${s.period}|${sorted.length}|${running.at(-1)?.value}|${book.weighted}`,
   })}</div>` : '';
 
-  const goal = goalCalculator(ctx, list, book.weighted);
+  const goal = goalCalculator(ctx, list, book.weighted) + gradeSimulator(ctx, book, { period: s.period, subjectId });
   const gradesHeader = sectionHeader('Voti', { subtitle: list.length === 1 ? '1 valutazione' : `${list.length} valutazioni` });
   const gradeList = listGroup(list.map((g) => gradeCard(g, book, s.expanded.has(g.id), `subject-${subjectId}`)));
 
@@ -309,3 +328,141 @@ function goalCalculator(ctx, list, weighted) {
     <div class="row-between"><span>Prossime prove</span>${stepper(s.upcoming, { action: 'goal-count', min: 1, max: 5, step: 1 })}</div>
     <hr class="divider">${result}</div>`;
 }
+
+// MARK: - E se prendessi…
+
+/**
+ * "E se prendessi…" (3.3, come `GradeSimulator` nell'app): come cambierebbe la media con uno o più
+ * voti ipotetici. Nella pagina di una materia i voti sono di quella materia, nei Voti si sceglie la
+ * materia di ognuno tra tutte quelle dell'anno (anche senza voti). Nulla viene salvato: i voti
+ * ipotetici spariscono uscendo dalla pagina della materia (`ctx.pageState`); nei Voti restano finché
+ * resta aperta la sessione, come la scheda nell'app.
+ */
+function simulatorState(ctx, subjectId) {
+  const init = () => ({ open: false, grades: [], value: 7, weight: 1, chosen: null });
+  if (subjectId == null) return { key: 'sim:grades', state: ctx.state('sim:grades', init) };
+  return ctx.pageState(`sim-${subjectId}`, init);
+}
+
+/** Lo stato del simulatore a cui appartiene un controllo (`data-sim`). */
+const simulatorOf = (ctx, el) => ctx.app.viewState.get(el.dataset.sim);
+
+/**
+ * Tutte le materie dell'anno (anche quelle ancora senza voti), più quelle che compaiono solo nei
+ * voti (es. un anno con l'elenco delle materie non ancora scaricato).
+ */
+function simulatorSubjects(model, book) {
+  const names = new Map();
+  for (const subject of model.subjects ?? []) if (subject.id && subject.name) names.set(subject.id, subject.name);
+  for (const grade of book.grades) if (!names.has(grade.subjectId)) names.set(grade.subjectId, grade.subjectName);
+  return [...names.entries()].map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'it', { numeric: true, sensitivity: 'base' }));
+}
+
+/** In che periodo cade un voto ipotetico: quello scelto o, con tutto l'anno, l'ultimo. */
+function simulatorPeriod(book, period) {
+  const chosen = period != null ? book.activePeriods.find((p) => p.position === period) : null;
+  if (chosen) return { position: chosen.position, name: chosen.name };
+  const last = book.activePeriods.at(-1);
+  if (last) return { position: last.position, name: last.name };
+  return { position: period ?? 1, name: '' };
+}
+
+function simulatorTarget(s, subjects, { subjectId, suggestedSubject }) {
+  if (subjectId != null) return subjectId;
+  const known = (id) => id != null && subjects.some((x) => x.id === id);
+  if (known(s.chosen)) return s.chosen;
+  if (known(suggestedSubject)) return suggestedSubject;
+  return subjects[0]?.id ?? null;
+}
+
+export function gradeSimulator(ctx, book, { period = null, subjectId = null, suggestedSubject = null, collapsible: canCollapse = false } = {}) {
+  const { key, state: s } = simulatorState(ctx, subjectId);
+  const subjects = simulatorSubjects(ctx.model, book);
+  const target = simulatorTarget(s, subjects, { subjectId, suggestedSubject });
+  const nameOf = (id) => subjects.find((x) => x.id === id)?.name ?? 'Materia';
+  const sim = { sim: key };
+
+  const heading = `<span class="sim-heading"><span class="sim-art shaped">${shape('clover4Leaf')}${icon('wand')}</span>
+    <span class="grow"><strong>E se prendessi…</strong><small>Come cambierebbe la media</small></span></span>`;
+  const head = canCollapse
+    ? `<button class="sim-head" data-action="sim-toggle"${dataAttrs(sim)} aria-expanded="${s.open}" title="${s.open ? 'Nasconde la simulazione' : 'Apre la simulazione'}">${heading}${chevron(!s.open, { rotateUp: true })}</button>`
+    : `<div class="sim-head">${heading}</div>`;
+
+  const form = [];
+  if (subjectId == null && subjects.length) {
+    // Il nome della materia può essere lungo: l'etichetta resta intera e il campo prende il resto
+    // della riga, andando a capo su due righe.
+    form.push(`<div class="sim-row sim-subject"><span>Materia</span>${select(subjects.map((x) => [x.id, x.name]), target, 'sim-subject', { label: 'Materia', params: sim })}</div>`);
+  }
+  form.push(`<div class="sim-row"><span>Voto</span>${stepper(s.value, { action: `sim-value"${dataAttrs(sim)} data-x="`, min: 1, max: 10, step: 0.25, format: GradeFormat.short })}</div>`);
+  if (book.weighted) {
+    form.push(`<div class="sim-row"><span>Peso</span>${stepper(s.weight, { action: `sim-weight"${dataAttrs(sim)} data-x="`, min: 0.25, max: 3, step: 0.25, format: (v) => `${GradeFormat.short(v * 100)}%` })}</div>`);
+  }
+  form.push(button('Aggiungi questo voto', { action: 'sim-add', params: { ...sim, subject: target ?? '' }, iconName: 'plus', style: 'tonal', cls: 's wide', disabled: target == null }));
+
+  let extra = '';
+  if (s.grades.length) {
+    const chips = s.grades.map((g) => {
+      const tone = gradeTone(g.value);
+      return `<button class="sim-chip" style="--chip-bg:var(--${tone}-container);--chip-fg:var(--on-${tone}-container)" data-action="sim-remove"${dataAttrs({ ...sim, id: g.id })} data-key="sim-${g.id}" aria-label="Togli il voto ${esc(GradeFormat.short(g.value))}">
+        <strong class="numeral">${esc(GradeFormat.short(g.value))}</strong>${subjectId == null ? `<span class="sim-chip-name">${esc(g.subjectName)}</span>` : ''}
+        ${book.weighted && g.weight !== 1 ? `<span>${esc(GradeFormat.short(g.weight * 100))}%</span>` : ''}${icon('x', { cls: 'small' })}</button>`;
+    }).join('');
+    const where = simulatorPeriod(book, period);
+    const simulated = book.adding(s.grades, where.position, where.name);
+    const touched = [...new Set(s.grades.map((g) => g.subjectId))].sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'it'));
+    const rows = touched.map((id) => simulatorRow(subjectId == null ? nameOf(id) : 'Media della materia',
+      GradeBook.average(book.gradesIn(period).filter((g) => g.subjectId === id), book.weighted),
+      GradeBook.average(simulated.gradesIn(period).filter((g) => g.subjectId === id), book.weighted),
+      subjectId != null));
+    rows.push(simulatorRow(period == null ? 'Media generale' : 'Media del periodo', book.average(period), simulated.average(period), subjectId == null));
+    extra = `<div class="sim-chips">${chips}</div><hr class="divider"><div class="sim-results">${rows.join('')}</div>
+      <div class="sim-reset">${button('Azzera', { action: 'sim-reset', params: sim, style: 'text', cls: 'xs' })}</div>`;
+  }
+  const body = `<div class="stack gap-14">${form.join('')}${extra}</div>`;
+  return `<section class="card sim-card" data-key="${esc(key)}">${head}${collapsible(!canCollapse || s.open, body, { spacing: 14 })}</section>`;
+}
+
+/** Prima e dopo: la media (in piccolo quella di prima, in grande quella nuova) e la differenza. */
+function simulatorRow(title, before, after, prominent) {
+  const delta = before != null && after != null && Math.abs(after - before) >= 0.005 ? after - before : null;
+  return `<div class="sim-result ${prominent ? 'prominent' : ''}"><span class="sim-result-title">${esc(title)}</span>
+    <span class="sim-before numeral">${GradeFormat.average(before)}</span>${icon('chevronRight', { cls: 'small' })}
+    <strong class="sim-after numeral" style="color:${gradeColorValue(after)}">${GradeFormat.average(after)}</strong>
+    ${delta != null ? `<span class="sim-delta ${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '+' : '−'}${GradeFormat.average(Math.abs(delta))}</span>` : ''}</div>`;
+}
+
+const dataAttrs = (params) => Object.entries(params).filter(([, v]) => v != null)
+  .map(([k, v]) => ` data-${k}="${esc(String(v))}"`).join('');
+
+const simulatorActions = {
+  'sim-toggle': (ctx, el) => { const s = simulatorOf(ctx, el); if (s) s.open = !s.open; },
+  'sim-subject': (ctx, el) => { const s = simulatorOf(ctx, el); if (s) s.chosen = Number(el.value); },
+  'sim-value': (ctx, el) => {
+    const s = simulatorOf(ctx, el);
+    if (s) s.value = Math.min(10, Math.max(1, s.value + Number(el.dataset.delta)));
+  },
+  'sim-weight': (ctx, el) => {
+    const s = simulatorOf(ctx, el);
+    if (s) s.weight = Math.min(3, Math.max(0.25, s.weight + Number(el.dataset.delta)));
+  },
+  'sim-add': (ctx, el) => {
+    const s = simulatorOf(ctx, el);
+    const subjectId = Number(el.dataset.subject);
+    if (!s || !el.dataset.subject) return;
+    const book = ctx.model.gradeBook;
+    const name = simulatorSubjects(ctx.model, book).find((x) => x.id === subjectId)?.name ?? 'Materia';
+    navigator.vibrate?.(4);
+    s.grades = [...s.grades, newHypothetical({ subjectId, subjectName: name, value: s.value, weight: book.weighted ? s.weight : 1 })];
+  },
+  'sim-remove': (ctx, el) => {
+    const s = simulatorOf(ctx, el);
+    if (!s) return;
+    navigator.vibrate?.(4);
+    s.grades = s.grades.filter((g) => g.id !== Number(el.dataset.id));
+  },
+  'sim-reset': (ctx, el) => { const s = simulatorOf(ctx, el); if (s) s.grades = []; },
+};
+
+Object.assign(grades.actions, simulatorActions);

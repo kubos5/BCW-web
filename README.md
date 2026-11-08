@@ -50,7 +50,7 @@ Il proxy che BCW usa di base si imposta in `config.json`, così chi apre il sito
 
 `api` è l'indirizzo del server per gli account BCW (vedi sotto); senza, l'accesso con un account BCW chiede di impostarlo.
 
-All'avvio BCW sceglie, in ordine: l'indirizzo inserito a mano dall'utente (Modifica accanto a "Server" nella schermata di accesso, oppure Impostazioni › Server), il proxy del sito stesso se c'è (con `node server.js`), poi quello di `config.json`. Lasciando vuoto il campo si torna al predefinito.
+All'avvio BCW sceglie, in ordine: l'indirizzo inserito a mano dall'utente ("Usa un altro proxy" in fondo alla schermata di accesso, oppure Impostazioni › Server), il proxy del sito stesso se c'è (con `node server.js`), poi quello di `config.json`. Lasciando vuoto il campo si torna al predefinito.
 
 Anche `server.js` accetta richieste da altri siti se imposti `ALLOWED_ORIGINS`.
 
@@ -60,7 +60,7 @@ Con un account BCW (nome utente e password) si abbinano uno o più account Class
 
 Chi entra con un account Classeviva vede in Impostazioni › Account a quali account BCW è abbinato e può scollegarsi da ognuno: basta l'accesso a Classeviva.
 
-Il server è [BCW-api](https://github.com/kubos5/BCW-api), un Cloudflare Worker con un database D1. Il suo indirizzo predefinito si imposta in `config.json`, alla voce `api`; ognuno può cambiarlo da Impostazioni › Account › Server BCW (o da "Modifica" accanto a "Server BCW" nella schermata di accesso). BCW-api fa anche da proxy per Classeviva, quindi può stare anche nella voce `proxy`.
+Il server è [BCW-api](https://github.com/kubos5/BCW-api), un Cloudflare Worker con un database D1. Il suo indirizzo predefinito si imposta in `config.json`, alla voce `api`; ognuno può cambiarlo da Impostazioni › Account › Server BCW (o da "Usa un altro server BCW" in fondo alla schermata di accesso, scegliendo Account BCW). BCW-api fa anche da proxy per Classeviva, quindi può stare anche nella voce `proxy`.
 
 ### Installazione come app
 
@@ -76,11 +76,12 @@ Le stesse dell'app nativa:
 - toccando il periodo sopra la settimana si sceglie una data qualsiasi dal selettore della data; frecce e scorrimento di lato sulla settimana cambiano settimana (o mese), scorrendo di lato sul giorno si passa al giorno prima o dopo, con la transizione ad asse condiviso
 - "Nei prossimi giorni" come la vista Programma di Google Calendar: la data in un riquadro (solo toccando quella si va al giorno), il nome del giorno che comprime gli elementi e gli elementi in una lista segmentata, con le stesse azioni del giorno scelto
 - ricerca dalla barra in cima alla Dashboard, con la vista e l'avatar dell'account (che apre gli account): toccandola diventa il campo e i risultati prendono il posto della pagina
-- toccando di nuovo la scheda Dashboard si torna in cima alla pagina e, se si è già in cima, alla giornata di domani
+- toccando di nuovo la scheda aperta si torna in cima alla pagina in vista (anche a una pagina aperta dentro la scheda, poi alla pagina principale); se si è già in cima, la Dashboard va a domani, l'Orario al giorno con il prossimo evento e i Voti tornano alla media dell'anno
 - puoi segnare i compiti come fatti e, opzionalmente, nasconderli
 - Voti con la media in primo piano e i periodi in un gruppo di pulsanti collegati, grafico dell'andamento, schede Ultimi voti (divisi per mese, espandibili e filtrabili per materia) e Materie
 - effetto di ogni voto sulla media della materia (▲/▼) e grafico dei voti di ogni materia
 - dato un obiettivo di media, il voto necessario nelle prossime 1-5 prove
+- "E se prendessi…": come cambierebbe la media (della materia e generale) con uno o più voti ipotetici, nei Voti (scegliendo la materia di ogni voto tra tutte quelle dell'anno, anche senza voti) e nella pagina di ogni materia; i voti ipotetici non vengono salvati
 - media di tutti i voti o media delle medie, con o senza pesi
 - Tu con il profilo al centro (Gestisci account, Cambia o Aggiungi), statistiche collegate, "Da vedere" (comunicazioni e note da leggere, assenze da giustificare) e tutte le altre sezioni in liste segmentate; le Impostazioni si aprono dall'ingranaggio
 - bacheca con filtri e ricerca, adesione, firma e risposta alle comunicazioni e anteprima degli allegati: immagini da ingrandire (pulsanti, pizzico, doppio tocco, Ctrl + rotellina, tasti + − 0) e scorrere, adatte alla finestra o alla larghezza, anteprima a schermo intero con i controlli in alto, apertura in una nuova scheda senza scaricare e Scarica
@@ -93,11 +94,12 @@ Le stesse dell'app nativa:
 - aggiunta al Calendario di compiti, verifiche ed eventi (file .ics), anche di tutta l'agenda con gli avvisi già impostati
 - blocco dell'app con una passkey (Face ID, Touch ID, Windows Hello o lo sblocco del dispositivo), oppure con un codice
 - consultazione offline con i dati dell'ultima volta
-- account genitore con più figli, più account salvati e passaggio dall'uno all'altro (anche tenendo premuta la scheda Tu), con una dissolvenza tra i dati di un account e quelli dell'altro
+- account genitore con più figli, più account salvati e passaggio dall'uno all'altro (anche tenendo premuta la scheda Tu), con una dissolvenza tra i dati di un account e quelli dell'altro; con un account BCW nel popup degli account c'è anche "Esci da BCW"
 - account BCW: account Classeviva abbinati con un solo accesso, impostazioni e orario sincronizzati tra i dispositivi (scegliendo cosa sincronizzare), scollegamento dagli account BCW anche dal lato Classeviva
 - modalità demo con dati di esempio, anche con un account già collegato (uscendo si torna all'account)
 - notifiche per nuovi voti, comunicazioni, note, assenze e compiti, da attivare in Impostazioni › Notifiche
-- impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account
+- impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account; in Generale anche "Rivedi l'introduzione" e i collegamenti al codice su GitHub
+- alla prima apertura un'introduzione guida tra colori, tema, forme e movimento, vista della Dashboard, funzioni, accesso a Classeviva, account BCW e orario ricavato dalle lezioni: BCW parte in bianco e nero e i colori arrivano con un cerchio che si allarga dal colore scelto, con il bordo del nuovo colore come nell'app; sugli schermi larghi l'introduzione è un pannello in due colonne (titolo e forma a sinistra, scelte a destra)
 - aspetto personalizzabile (Impostazioni › Aspetto): tema chiaro, scuro o automatico, colore d'accento (campioni o un colore qualsiasi) da cui si generano tutti i colori del sito, stile dei colori (Tonale, Vivace, Espressivo, Fedele, Neutro, Arcobaleno, Macedonia), contrasto, angoli più o meno arrotondati, animazioni espressive, standard o ridotte, caratteri arrotondati; "Ripristina l'aspetto di BCW" riporta tutto com'era
 
 ### Orario
@@ -107,21 +109,22 @@ La scheda Orario contiene l'orario settimanale, che si compila a mano o si gener
 - due viste: Lista (la settimana in alto e il giorno in grande con le lezioni in una lista segmentata) e Giorno (le ore della giornata, a blocchi pieni nella tinta; su schermi larghi l'intera settimana)
 - in cima la settimana è una fila di pulsanti, come nella Dashboard; scorrendo di lato si passa al giorno prima o dopo
 - si apre su oggi finché c'è un evento da finire, altrimenti sul primo giorno successivo con eventi (finite le lezioni di oggi, o nel fine settimana); a quel giorno riportano anche il pulsante accanto al giorno in grande ("Oggi", "Domani" o il giorno della settimana), Alt+T e un nuovo tocco sulla scheda Orario
-- accanto al giorno in grande, attivandola in Impostazioni › Orario, la percentuale e la barra di avanzamento della giornata: la parte passata della durata complessiva delle lezioni (ondulata mentre la giornata è in corso)
 - la scheda Orario si può nascondere da Impostazioni › Orario (l'orario resta salvato e sincronizzato)
-- oggi una scheda in cima mostra la lezione in corso (quanto manca, con l'avanzamento) e quella dopo, oppure la prossima lezione
+- oggi una scheda in cima mostra la lezione in corso (quanto manca, con l'avanzamento, contando come una sola le ore uguali di seguito) e quella dopo, oppure la prossima lezione; si può nascondere da Impostazioni › Orario
 - toccando un evento si vedono i dettagli e si aggiungono note, file e foto, per un solo giorno o per ogni settimana
 - le verifiche segnate dai docenti su Classeviva compaiono da sole sulla lezione della materia e si possono nascondere; altre verifiche si segnano a mano, per un giorno o per ogni settimana
 - Verifiche nascoste (dal menu dell'orario): l'elenco delle verifiche nascoste, con il motivo, da cui si possono mostrare di nuovo, e le regole per nasconderle in automatico (per docente, materia, giorno della settimana, periodo, parole nel testo o materie che quel giorno non sono in orario)
 - modificando un evento si può applicare la modifica a tutti quelli con lo stesso nome
-- gli eventi uguali di seguito (es. due ore di matematica) sono uniti in un gruppo, quelli contemporanei sono affiancati
+- gli eventi uguali di seguito (es. due ore di matematica) sono uniti in un gruppo, con la barretta del colore divisa in segmenti, uno per ora; quelli contemporanei sono affiancati
 - intervalli che nella vista Giorno stanno sopra le lezioni senza cambiarne la durata e nella vista Lista sono una pillola con l'orario tra due linee ondulate
-- le verifiche nella vista Lista si mostrano solo attivando "Mostra le verifiche" (Impostazioni o menu dell'orario)
+- le verifiche nella vista Lista si possono togliere spegnendo "Mostra le verifiche" (Impostazioni o menu dell'orario)
 - il pulsante + apre un menu con nuovo evento, nuovo intervallo, Modifica orario e generazione dalle lezioni
-- modalità Modifica orario, nella vista Giorno, con una barra degli strumenti flottante in basso (allineamento, intervalli, colori, Fine) al posto della barra di navigazione: gli eventi si spostano trascinandoli (sul telefono dopo averli tenuti premuti; su schermi larghi anche da un giorno all'altro), si allungano dal bordo inferiore, se ne crea uno nuovo con un doppio tocco su un'ora vuota e toccandoli si modificano gli orari a mano
+- modalità Modifica orario, nella vista Giorno, con una barra degli strumenti flottante in basso (allineamento, spostamento degli orari, intervalli, Fine) al posto della barra di navigazione: gli eventi si spostano trascinandoli (sul telefono dopo averli tenuti premuti; su schermi larghi anche da un giorno all'altro), si allungano dal bordo inferiore, se ne crea uno nuovo con un doppio tocco su un'ora vuota e toccandoli si modificano gli orari a mano
+- spostamento degli orari, in Modifica orario: alcuni o tutti gli eventi, con o senza intervalli, di un numero di minuti a tua scelta, uguale per tutti o diverso per ogni giorno della settimana (per esempio tutto avanti di 5 minuti), vedendo prima i nuovi orari; la durata non cambia
 - allineamento dell'orario: automatico (eventi da 30 minuti o un'ora, alla mezz'ora) o libero (qualsiasi orario e durata); passando all'automatico gli eventi non allineati vengono allineati dopo una conferma; gli intervalli si posizionano sempre liberamente
 - colori: quelli delle lezioni, colori personalizzati salvati, colori presi dalle palette (anche personalizzate) oppure una palette a sfumatura applicata a una serie di eventi di una giornata
-- generazione automatica di una bozza dell'orario dalle lezioni registrate, mostrata in anteprima con i bordi tratteggiati prima di applicarla
+- generazione automatica di una bozza dell'orario dalle lezioni registrate, mostrata in anteprima prima di applicarla: pillole morbide con un'onda di luce che attraversa la giornata, che applicando si assestano nell'orario; Applica, Scarta e Rigenera stanno in una barra degli strumenti al posto della barra di navigazione. Con ore che non iniziano all'ora o alla mezz'ora (es. dalle 8:10, o da 50 minuti) gli orari restano esatti e applicando l'orario passa da solo all'allineamento libero
+- per ogni evento, intervalli compresi, la scelta per l'attività in diretta dell'app per iPhone (Segui default, Mostra, Non mostrare): il web non ha attività in diretta, ma la scelta si salva nell'orario e si sincronizza
 - backup dell'orario da esportare e reimportare dalle Impostazioni (con i file allegati), compatibile con l'app BCW per iPhone e iPad
 
 L'orario è salvato nel browser, separato per ogni account (il documento in `localStorage`, i file in IndexedDB); con un account BCW si sincronizza anche con il server.
@@ -132,12 +135,14 @@ Il layout dell'app adattato a uno schermo largo, come le app Google sul web: in 
 
 Scorciatoie: ⌘F (Ctrl+F) per cercare; con Alt (⌥ su Mac) Alt+1…9 per le sezioni (1 Dashboard, 2 Orario, 3 Voti, 4 Tu, 5 Bacheca, 6 Note, 7 Assenze, 8 Agenda, 9 Materiale), Alt+R per aggiornare, Alt+Maiusc+T per andare a domani nella Dashboard, Alt+T per tornare al giorno predefinito e Alt+N per un nuovo evento nell'Orario (con la scheda Orario nascosta Alt+1…3 per Dashboard, Voti e Tu), Invio per uscire da Modifica orario.
 
-Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, uguale a quello dell'app per iPhone, con la barra di navigazione in basso e quattro schede (tra 600 e 840 pixel le schede stanno in una barra laterale).
+Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, uguale a quello dell'app per iPhone, con la barra di navigazione flottante in basso (una pillola con i nomi delle quattro schede; quella aperta è piena nel colore primario, con l'icona, e scivola da una scheda all'altra); tra 600 e 840 pixel le schede stanno in una barra laterale.
 
 ### Differenze dovute al web
 
 - le credenziali sono salvate nel browser (`localStorage`) invece che nel Portachiavi, e inviate solo ai server di Classeviva tramite il proxy (con un account BCW anche al server di BCW, che le conserva cifrate)
 - le notifiche arrivano mentre BCW è aperta, anche in una scheda in secondo piano o installata come app; per avvisi sempre affidabili conviene esportare l'agenda nel Calendario
+- niente widget, attività in diretta, Liquid Glass e scelta dell'icona: sono dell'app per iPhone e iPad (le loro scelte salvate nell'orario e nell'account BCW restano)
+- nella schermata di accesso, oltre al server BCW, c'è il collegamento per cambiare il proxy di Classeviva (senza un proxy funzionante l'accesso non parte)
 - su iPhone e iPad le notifiche web funzionano solo con BCW aggiunta alla schermata Home
 
 ### Design
@@ -146,9 +151,10 @@ Il sito segue [Material 3 Expressive](https://m3.material.io/):
 
 - colori generati con material-color-utilities (schema Tonal Spot) dal rosso mattone di BCW `#A23E2F`, con tema chiaro e scuro; materie e stati (bene, sufficiente, insufficiente) hanno le loro palette tonali. Scegliendo un altro colore d'accento lo schema viene rigenerato nel browser (`js/theme.js`) e salvato, così all'apertura si applica subito
 - font Google Sans Flex (incluso nel sito), con l'asse ROND per titoli e numeri arrotondati; anche il logo è scritto con questo font
-- favicon con la linea di BCW nel colore del tema scelto nell'app (chiaro, scuro e colore d'accento)
+- icona come quella dell'app per iPhone dalla 3.3: la scritta BCW e sotto la barra del marchio, nei colori del tema (`js/app-icon.js`, `icons/icon.svg`); il favicon la ridisegna nel tema scelto nell'app (chiaro o scuro e colore d'accento)
 - icone Material Symbols Rounded
-- angoli ampi, liste segmentate, sezioni segmentate comprimibili, chip di stato, gruppi di pulsanti collegati, schede, barra di ricerca in alto, menu del pulsante d'azione flottante, barra degli strumenti flottante, selettore della data, barra di navigazione corta e barra di navigazione laterale, fogli dal basso e dialoghi
+- angoli ampi, liste segmentate, sezioni segmentate comprimibili, chip di stato, gruppi di pulsanti collegati, schede, barra di ricerca in alto, menu del pulsante d'azione flottante, barra degli strumenti flottante, selettore della data, barra di navigazione flottante e barra di navigazione laterale, fogli dal basso e dialoghi
+- forme che si trasformano l'una nell'altra nell'introduzione, e un cerchio che si allarga cambiando colori o tema chiaro e scuro, con un anello del nuovo colore sul bordo (View Transitions)
 - transizioni di Material 3: asse condiviso tra i giorni e tra le schede dei Voti, dissolvenza incrociata verso la ricerca e tra le viste Lista e Giorno dell'orario; sui telefoni, cambiando scheda, le pagine salgono dal basso
 - forme espressive (MaterialShapes): i voti in un "biscotto" a nove lobi, l'indicatore di caricamento che cambia forma ruotando, avatar e stati vuoti nelle forme di Material
 - medie in anelli con la parte piena ondulata e barre di avanzamento ondulate
@@ -176,13 +182,15 @@ js/
 ├── calendar-export.js Esportazione .ics
 ├── lock.js           Blocco con passkey o codice
 ├── theme.js          Aspetto: colori dal colore d'accento, angoli, animazioni, caratteri
-├── theme-boot.js     Applica l'aspetto salvato prima del primo disegno
+├── theme-boot.js     Applica l'aspetto salvato prima del primo disegno (alla prima apertura il bianco e nero)
+├── onboarding.js     Introduzione: passaggi, forme che si trasformano, colori scelti con il cerchio
 ├── vendor/           material-color-utilities (licenza Apache 2.0), raccolta in un file
 ├── demo.js, pdf.js   Server demo e PDF di esempio
 ├── components.js     Componenti (liste e sezioni segmentate, chip, badge voto, anelli ondulati, righe agenda…)
 ├── calendar-bar.js   Settimana e mese come gruppo di pulsanti
 ├── date-picker.js    Selettore della data di Material 3
-├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo (testo e linea)
+├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo (testo e barra)
+├── app-icon.js       Icona di BCW (tracciati della scritta e della barra) per favicon e icone
 ├── viewer.js         Anteprima dei file con zoom e schermo intero
 ├── charts.js         Grafici SVG
 ├── dom.js            Aggiornamento del DOM per confronto
@@ -191,7 +199,8 @@ config.json           Proxy e server BCW predefiniti
 server.js             Server statico e proxy (Node, senza dipendenze)
 proxy/                Proxy come Cloudflare Worker
 sw.js                 Service worker per l'uso offline
-logo/                 Logo (BCW con la linea) e linea da sola, in SVG
+logo/                 Logo (la scritta BCW con la barra sotto), in SVG
+icons/                Icona dell'app e favicon, dagli stessi tracciati di js/app-icon.js
 ```
 
 Le viste producono HTML a partire dallo stato; `dom.js` applica al documento solo le differenze, così restano intatti fuoco, scorrimento e animazioni.

@@ -1,7 +1,7 @@
 // Raccolta di voti e periodi con tutti i calcoli sulle medie.
 
-import { syntheticPeriod } from './models.js';
-import { groupBy, startOfDay, byName } from './util.js';
+import { parseGrade, syntheticPeriod } from './models.js';
+import { groupBy, startOfDay, byName, dayKey, GradeFormat } from './util.js';
 
 export const AverageMode = {
   allGrades: 'Media di tutti i voti',
@@ -97,6 +97,16 @@ export class GradeBook {
     return points;
   }
 
+  /**
+   * Lo stesso libretto con in più dei voti ipotetici (`{ id, subjectId, subjectName, value,
+   * weight }`, "E se prendessi…"), datati oggi e nel periodo indicato: entrano in tutti i calcoli
+   * come quelli veri. Il libretto originale non cambia (come `GradeBook.adding` nell'app).
+   */
+  adding(hypothetical, position, periodName) {
+    const extra = hypothetical.map((h) => hypotheticalGrade(h, position, periodName));
+    return new GradeBook([...this.grades, ...extra], this.periods, this.mode, this.weighted);
+  }
+
   /** Voto necessario nelle prossime `count` prove per raggiungere `target`. */
   static neededGrade(target, current, count = 1, weighted = false) {
     const valid = current.filter((g) => g.countsTowardAverage);
@@ -109,4 +119,25 @@ export class GradeBook {
     const sum = valid.reduce((s, g) => s + g.value, 0);
     return (target * (valid.length + n) - sum) / n;
   }
+}
+
+let hypotheticalCounter = 0;
+
+/** Un voto ipotetico con un id negativo e unico (`newHypothetical`). */
+export function newHypothetical({ subjectId, subjectName, value, weight = 1 }) {
+  hypotheticalCounter += 1;
+  return { id: -hypotheticalCounter, subjectId, subjectName, value, weight };
+}
+
+/** Un voto che non esiste, dallo stesso JSON dell'API (come `Grade.hypothetical` nell'app). */
+function hypotheticalGrade(h, position, periodName) {
+  const grade = parseGrade({
+    evtId: h.id < 0 ? h.id : -Math.abs(h.id) - 1,
+    subjectId: h.subjectId, subjectDesc: h.subjectName, evtCode: 'GRV0',
+    evtDate: dayKey(new Date()), decimalValue: h.value, displayValue: GradeFormat.short(h.value),
+    periodPos: position, periodDesc: periodName, weightFactor: h.weight, noAverage: false, canceled: false,
+  });
+  // Il nome resta quello scelto (l'API lo darebbe in maiuscolo).
+  grade.subjectName = h.subjectName;
+  return grade;
 }

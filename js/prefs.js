@@ -22,9 +22,9 @@ const defaults = {
   collapsedSections: [],
   completedHomework: [],
   timetableMode: 'list',
-  timetableShowsTests: false,
+  timetableShowsTests: true,
+  timetableShowsNowCard: true,
   showsTimetableTab: true,
-  showsDayProgress: false,
   newsNotifications: [],
   unsyncedCategories: [],
 };
@@ -48,6 +48,13 @@ export class Preferences {
     this.onChange = onChange;
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* valori predefiniti */ }
+    // 3.3, come nell'app: le verifiche nella Lista dell'orario sono accese di serie (prima spente,
+    // e salvate così con tutti gli altri valori) e la barra di avanzamento della giornata non c'è
+    // più. Un browser che arriva dalla 3.2.1 (senza `timetableShowsNowCard`) passa al nuovo valore.
+    if (stored && typeof stored === 'object' && !('timetableShowsNowCard' in stored)) {
+      if (stored.timetableShowsTests === false) delete stored.timetableShowsTests;
+    }
+    if (stored && typeof stored === 'object') delete stored.showsDayProgress;
     this.values = { ...defaults, ...stored };
     this.completed = new Set(this.values.completedHomework);
     this.collapsed = new Set(this.values.collapsedSections);
@@ -87,11 +94,12 @@ export class Preferences {
   get hideCompletedHomework() { return this.values.hideCompletedHomework; }
   get showUpcomingDays() { return this.values.showUpcomingDays; }
 
-  get timetableShowsTests() { return this.values.timetableShowsTests; }
+  /** Verifiche nella vista Lista dell'orario (accese di serie: si nascondono solo su richiesta). */
+  get timetableShowsTests() { return this.values.timetableShowsTests !== false; }
+  /** Card "Adesso" (evento in corso o prossimo) in cima all'orario di oggi (accesa di serie). */
+  get timetableShowsNowCard() { return this.values.timetableShowsNowCard !== false; }
   /** La scheda Orario nella barra di navigazione (Impostazioni › Orario). */
   get showsTimetableTab() { return this.values.showsTimetableTab !== false; }
-  /** Barra di avanzamento della giornata accanto al giorno in grande dell'Orario (spenta di serie). */
-  get showsDayProgress() { return this.values.showsDayProgress === true; }
 
   /**
    * La voce si sincronizza con l'account BCW (Impostazioni › Account › Da sincronizzare,

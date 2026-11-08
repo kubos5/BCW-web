@@ -129,7 +129,28 @@ export function makeEntry(fields = {}) {
     note: fields.note ?? '',
     attachments: fields.attachments ?? [],
     isWeeklyTest: fields.isWeeklyTest ?? false,
+    liveActivity: fields.liveActivity ?? null,
   };
+}
+
+/**
+ * Attività in diretta dell'app per iPhone, per un evento (3.3, `LiveActivityChoice`): `null` segue
+ * l'impostazione del telefono, `show` lo mostra anche con l'avvio automatico spento, `hide` lo
+ * salta. Il web non ha attività in diretta, ma tiene il campo (si sincronizza e va nei backup).
+ */
+export const LiveActivityChoice = {
+  show: { id: 'show', title: 'Mostra' },
+  hide: { id: 'hide', title: 'Non mostrare' },
+};
+
+/**
+ * L'evento spostato di `minutes` minuti (negativi = prima), con la stessa durata e senza uscire
+ * dalla giornata (`TimetableEntry.shifted` nell'app).
+ */
+export function shiftedEntry(e, minutes) {
+  const length = duration(e);
+  const start = Math.min(Math.max(0, e.start + minutes), 1440 - length);
+  return { ...e, start, end: start + length };
 }
 
 export const cloneEntry = (e) => ({ ...e, color: e.color ? { ...e.color } : null, attachments: [...e.attachments] });
@@ -339,6 +360,8 @@ function decodeEntry(v, strict) {
     note: strOr(v.note),
     attachments: decodeAttachments(v.attachments, strict),
     isWeeklyTest: v.isWeeklyTest === true,
+    // Un valore sconosciuto (es. di una versione futura) vale come "segue l'impostazione".
+    liveActivity: LiveActivityChoice[v.liveActivity] ? v.liveActivity : null,
   };
 }
 
@@ -479,8 +502,8 @@ function sorted(value) {
 function encodeEntry(e) {
   return {
     attachments: e.attachments, color: encodeColor(e.color), end: e.end, id: e.id, isWeeklyTest: e.isWeeklyTest,
-    kind: e.kind, note: e.note, room: e.room, start: e.start, subjectId: e.subjectId ?? undefined, teacher: e.teacher,
-    title: e.title, weekday: e.weekday,
+    kind: e.kind, liveActivity: e.liveActivity ?? undefined, note: e.note, room: e.room, start: e.start,
+    subjectId: e.subjectId ?? undefined, teacher: e.teacher, title: e.title, weekday: e.weekday,
   };
 }
 
@@ -975,6 +998,7 @@ export class TimetableStore {
           if (original.teacher !== entry.teacher) other.teacher = entry.teacher;
           if (original.room !== entry.room) other.room = entry.room;
           if (original.note !== entry.note) other.note = entry.note;
+          if ((original.liveActivity ?? null) !== (entry.liveActivity ?? null)) other.liveActivity = entry.liveActivity ?? null;
           if (!sameColor(original.color, entry.color) && entry.color?.type !== 'series') other.color = entry.color ? { ...entry.color } : null;
         }
       }
@@ -1004,6 +1028,22 @@ export class TimetableStore {
       entry.start = start;
       entry.end = end;
       entry.weekday = w;
+    });
+  }
+
+  /**
+   * Sposta più eventi insieme (`minutes`: minuti per id, `shiftedEntry`), come
+   * `TimetableStore.shift` nell'app. `freeAlignment` passa anche all'allineamento libero: con
+   * quello automatico gli eventi stanno alle ore e alle mezz'ore.
+   */
+  shift(minutes, { freeAlignment = false } = {}) {
+    if (![...minutes.values()].some((m) => m !== 0)) return;
+    this.mutate((t) => {
+      if (freeAlignment) t.alignment = 'free';
+      t.entries = t.entries.map((e) => {
+        const delta = minutes.get(e.id);
+        return delta ? shiftedEntry(e, delta) : e;
+      });
     });
   }
 
@@ -1203,10 +1243,27 @@ export class TimetableStore {
 
   discardDraft() { this.setDraft(null); }
 
+  /**
+   * La bozza ha lezioni che l'allineamento automatico sposterebbe (gli intervalli sono sempre
+   * liberi): applicandola l'orario passa all'allineamento libero, che tiene gli orari esatti.
+   */
+  get draftNeedsFreeAlignment() {
+    if (this.alignment !== 'automatic' || !this.draft) return false;
+    return this.draft.entries.some((e) => !isAutoAligned(e));
+  }
+
+  /**
+   * Applica la bozza: sostituisce l'orario o aggiunge solo gli eventi che non si sovrappongono.
+   * Con ore fuori dalle mezz'ore (es. dalle 8:10, o da 50 minuti) l'orario passa
+   * all'allineamento libero (`draftNeedsFreeAlignment`), come nell'app dalla 3.3: prima le
+   * lezioni venivano spostate all'ora o alla mezz'ora più vicina.
+   */
   applyDraft(replacing) {
     const draft = this.draft;
     if (!draft) return;
+    const needsFree = this.draftNeedsFreeAlignment;
     this.mutate((t) => {
+      if (needsFree) t.alignment = 'free';
       if (replacing) {
         t.entries = draft.entries;
         t.occurrences = {};
@@ -1275,34 +1332,6 @@ export function defaultTimetableDay(store, now = new Date()) {
     if (events(day).length) return day;
   }
   return today;
-}
-
-// MARK: - Avanzamento della giornata
-
-/**
- * A che punto è la giornata dell'orario (barra accanto al giorno in grande, come `DayProgress`
- * nell'app): la parte già passata della durata complessiva degli eventi. Con 5 ore di lezione e
- * un'ora e mezza passata, il 30%. Gli eventi sovrapposti contano una volta sola; negli spazi tra
- * un evento e l'altro (intervalli, ore libere) l'avanzamento resta fermo. Come per il giorno
- * predefinito contano gli eventi dell'utente, non gli intervalli.
- *
- * @param {{start: number, end: number}[]} spans gli eventi del giorno, senza intervalli.
- * @param {number} minute il minuto attuale per oggi; per un giorno passato 24 × 60, per uno futuro 0.
- * @returns `{ elapsed, total, percent, finished }` (minuti; percentuale per difetto, 100 solo a
- *   giornata finita), oppure `null` se il giorno non ha eventi.
- */
-export function dayProgress(spans, minute) {
-  const merged = [];
-  const sorted = spans.filter((s) => s.end > s.start).sort((a, b) => a.start - b.start || a.end - b.end);
-  for (const span of sorted) {
-    const last = merged[merged.length - 1];
-    if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
-    else merged.push({ start: span.start, end: span.end });
-  }
-  const total = merged.reduce((sum, b) => sum + b.end - b.start, 0);
-  if (total <= 0) return null;
-  const elapsed = merged.reduce((sum, b) => sum + Math.max(0, Math.min(b.end, minute) - b.start), 0);
-  return { elapsed, total, percent: Math.floor((elapsed * 100) / total), finished: elapsed >= total };
 }
 
 // MARK: - Contenuto di una giornata
