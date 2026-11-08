@@ -2652,8 +2652,16 @@ html.reduced-reveal::view-transition-old(root),
 html.reduced-reveal::view-transition-new(root) { animation-duration: .2s; }
 /* Il fronte dell'onda: un anello del nuovo colore primario, in un gruppo suo sopra le due
    fotografie (le animazioni le dà `revealTheme`). */
+/* Raggio e spessore animati da `revealTheme` su <html> (per l'anello) e sulla pagina nuova (per il
+   cerchio): registrati, così si interpolano, e letti dallo stesso fotogramma. */
+@property --reveal-r { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --reveal-w { syntax: "<length>"; inherits: true; initial-value: 0px; }
+html.theme-reveal:not(.reduced-reveal)::view-transition-new(root) { clip-path: circle(var(--reveal-r) at var(--reveal-x, 50%) var(--reveal-y, 50%)); }
 .reveal-ring { position: fixed; inset: 0; z-index: 1000; pointer-events: none; overflow: hidden; view-transition-name: reveal-ring; }
-.reveal-ring i { position: absolute; display: block; box-sizing: border-box; border: 0 solid var(--primary); border-radius: 50%; opacity: 0; }
+/* Il tratto è centrato sul bordo del cerchio: metà sopra la pagina di prima, metà sopra la nuova. */
+.reveal-ring i { position: absolute; display: block; box-sizing: border-box; border: var(--reveal-w) solid var(--primary); border-radius: 50%; opacity: 0;
+  left: calc(var(--reveal-x) - var(--reveal-r) - var(--reveal-w) / 2); top: calc(var(--reveal-y) - var(--reveal-r) - var(--reveal-w) / 2);
+  width: calc(2 * var(--reveal-r) + var(--reveal-w)); height: calc(2 * var(--reveal-r) + var(--reveal-w)); }
 html.theme-reveal::view-transition-group(reveal-ring),
 html.theme-reveal::view-transition-old(reveal-ring),
 html.theme-reveal::view-transition-new(reveal-ring) { animation: none; }

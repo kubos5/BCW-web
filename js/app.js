@@ -522,6 +522,9 @@ function render() {
  * anello del nuovo colore primario sul bordo tra prima (fuori) e dopo (dentro): cresce con il
  * cerchio, si assottiglia da 26 a 2 px e svanisce (opacità 0 → 0,5 → 0,3 → 0, come nell'app).
  * L'anello è un elemento con il suo `view-transition-name`, così sta sopra le due fotografie.
+ * Cerchio e anello leggono lo stesso raggio (`--reveal-r`, proprietà registrata in `bcw.css`)
+ * dalla stessa animazione sul thread principale: un ritaglio animato dal compositore andava avanti
+ * da solo e lasciava l'anello indietro quando la pagina era occupata.
  * Intanto i tocchi si fermano sulla fotografia. Con le animazioni ridotte è una dissolvenza
  * senza anello; senza View Transitions cambia e basta.
  */
@@ -533,6 +536,7 @@ async function revealTheme(point, changes) {
   const html = document.documentElement;
   let applied = false;
   let ring = null;
+  let spread = null;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches || html.dataset.motion === 'reduced';
   const apply = async () => {
     if (applied) return;
@@ -559,24 +563,19 @@ async function revealTheme(point, changes) {
   const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y)) + 8;
   html.classList.add('theme-reveal');
   html.classList.toggle('reduced-reveal', reduced);
+  html.style.setProperty('--reveal-x', `${x}px`);
+  html.style.setProperty('--reveal-y', `${y}px`);
   try {
     const transition = document.startViewTransition(apply);
     if (!reduced) {
       transition.ready.then(() => {
-        const timing = { duration: REVEAL_DURATION, easing: REVEAL_EASING };
-        html.animate(
-          { clipPath: [`circle(0.5px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-          { ...timing, pseudoElement: '::view-transition-new(root)' },
-        );
-        const band = ring?.firstElementChild;
-        if (!band) return;
-        // Il tratto è centrato sul bordo del cerchio: metà sopra la pagina di prima, metà sopra la nuova.
-        const frame = (r, width) => ({
-          left: `${x - r - width / 2}px`, top: `${y - r - width / 2}px`,
-          width: `${2 * r + width}px`, height: `${2 * r + width}px`, borderWidth: `${width}px`,
-        });
-        band.animate([frame(0.5, 26), frame(radius, 2)], { ...timing, fill: 'forwards' });
-        band.animate([{ opacity: 0 }, { opacity: 0.5, offset: 0.12 }, { opacity: 0.3, offset: 0.6 }, { opacity: 0 }],
+        const timing = { duration: REVEAL_DURATION, easing: REVEAL_EASING, fill: 'forwards' };
+        const grow = [{ '--reveal-r': '0.5px', '--reveal-w': '26px' }, { '--reveal-r': `${radius}px`, '--reveal-w': '2px' }];
+        // Le due animazioni nascono nello stesso momento e vanno di pari passo: quella sulla pagina
+        // nuova (che tiene aperta la transizione) per il cerchio, quella su <html> per l'anello.
+        html.animate(grow, { ...timing, pseudoElement: '::view-transition-new(root)' });
+        spread = html.animate(grow, timing);
+        ring?.firstElementChild?.animate([{ opacity: 0 }, { opacity: 0.5, offset: 0.12 }, { opacity: 0.3, offset: 0.6 }, { opacity: 0 }],
           { duration: REVEAL_DURATION, fill: 'forwards' });
         navigator.vibrate?.(6);
       }).catch(() => {});
@@ -586,6 +585,9 @@ async function revealTheme(point, changes) {
     await apply();
   } finally {
     ring?.remove();
+    spread?.cancel();
+    html.style.removeProperty('--reveal-x');
+    html.style.removeProperty('--reveal-y');
     html.classList.remove('theme-reveal', 'reduced-reveal');
     revealing = false;
   }

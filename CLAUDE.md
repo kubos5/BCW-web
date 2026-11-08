@@ -198,7 +198,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   `js/theme-boot.js` con la stessa regola; tocca solo i ruoli di M3. Cerchio dei colori: `revealTheme(punto, changes)` in
   `app.js` (`ctx.revealTheme`) con le View Transitions (la pagina nuova in un `circle()` che cresce, 1,15 s, curva
   "emphasized"; sul bordo l'anello del nuovo primario come `ThemeReveal` dell'app: `.reveal-ring` con un suo
-  `view-transition-name`, sopra le due fotografie, spessore 26→2 px e opacità 0→0,5→0,3→0; dissolvenza con le
+  `view-transition-name`, sopra le due fotografie, spessore 26→2 px e opacità 0→0,5→0,3→0; cerchio e anello leggono
+  lo stesso raggio, le proprietà registrate `--reveal-r`/`--reveal-w` animate insieme su `<html>` e sulla pagina nuova:
+  un `clip-path` animato a parte va avanti nel compositore e lascia indietro l'anello; dissolvenza con le
   animazioni ridotte; senza View Transitions cambia e basta): scegliere un colore,
   chiaro o scuro, riaprire e finire l'introduzione. Forme che si trasformano (`animateMorphShapes`, dopo ogni disegno):
   180 punti per forma, ricavati a mano dai tracciati di `shapes.js` (`getPointAtLength` costava 0,2 s per forma),
