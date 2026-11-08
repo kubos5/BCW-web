@@ -55,9 +55,12 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   `…Fill`; icone che non sono Material Symbols, come `github`, con il loro riquadro in `viewBoxes`); forme in
   `js/shapes.js` (`shape(name)` dentro un `.shaped`); logo come testo (`js/logo.js`: "BCW" in Google Sans Flex e la linea
   in `--brand`; `stacked` con la barra sotto, come nell'introduzione e nell'icona dell'app), così segue il tema scelto
-  nell'app; il favicon si ridisegna con `--brand` (`Theme.updateFavicon()`). Icona dell'app installata (`icons/icon.svg`
-  e i PNG): come l'icona dell'app per iPhone dalla 3.3, la scritta e la barra sotto nei ruoli del tema Mattone
-  (sfondo `primary-container`, scritta `on-surface`, barra `brand`), dai tracciati di `AppIcon.icon` dell'app. Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
+  nell'app. Icona (3.3, come l'icona dell'app per iPhone): la scritta e la barra sotto, tracciati di `AppIcon.icon`
+  dell'app in `js/app-icon.js` (`appIconSVG`, `drawAppIcon`); da lì `icons/icon.svg` e i PNG (tema Mattone: sfondo
+  `primary-container`, scritta `on-surface`, barra `brand`), `icons/favicon.svg` (angoli arrotondati, chiaro e scuro),
+  `logo/bcw-logo.svg` e il favicon che `Theme.updateFavicon()` ridisegna nel tema scelto (in scuro sfondo
+  `surface-container-lowest`). Non ci sono altre icone: tutte vengono da
+  `js/app-icon.js`. Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
 - Larghezze: sotto 600 px barra di navigazione flottante (3.3, come nell'app: `floatingNavBar` in `app.js`, una pillola
   di 56 px sospesa sul contenuto, 14 px sopra il bordo o 10 px dentro lo spazio sicuro, con i nomi delle quattro schede:
   Dashboard, Orario, Voti, Tu; tre con l'Orario nascosto, vedi Orario). La scheda aperta è una pillola piena nel primario
@@ -194,11 +197,21 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   `<html>` (blocchi `:root[data-mono]` in fondo al CSS, che battono anche il tema generato), messo già da
   `js/theme-boot.js` con la stessa regola; tocca solo i ruoli di M3. Cerchio dei colori: `revealTheme(punto, changes)` in
   `app.js` (`ctx.revealTheme`) con le View Transitions (la pagina nuova in un `circle()` che cresce, 1,15 s, curva
-  "emphasized"; dissolvenza con le animazioni ridotte; senza View Transitions cambia e basta): scegliere un colore,
+  "emphasized"; sul bordo l'anello del nuovo primario come `ThemeReveal` dell'app: `.reveal-ring` con un suo
+  `view-transition-name`, sopra le due fotografie, spessore 26→2 px e opacità 0→0,5→0,3→0; dissolvenza con le
+  animazioni ridotte; senza View Transitions cambia e basta): scegliere un colore,
   chiaro o scuro, riaprire e finire l'introduzione. Forme che si trasformano (`animateMorphShapes`, dopo ogni disegno):
   180 punti per forma, ricavati a mano dai tracciati di `shapes.js` (`getPointAtLength` costava 0,2 s per forma),
   interpolati con una molla; gli SVG hanno `data-morph-skip`. Le pagine usano `axisPage` (asse condiviso) e
-  `.stagger` (comparsa a scaglioni); gli interruttori riusano le azioni delle Impostazioni.
+  `.stagger` (comparsa a scaglioni); gli interruttori riusano le azioni delle Impostazioni. Ogni passaggio dà le sue
+  parti (`stepParts`: titolo, spiegazione, contenuto, azioni; accoglienza e fine `center`; `key` per le due pagine
+  dell'orario, che scorrono come passaggi con `ob.dir`) e `renderOnboarding` le dispone. Da 840 px (`ctx.wide`), come
+  la shell: barra in alto sullo sfondo `surface-container` e pannello `surface` in due colonne (5:7, al massimo
+  1240 × 820 px); a sinistra titolo e spiegazione (asse `ob-aside`) con sotto la forma, più grande (`--wide`, limitata
+  da `21vw`/`33vh`), che scivola con `data-flip` quando cambia posto; a destra il contenuto che scorre e le azioni in
+  riga in fondo a destra (la principale per ultima, `.ob-row` con `display: contents`). Accoglienza e fine: la forma al
+  centro a sinistra, titolo, testo e pulsanti a destra. Sugli schermi larghi la tastiera non nasconde la forma
+  (`isTyping`).
 - Per provare usare "Prova la demo" (`js/demo.js`, dati deterministici generati nel browser); nell'Orario "Genera"
   crea la bozza dalle lezioni della demo. Per rivedere la prima apertura: cancellare `bcw.onboardingCompleted` (e gli
   account) dal `localStorage`; nelle prove automatiche impostarlo prima di aprire la pagina.

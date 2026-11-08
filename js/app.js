@@ -515,30 +515,45 @@ function render() {
 // MARK: Cerchio dei colori
 
 /**
- * Cambio di colori con un cerchio che si allarga da `point` (come `ThemeReveal` nell'app): con le
+ * Cambio di colori con un cerchio che si allarga da `point`, uguale a `ThemeReveal` nell'app: con le
  * View Transitions il browser tiene una fotografia della pagina di prima, `changes` cambia colori
  * e contenuto sotto, e la pagina nuova compare in un cerchio che cresce fino all'angolo più
- * lontano (curva "emphasized" di Material 3, 1,15 s). Intanto i tocchi si fermano sulla
- * fotografia. Con le animazioni ridotte è una dissolvenza; senza View Transitions cambia e basta.
+ * lontano (più 8 px), con la curva "emphasized" di Material 3 in 1,15 s. Il fronte dell'onda è un
+ * anello del nuovo colore primario sul bordo tra prima (fuori) e dopo (dentro): cresce con il
+ * cerchio, si assottiglia da 26 a 2 px e svanisce (opacità 0 → 0,5 → 0,3 → 0, come nell'app).
+ * L'anello è un elemento con il suo `view-transition-name`, così sta sopra le due fotografie.
+ * Intanto i tocchi si fermano sulla fotografia. Con le animazioni ridotte è una dissolvenza
+ * senza anello; senza View Transitions cambia e basta.
  */
 let revealing = false;
+const REVEAL_DURATION = 1150;
+const REVEAL_EASING = 'cubic-bezier(.42, 0, .18, 1)';
 
 async function revealTheme(point, changes) {
   const html = document.documentElement;
   let applied = false;
+  let ring = null;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches || html.dataset.motion === 'reduced';
   const apply = async () => {
     if (applied) return;
     applied = true;
     await changes();
     applyTheme();
     render();
+    // L'anello fa parte della pagina nuova (nel colore nuovo), in un gruppo suo sopra le fotografie.
+    if (revealing && !reduced) {
+      ring = document.createElement('div');
+      ring.className = 'reveal-ring';
+      ring.setAttribute('aria-hidden', 'true');
+      ring.append(document.createElement('i'));
+      document.body.append(ring);
+    }
   };
   if (revealing || typeof document.startViewTransition !== 'function') {
     await apply();
     return;
   }
   revealing = true;
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches || html.dataset.motion === 'reduced';
   const x = point?.x ?? window.innerWidth / 2;
   const y = point?.y ?? window.innerHeight / 2;
   const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y)) + 8;
@@ -547,15 +562,30 @@ async function revealTheme(point, changes) {
   try {
     const transition = document.startViewTransition(apply);
     if (!reduced) {
-      transition.ready.then(() => html.animate(
-        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-        { duration: 1150, easing: 'cubic-bezier(.42, 0, .18, 1)', pseudoElement: '::view-transition-new(root)' },
-      )).catch(() => {});
+      transition.ready.then(() => {
+        const timing = { duration: REVEAL_DURATION, easing: REVEAL_EASING };
+        html.animate(
+          { clipPath: [`circle(0.5px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+          { ...timing, pseudoElement: '::view-transition-new(root)' },
+        );
+        const band = ring?.firstElementChild;
+        if (!band) return;
+        // Il tratto è centrato sul bordo del cerchio: metà sopra la pagina di prima, metà sopra la nuova.
+        const frame = (r, width) => ({
+          left: `${x - r - width / 2}px`, top: `${y - r - width / 2}px`,
+          width: `${2 * r + width}px`, height: `${2 * r + width}px`, borderWidth: `${width}px`,
+        });
+        band.animate([frame(0.5, 26), frame(radius, 2)], { ...timing, fill: 'forwards' });
+        band.animate([{ opacity: 0 }, { opacity: 0.5, offset: 0.12 }, { opacity: 0.3, offset: 0.6 }, { opacity: 0 }],
+          { duration: REVEAL_DURATION, fill: 'forwards' });
+        navigator.vibrate?.(6);
+      }).catch(() => {});
     }
     await transition.finished;
   } catch {
     await apply();
   } finally {
+    ring?.remove();
     html.classList.remove('theme-reveal', 'reduced-reveal');
     revealing = false;
   }

@@ -5,7 +5,10 @@
 // tema, forme e movimento, vista della Dashboard, funzioni, accesso a Classeviva, account BCW,
 // orario ricavato dalle lezioni (con la scheda Orario e un account), fine. In cima a ogni
 // passaggio una forma di M3 Expressive che si trasforma nella successiva; sotto, il contenuto che
-// scorre di lato (asse condiviso) e le azioni ferme in fondo.
+// scorre di lato (asse condiviso) e le azioni ferme in fondo. Da 840 px, come la shell dell'app, la
+// barra in alto sullo sfondo e un pannello in due colonne: a sinistra titolo, spiegazione e forma,
+// a destra il contenuto con le azioni in fondo a destra (accoglienza e fine: la forma a sinistra,
+// titolo e pulsanti a destra).
 
 import { icon } from './icons.js';
 import { shape, shapes } from './shapes.js';
@@ -64,7 +67,7 @@ export function newOnboarding({ replay = false } = {}) {
     chosen: false, typing: false,
     username: '', password: '', error: null, loading: false, choices: [],
     bcwChoice: 'none', bcwUsername: '', bcwPassword: '', bcwConfirm: '', bcwError: null, bcwLoading: false,
-    draft: null, genDir: 1, generating: false, genError: null,
+    draft: null, generating: false, genError: null,
   };
 }
 
@@ -117,17 +120,41 @@ export function renderOnboarding(ctx) {
   if (!steps.includes(ob.step)) ob.step = steps.find((s) => ORDER.indexOf(s) > ORDER.indexOf(ob.step)) ?? 'done';
   const step = ob.step;
   const index = steps.indexOf(step);
+  const wide = !!ctx.wide;
+  const typing = isTyping(ctx);
   const top = step === 'welcome' || step === 'done'
     ? '<div class="ob-top-spacer"></div>'
     : `<div class="ob-top" data-key="ob-top"><button class="icon-btn" data-action="ob-back" aria-label="Indietro" title="Indietro">${icon('arrowBack')}</button>
       ${wavyProgress(index, Math.max(1, steps.length - 1), { label: "Avanzamento dell'introduzione" })}
       <button class="btn text xs" data-action="ob-skip">Salta</button></div>`;
-  const page = renderStep(ctx, step);
-  return `<div class="onboarding ${ob.typing ? 'typing' : ''}" data-key="onboarding" role="dialog" aria-modal="true" aria-label="Introduzione a BCW">
-    <div class="ob-column">${top}${ob.typing ? '' : hero(step)}
-      ${axisPage('onboarding', ob.dir, `ob-${step}`, page, { cls: 'ob-axis' })}</div></div>`;
+  const parts = renderStep(ctx, step);
+  // Le due pagine dell'orario (ore e anteprima) scorrono come due passaggi.
+  const key = `ob-${parts.key ?? step}`;
+  const attrs = 'data-key="onboarding" role="dialog" aria-modal="true" aria-label="Introduzione a BCW"';
+  if (!wide) {
+    const body = parts.center ? centerPage(parts) : page(parts);
+    return `<div class="onboarding ${typing ? 'typing' : ''}" ${attrs}>
+      <div class="ob-column">${top}${typing ? '' : hero(step)}
+        ${axisPage('onboarding', ob.dir, key, body, { cls: 'ob-axis' })}</div></div>`;
+  }
+  // Schermi larghi: titolo e spiegazione scorrono di lato nella colonna a sinistra, sopra la
+  // forma; il contenuto nella colonna a destra. Nell'accoglienza e alla fine la colonna a sinistra
+  // ha solo la forma, più grande, e a destra titolo e pulsanti.
+  const heading = parts.center ? '' : headingBlock(parts);
+  const main = parts.center ? centerPage(parts) : page(parts, { heading: false });
+  return `<div class="onboarding wide" ${attrs}><div class="ob-frame">${top}
+      <div class="ob-panel ${parts.center ? 'center' : ''}">
+        <div class="ob-aside">${axisPage('ob-aside', ob.dir, `${key}-aside`, heading, { cls: 'ob-aside-axis' })}${hero(step)}</div>
+        ${axisPage('onboarding', ob.dir, key, main, { cls: 'ob-axis' })}</div></div></div>`;
 }
 
+/** Con la tastiera aperta sui telefoni (sugli schermi larghi c'è posto per tutto). */
+const isTyping = (ctx) => !!ctx.app.onboarding?.typing && !ctx.wide;
+
+/**
+ * Le parti di un passaggio: `{ title, subtitle, content, actions }`, oppure per accoglienza e fine
+ * `{ center: true, title, text, actions: [html…] }`; `key` distingue le pagine di uno stesso passaggio.
+ */
 function renderStep(ctx, step) {
   switch (step) {
     case 'welcome': return welcomePage();
@@ -143,11 +170,23 @@ function renderStep(ctx, step) {
   }
 }
 
+/** Le parti di un passaggio con titolo, spiegazione, contenuto e azioni. */
+const stepParts = (title, subtitle, content, actions) => ({ title, subtitle, content, actions });
+
+const headingBlock = ({ title, subtitle }) => `<div class="ob-heading stagger" style="--i:0"><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div>`;
+
 /** Titolo, spiegazione e contenuto che scorrono, con le azioni ferme in fondo. */
-function page(title, subtitle, content, actions) {
+function page(parts, { heading = true } = {}) {
   return `<div class="ob-page"><div class="ob-scroll" data-bar-ignore><div class="ob-content">
-      <div class="ob-heading stagger" style="--i:0"><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div>${content}</div></div>
-    <div class="ob-actions">${actions}</div></div>`;
+      ${heading ? headingBlock(parts) : ''}${parts.content}</div></div>
+    <div class="ob-actions">${parts.actions}</div></div>`;
+}
+
+/** Accoglienza e fine: titolo grande, testo e pulsanti. */
+function centerPage({ title, text, done = false, actions }) {
+  return `<div class="ob-page ob-center-page"><div class="ob-center">
+      ${stagger(0, `<h1 class="ob-big${done ? ' done' : ''}">${esc(title)}</h1>`)}${stagger(1, `<p>${esc(text)}</p>`)}</div>
+    <div class="ob-actions">${actions.map((html, i) => stagger(i + 2, html)).join('')}</div></div>`;
 }
 
 /** Il pulsante principale: "Continua" con la freccia. */
@@ -191,11 +230,15 @@ function hero(step) {
   const center = info.icon
     ? `<span class="ob-hero-center" data-key="ob-center-${info.icon}">${icon(info.icon)}</span>`
     : `<span class="ob-hero-center logo" data-key="ob-center-logo">${logo('ob-logo', { stacked: true })}</span>`;
-  return `<div class="ob-hero ${step === 'welcome' ? 'welcome' : ''}" style="--size:${info.size}px" aria-hidden="true" data-key="ob-hero">
+  // Sugli schermi larghi più grande (`--wide`, limitata dalla finestra nel CSS). La forma con le
+  // altre due scivola con la molla quando cambia posto (`data-flip`, come il logo dell'accesso).
+  const wide = Math.round(info.size * (big ? 1.35 : 1.95));
+  return `<div class="ob-hero ${step === 'welcome' ? 'welcome' : ''}" style="--base:${info.size}px;--wide:${wide}px" aria-hidden="true" data-key="ob-hero">
+    <div class="ob-hero-art" data-flip="ob-hero">
     <span class="ob-sat a" style="--x:${a.x};--y:${a.y};--s:${a.s}">${morphSVG('ob-sat-a', SATELLITES_A[index])}</span>
     <span class="ob-sat b" style="--x:${b.x};--y:${b.y};--s:${b.s}">${morphSVG('ob-sat-b', SATELLITES_B[index])}</span>
     <span class="ob-main">${morphSVG('ob-main', info.shape)}</span>${center}
-    ${step === 'done' ? shapeBurst() : ''}</div>`;
+    ${step === 'done' ? shapeBurst() : ''}</div></div>`;
 }
 
 function morphSVG(key, name) {
@@ -350,11 +393,12 @@ export function animateMorphShapes(root) {
 // MARK: - Accoglienza
 
 function welcomePage() {
-  return `<div class="ob-page ob-center-page"><div class="ob-center">
-      ${stagger(0, '<h1 class="ob-big">Ciao! Questa è BCW</h1>')}
-      ${stagger(1, "<p>Better ClasseViVa: voti, compiti, orario e comunicazioni di Classeviva, in un'app fatta su misura per te.</p>")}</div>
-    <div class="ob-actions">${stagger(2, nextButton({ title: 'Inizia' }))}
-      ${stagger(3, '<button class="btn text m wide" data-action="ob-skip">Salta introduzione</button>')}</div></div>`;
+  return {
+    center: true,
+    title: 'Ciao! Questa è BCW',
+    text: "Better ClasseViVa: voti, compiti, orario e comunicazioni di Classeviva, in un'app fatta su misura per te.",
+    actions: [nextButton({ title: 'Inizia' }), '<button class="btn text m wide" data-action="ob-skip">Salta introduzione</button>'],
+  };
 }
 
 // MARK: - Colori
@@ -390,7 +434,7 @@ function colorsPage(ctx) {
   const custom = stagger(AccentPresets.length + 1, `<label class="ob-swatch custom ${ob.chosen && isCustom ? 'selected' : ''}" title="Scegli un colore qualsiasi">
     <span class="ob-swatch-art"><span class="ob-swatch-fill rainbow" style="--mask:${esc(maskOf('arch'))}"></span>${ob.chosen && isCustom ? `<span class="ob-swatch-check">${icon('check')}</span>` : ''}</span>
     <span class="ob-swatch-name">Altro</span><input type="color" value="${accent}" data-change="ob-color-pick" aria-label="Scegli un colore qualsiasi"></label>`);
-  return page('Scegli i tuoi colori',
+  return stepParts('Scegli i tuoi colori',
     "Da qui comincia tutto: l'app prende il colore che tocchi. Potrai cambiarlo quando vuoi in Impostazioni › Aspetto.",
     `<div class="ob-swatches">${swatches}${custom}</div>`,
     nextButton({ disabled: !ob.chosen }));
@@ -415,7 +459,7 @@ function interfacePage(ctx) {
   const icons = { system: 'contrast', light: 'sun', dark: 'circleFill' };
   const modes = connectedGroup(Object.entries(AppearanceMode).map(([value, title]) => [value, `<span class="ob-mode">${icon(icons[value])}<span>${esc(title)}</span></span>`]),
     prefs.get('appearance'), 'ob-appearance', { height: 64 });
-  return page("Com'è la tua app?",
+  return stepParts("Com'è la tua app?",
     'Chiara o scura, e con quanto contrasto tra i colori. Si cambia anche dopo, in Impostazioni › Aspetto.',
     stagger(1, `<div class="stack gap-8"><h3 class="list-header">Tema</h3>${modes}</div>`)
       + stagger(2, listGroup([formRow('Contrasto', select(Object.entries(Contrast), prefs.get('contrast'), 'pref-contrast', { label: 'Contrasto' }), { iconName: 'contrast' })],
@@ -427,7 +471,7 @@ function interfacePage(ctx) {
 
 function feelPage(ctx) {
   const p = ctx.prefs;
-  return page('Forme e movimento',
+  return stepParts('Forme e movimento',
     "Quanto arrotondare, come muovere e con che accostamenti di colore. L'anteprima cambia mentre scegli.",
     stagger(1, listGroup([themePreview()]))
       + stagger(2, listGroup([
@@ -462,7 +506,7 @@ function dashboardPreview(mode) {
 
 function dashboardPage(ctx) {
   const mode = ctx.prefs.dashboardMode;
-  return page('Come vuoi la Dashboard?',
+  return stepParts('Come vuoi la Dashboard?',
     'È la prima cosa che vedi: i prossimi compiti, le verifiche e gli eventi. Si cambia anche dopo, in Impostazioni › Dashboard.',
     stagger(1, `<div class="ob-choices">${previewChoice('Lista', 'Vista compatta', mode === 'list', 'ob-dashboard', 'list', dashboardPreview('list'))}
       ${previewChoice('Calendario', 'Vista estesa', mode === 'calendar', 'ob-dashboard', 'calendar', dashboardPreview('calendar'))}</div>`),
@@ -475,7 +519,7 @@ function featuresPage(ctx) {
   const p = ctx.prefs;
   const supported = Reminders.supported;
   const lockLabel = Lock.biometryAvailable ? 'Blocca con passkey' : 'Blocca con un codice';
-  return page('Cosa ti serve?', "Puoi tenere tutto così com'è: ogni scelta si cambia in Impostazioni.",
+  return stepParts('Cosa ti serve?', "Puoi tenere tutto così com'è: ogni scelta si cambia in Impostazioni.",
     stagger(1, listGroup([
       toggleRow('Scheda Orario', p.showsTimetableTab, 'pref-tt-tab', { iconName: 'timetable', subtitle: 'Il tuo orario settimanale, tra Dashboard e Voti' }),
       toggleRow("Verifiche nell'orario", p.timetableShowsTests, 'pref-tt-tests', { iconName: 'test', subtitle: 'Segna nella lista le verifiche di Classeviva' }),
@@ -499,7 +543,7 @@ function classevivaPage(ctx) {
   const signedIn = model.phase === 'signedIn' && !model.isDemo;
   if (signedIn) {
     const count = model.accounts.length;
-    return page("Hai già effettuato l'accesso", 'Puoi aggiungere altri account, per esempio quello di un fratello o di una sorella.',
+    return stepParts("Hai già effettuato l'accesso", 'Puoi aggiungere altri account, per esempio quello di un fratello o di una sorella.',
       stagger(1, `<div class="stack gap-12"><div class="ob-summary">${avatar(model.initials, { size: 56, shapeName: 'cookie9Sided' })}
         <span class="grow"><strong>${esc(model.displayName)}</strong><small>${count === 1 ? '1 account' : `${count} account`}</small></span></div>
         ${button(model.isCloud ? 'Abbina un altro account' : 'Aggiungi un altro account', { action: 'add-account', iconName: 'userPlus', style: 'tonal', cls: 's wide' })}</div>`),
@@ -516,11 +560,11 @@ function classevivaPage(ctx) {
     </div>${errorBox(ob.error)}<p class="ob-note">BCW non è affiliata a Gruppo Spaggiari Parma.</p>
     <button type="submit" hidden></button></form>`;
   const disabled = !ob.username || !ob.password || ob.loading;
-  return page('Accedi a Classeviva',
+  return stepParts('Accedi a Classeviva',
     'Usa le stesse credenziali del registro: codice utente (o email) e password. Restano solo in questo browser e vanno soltanto ai server di Classeviva.',
     stagger(1, form),
     nextButton({ title: model.isCloud ? 'Abbina' : 'Accedi', action: 'ob-signin', disabled, loading: ob.loading })
-      + (ob.typing ? '' : `<div class="ob-row">${button('Prova la demo', { action: 'ob-demo', iconName: 'sparkles', style: 'tonal', cls: 's wide' })}
+      + (isTyping(ctx) ? '' : `<div class="ob-row">${button('Prova la demo', { action: 'ob-demo', iconName: 'sparkles', style: 'tonal', cls: 's wide' })}
         <button class="btn text s wide" data-action="ob-next">Più tardi</button></div>`));
 }
 
@@ -570,7 +614,7 @@ function bcwPage(ctx) {
   const ob = ctx.app.onboarding;
   const model = ctx.model;
   if (model.isCloud) {
-    return page('Sei nel tuo account BCW', 'Impostazioni, orario e account abbinati ti seguono su ogni dispositivo.',
+    return stepParts('Sei nel tuo account BCW', 'Impostazioni, orario e account abbinati ti seguono su ogni dispositivo.',
       stagger(1, `<div class="ob-summary"><span class="ob-summary-art shaped">${shape('cookie9Sided')}${icon('cloud')}</span>
         <span class="grow"><strong>${esc(model.cloudUser?.username ?? '')}</strong><small>${esc(BCWServer.isConfigured ? hostOf(BCWServer.base) : '')}</small></span></div>`),
       nextButton());
@@ -578,7 +622,7 @@ function bcwPage(ctx) {
   const subtitle = "È facoltativo. Con un nome utente e una password ritrovi tutto su ogni dispositivo, anche nell'app per iPhone e iPad.";
   if (ob.bcwChoice === 'none') {
     const benefit = (iconName, title, sub) => `<div class="list-item form-row"><span class="form-icon">${icon(iconName)}</span><span class="li-text"><strong>${esc(title)}</strong><small>${esc(sub)}</small></span></div>`;
-    return page('Vuoi un account BCW?', subtitle,
+    return stepParts('Vuoi un account BCW?', subtitle,
       stagger(1, listGroup([
         benefit('users', 'Tutti i tuoi account insieme', 'Più account Classeviva, un solo accesso'),
         benefit('timetable', 'Orario e impostazioni ovunque', "Nell'app per iPhone e iPad e nel browser"),
@@ -606,10 +650,10 @@ function bcwPage(ctx) {
     <button class="link-button proxy-line ob-server" type="button" data-action="cloud-server-sheet">${icon('cloud')}<span>Usa un altro server BCW</span></button>
     <button type="submit" hidden></button></form>`;
   const disabled = !ob.bcwUsername || !ob.bcwPassword || (create && !ob.bcwConfirm) || ob.bcwLoading;
-  return page(create ? 'Crea un account BCW' : 'Accedi con un account BCW', subtitle,
+  return stepParts(create ? 'Crea un account BCW' : 'Accedi con un account BCW', subtitle,
     stagger(1, form),
     nextButton({ title: create ? 'Crea account' : 'Accedi', action: 'ob-bcw-submit', disabled, loading: ob.bcwLoading })
-      + (ob.typing ? '' : '<button class="btn text s wide" data-action="ob-bcw-choice" data-value="none">Indietro</button>'));
+      + (isTyping(ctx) ? '' : '<button class="btn text s wide" data-action="ob-bcw-choice" data-value="none">Indietro</button>'));
 }
 
 function hostOf(base) {
@@ -670,8 +714,9 @@ function genState(ctx) {
 
 function timetablePage(ctx) {
   const ob = ctx.app.onboarding;
-  const content = ob.draft ? previewPage(ctx, ob.draft) : setupPage(ctx);
-  return axisPage('ob-timetable', ob.genDir, ob.draft ? 'ob-tt-preview' : 'ob-tt-setup', content, { cls: 'ob-axis' });
+  return ob.draft
+    ? { ...previewPage(ctx, ob.draft), key: 'timetable-preview' }
+    : { ...setupPage(ctx), key: 'timetable-setup' };
 }
 
 function setupPage(ctx) {
@@ -684,7 +729,7 @@ function setupPage(ctx) {
     ? "Con ore così BCW tiene gli orari esatti: applicando l'orario passerà da solo all'allineamento libero, che si cambia in Modifica orario."
     : 'Le trovi sul diario o sul sito della scuola. Se sbagli, potrai cambiarle e rigenerare.';
   const intro = events > 0 ? `Hai già un orario con ${plural(events, '1 evento', '# eventi')}. Puoi ricavarne un altro` : 'BCW può ricavarlo';
-  return page('Crea il tuo orario',
+  return stepParts('Crea il tuo orario',
     `${intro} dalle lezioni già registrate su Classeviva, che però dice solo in quale ora si svolge una lezione: indica quando comincia la prima e quanto dura. Prima di applicarlo vedrai un'anteprima.`,
     stagger(1, `<div class="stack gap-20">${generationFields(ctx, GEN_ID, g, { footer })}</div>`) + errorBox(ob.genError),
     `<button class="btn filled m wide" data-action="ob-generate"${ob.generating ? ' disabled' : ''}>${ob.generating ? loadingIndicator({ size: 'small' }) : icon('wand')}<span>Crea l'anteprima</span></button>
@@ -693,7 +738,7 @@ function setupPage(ctx) {
 
 function previewPage(ctx, draft) {
   const lessons = draft.entries.filter((e) => !isBreak(e)).length;
-  return page('Ecco la tua settimana',
+  return stepParts('Ecco la tua settimana',
     `${plural(lessons, '1 lezione ricavata', '# lezioni ricavate')} da ${plural(draft.analyzedDays, '1 giorno', '# giorni')} di registro. Controlla che torni: potrai cambiarla quando vuoi nella scheda Orario.`,
     stagger(1, weekGlance(ctx, draft)),
     `${nextButton({ title: "Applica l'orario", action: 'ob-apply' })}
@@ -707,7 +752,8 @@ function previewPage(ctx, draft) {
  */
 function weekGlance(ctx, draft) {
   const store = ctx.model.timetable;
-  const hourHeight = 40;
+  // Sugli schermi larghi c'è posto per ore più alte.
+  const hourHeight = ctx.wide ? 54 : 40;
   const days = [1, 2, 3, 4, 5, 6, 7].map((w) => ({ w, entries: draft.entries.filter((e) => e.weekday === w) })).filter((d) => d.entries.length);
   const starts = draft.entries.map((e) => e.start);
   const ends = draft.entries.map((e) => e.end);
@@ -740,7 +786,7 @@ async function generate(ctx) {
   try {
     const draft = await makeTimetableDraft(ctx.model, genState(ctx).settings);
     navigator.vibrate?.(10);
-    ob.genDir = 1;
+    ob.dir = 1;
     ob.draft = draft;
   } catch (error) {
     ob.genError = error.message;
@@ -772,9 +818,7 @@ function donePage(ctx) {
   const text = signedIn
     ? 'BCW è fatta su misura per te. Puoi rivedere questa introduzione quando vuoi, in Impostazioni › Generale.'
     : "Manca solo l'accesso a Classeviva: lo trovi nella prossima schermata.";
-  return `<div class="ob-page ob-center-page"><div class="ob-center">
-      ${stagger(0, `<h1 class="ob-big done">${esc(title)}</h1>`)}${stagger(1, `<p>${esc(text)}</p>`)}</div>
-    <div class="ob-actions">${stagger(2, nextButton({ title: signedIn ? 'Apri BCW' : "Vai all'accesso", action: 'ob-finish' }))}</div></div>`;
+  return { center: true, done: true, title, text, actions: [nextButton({ title: signedIn ? 'Apri BCW' : "Vai all'accesso", action: 'ob-finish' })] };
 }
 
 /** Fine dell'introduzione (anche saltandola): il cerchio mostra l'accesso o BCW con i colori veri. */
@@ -846,7 +890,7 @@ export const onboardingActions = {
     if (ob) ob[el.dataset.field] = el.value;
   },
   // Con la tastiera aperta (telefoni) la forma in cima lascia spazio ai campi, come nell'app.
-  'ob-focus': (ctx) => { if (ctx.app.onboarding && matchMedia('(pointer: coarse)').matches) ctx.app.onboarding.typing = true; },
+  'ob-focus': (ctx) => { if (ctx.app.onboarding && !ctx.wide && matchMedia('(pointer: coarse)').matches) ctx.app.onboarding.typing = true; },
   'ob-blur': (ctx) => { if (ctx.app.onboarding) ctx.app.onboarding.typing = false; },
   'ob-signin': (ctx, el) => {
     const ob = ctx.app.onboarding;
@@ -880,7 +924,7 @@ export const onboardingActions = {
   'ob-regenerate': (ctx) => {
     const ob = ctx.app.onboarding;
     if (!ob) return;
-    ob.genDir = -1;
+    ob.dir = -1;
     ob.draft = null;
   },
   'ob-apply': (ctx) => {

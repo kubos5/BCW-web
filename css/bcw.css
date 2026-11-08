@@ -2650,6 +2650,13 @@ html.theme-reveal:not(.reduced-reveal)::view-transition-old(root),
 html.theme-reveal:not(.reduced-reveal)::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 html.reduced-reveal::view-transition-old(root),
 html.reduced-reveal::view-transition-new(root) { animation-duration: .2s; }
+/* Il fronte dell'onda: un anello del nuovo colore primario, in un gruppo suo sopra le due
+   fotografie (le animazioni le dà `revealTheme`). */
+.reveal-ring { position: fixed; inset: 0; z-index: 1000; pointer-events: none; overflow: hidden; view-transition-name: reveal-ring; }
+.reveal-ring i { position: absolute; display: block; box-sizing: border-box; border: 0 solid var(--primary); border-radius: 50%; opacity: 0; }
+html.theme-reveal::view-transition-group(reveal-ring),
+html.theme-reveal::view-transition-old(reveal-ring),
+html.theme-reveal::view-transition-new(reveal-ring) { animation: none; }
 
 /* L'introduzione a tutta pagina: una colonna di 560 px al massimo. */
 .onboarding { position: fixed; inset: 0; z-index: 6; display: flex; justify-content: center; background: var(--surface); overflow: hidden; }
@@ -2675,13 +2682,14 @@ html.reduced-reveal::view-transition-new(root) { animation-duration: .2s; }
 .ob-big.done { font-size: 40px; line-height: 48px; }
 .ob-center p { font-size: 16px; line-height: 24px; color: var(--on-surface-variant); }
 /* Gli elementi di una pagina salgono e compaiono uno dopo l'altro. */
-.ob-page .stagger { animation: ob-in var(--spring-slow-dur) var(--spring) calc(50ms + var(--i, 0) * 55ms) backwards; }
+.ob-page .stagger, .ob-aside .stagger { animation: ob-in var(--spring-slow-dur) var(--spring) calc(50ms + var(--i, 0) * 55ms) backwards; }
 @keyframes ob-in { from { opacity: 0; transform: translateY(22px) scale(.97); } }
 
 /* La forma in cima: cambia misura con la molla, ruota piano e si trasforma nella successiva. */
-.ob-hero { flex: none; position: relative; height: calc(var(--size) + 8px); margin-top: 8px; display: grid; place-items: center; transition: height var(--spring-slow-dur) var(--spring); }
+.ob-hero { --size: var(--base); flex: none; position: relative; height: calc(var(--size) + 8px); margin-top: 8px; display: grid; place-items: center; transition: height var(--spring-slow-dur) var(--spring); }
 .ob-hero.welcome { margin-top: 24px; }
-.ob-hero > * { grid-area: 1 / 1; }
+.ob-hero-art { display: grid; place-items: center; }
+.ob-hero-art > * { grid-area: 1 / 1; }
 .ob-main { width: var(--size); height: var(--size); color: var(--primary-container); transition: width var(--spring-slow-dur) var(--spring), height var(--spring-slow-dur) var(--spring); }
 .ob-sat { width: calc(var(--size) * var(--s)); height: calc(var(--size) * var(--s)); transform: translate(calc(var(--size) * var(--x)), calc(var(--size) * var(--y)));
   transition: transform var(--spring-slow-dur) var(--spring), width var(--spring-slow-dur) var(--spring), height var(--spring-slow-dur) var(--spring); }
@@ -2776,3 +2784,48 @@ html.reduced-reveal::view-transition-new(root) { animation-duration: .2s; }
   .ob-content { padding-left: 32px; padding-right: 32px; }
   .ob-actions { padding-left: 32px; padding-right: 32px; padding-bottom: 24px; }
 }
+
+/* Schermi larghi (da 840 px), come la shell dell'app: la barra in alto sullo sfondo e un pannello
+   con angoli ampi in due colonne. A sinistra titolo e spiegazione con sotto la forma, che riempie
+   lo spazio rimasto; a destra il contenuto che scorre e le azioni in fondo a destra (la principale
+   per ultima). Accoglienza e fine: la forma, più grande, al centro della colonna a sinistra e a
+   destra titolo, testo e pulsanti. Celle e controlli restano come nell'app (pannello `surface`). */
+.onboarding.wide { background: var(--surface-container); }
+.ob-frame { width: 100%; max-width: 1240px; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: var(--safe-top) 24px calc(24px + var(--safe-bottom)); }
+.onboarding.wide .ob-top { height: 64px; padding: 0 4px; gap: 12px; }
+.onboarding.wide .ob-top .btn { --h: 40px; padding: 0 16px; font-size: 14px; }
+.onboarding.wide .ob-top-spacer { height: 64px; }
+.ob-panel { flex: 1; min-height: 0; max-height: 820px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-rows: minmax(0, 1fr); gap: 56px;
+  padding: 40px 48px 32px; border-radius: var(--r-xli); background: var(--surface); }
+.ob-aside { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.ob-aside-axis { flex: none; display: flex; flex-direction: column; }
+.ob-aside .ob-heading { gap: 12px; padding-bottom: 16px; }
+.ob-aside .ob-heading h1 { font-size: 40px; line-height: 48px; letter-spacing: -.4px; font-variation-settings: "ROND" var(--rond); }
+.ob-aside .ob-heading p { font-size: 16px; line-height: 24px; }
+.onboarding.wide .ob-hero { --size: min(var(--wide), 21vw, 33vh); flex: 1; min-height: 0; height: auto; margin: 0; transition: none; }
+.onboarding.wide .ob-hero-center .ob-logo { font-size: calc(var(--size) * .235); }
+@media (min-width: 1600px) and (min-height: 960px) { .onboarding.wide .ob-hero { --size: min(calc(var(--wide) * 1.25), 21vw, 33vh); } }
+.onboarding.wide .ob-axis { min-width: 0; }
+.onboarding.wide .ob-content { gap: 24px; padding: 4px 8px 24px; }
+.onboarding.wide .ob-scroll { margin: 0 -8px; }
+.onboarding.wide .ob-actions { flex-direction: row-reverse; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 16px 0 0; }
+.onboarding.wide .ob-row { display: contents; }
+.onboarding.wide .ob-actions .btn { width: auto; flex: none; --h: 56px; --pressed: 12px; padding: 0 24px; font-size: 16px; line-height: 24px; }
+.onboarding.wide .ob-actions .btn.filled { min-width: 176px; }
+.onboarding.wide .ob-center-page { justify-content: center; gap: 36px; }
+.onboarding.wide .ob-center-page .ob-center { flex: none; gap: 16px; padding: 0; text-align: left; }
+.onboarding.wide .ob-big, .onboarding.wide .ob-big.done { font-size: 52px; line-height: 60px; letter-spacing: -.8px; font-variation-settings: "ROND" var(--rond); }
+.onboarding.wide .ob-center p { max-width: 480px; font-size: 18px; line-height: 28px; }
+.onboarding.wide .ob-center-page .ob-actions { flex-direction: row; justify-content: flex-start; padding: 0; }
+.onboarding.wide .ob-swatches { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 20px 8px; }
+.onboarding.wide .ob-swatch-art { width: 76px; height: 76px; }
+.onboarding.wide .ob-swatch-fill { width: 66px; height: 66px; }
+.onboarding.wide .ob-swatch.selected .ob-swatch-fill { width: 74px; height: 74px; }
+.onboarding.wide .ob-swatch-name { font-size: 13px; }
+.onboarding.wide .ob-choices { gap: 16px; }
+.onboarding.wide .ob-choice { padding: 12px; }
+.onboarding.wide .ob-choice-preview { height: 168px; }
+.onboarding.wide .ob-pv { gap: 8px; padding: 14px; }
+.onboarding.wide .ob-pv-week i { height: 30px; }
+.onboarding.wide .ob-pv-month i { height: 22px; }
+.onboarding.wide .ob-pv-row { height: 20px; }

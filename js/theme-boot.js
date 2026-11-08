@@ -1,6 +1,7 @@
 // Applica subito, prima del primo disegno, l'aspetto scelto nelle Impostazioni: tema chiaro
 // o scuro, colori generati dal colore d'accento (salvati da `js/theme.js`), angoli,
-// animazioni e caratteri. Script classico e minuscolo, così non ritarda l'apertura.
+// animazioni e caratteri. Script classico e minuscolo, così non ritarda l'apertura. Il favicon
+// nei colori del tema lo disegna poi `Theme.updateFavicon()` (fino ad allora `icons/favicon.svg`).
 (function () {
   try {
     var prefs = JSON.parse(localStorage.getItem('bcw.preferences') || '{}');
@@ -34,12 +35,6 @@
         var monoDark = prefs.appearance === 'dark' || (prefs.appearance !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
         if (mono) mono.content = monoDark ? '#0b0b0b' : '#fbfbfb';
       }
-    }
-    // Favicon nel colore del marchio del tema scelto (lo aggiorna poi js/theme.js).
-    var brand = getComputedStyle(html).getPropertyValue('--brand').trim();
-    var icon = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
-    if (brand && icon) {
-      icon.href = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="4" y="28.18" width="56" height="7.64" rx="3.82" fill="' + brand + '"/></svg>');
     }
   } catch { /* aspetto predefinito */ }
 })();

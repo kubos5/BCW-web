@@ -99,7 +99,7 @@ Le stesse dell'app nativa:
 - modalità demo con dati di esempio, anche con un account già collegato (uscendo si torna all'account)
 - notifiche per nuovi voti, comunicazioni, note, assenze e compiti, da attivare in Impostazioni › Notifiche
 - impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account; in Generale anche "Rivedi l'introduzione" e i collegamenti al codice su GitHub
-- alla prima apertura un'introduzione guida tra colori, tema, forme e movimento, vista della Dashboard, funzioni, accesso a Classeviva, account BCW e orario ricavato dalle lezioni: BCW parte in bianco e nero e i colori arrivano con un cerchio che si allarga dal colore scelto
+- alla prima apertura un'introduzione guida tra colori, tema, forme e movimento, vista della Dashboard, funzioni, accesso a Classeviva, account BCW e orario ricavato dalle lezioni: BCW parte in bianco e nero e i colori arrivano con un cerchio che si allarga dal colore scelto, con il bordo del nuovo colore come nell'app; sugli schermi larghi l'introduzione è un pannello in due colonne (titolo e forma a sinistra, scelte a destra)
 - aspetto personalizzabile (Impostazioni › Aspetto): tema chiaro, scuro o automatico, colore d'accento (campioni o un colore qualsiasi) da cui si generano tutti i colori del sito, stile dei colori (Tonale, Vivace, Espressivo, Fedele, Neutro, Arcobaleno, Macedonia), contrasto, angoli più o meno arrotondati, animazioni espressive, standard o ridotte, caratteri arrotondati; "Ripristina l'aspetto di BCW" riporta tutto com'era
 
 ### Orario
@@ -151,10 +151,10 @@ Il sito segue [Material 3 Expressive](https://m3.material.io/):
 
 - colori generati con material-color-utilities (schema Tonal Spot) dal rosso mattone di BCW `#A23E2F`, con tema chiaro e scuro; materie e stati (bene, sufficiente, insufficiente) hanno le loro palette tonali. Scegliendo un altro colore d'accento lo schema viene rigenerato nel browser (`js/theme.js`) e salvato, così all'apertura si applica subito
 - font Google Sans Flex (incluso nel sito), con l'asse ROND per titoli e numeri arrotondati; anche il logo è scritto con questo font
-- favicon con la linea di BCW nel colore del tema scelto nell'app (chiaro, scuro e colore d'accento); icona dell'app installata come quella dell'app per iPhone: la scritta BCW e sotto la barra (`icons/icon.svg`)
+- icona come quella dell'app per iPhone dalla 3.3: la scritta BCW e sotto la barra del marchio, nei colori del tema (`js/app-icon.js`, `icons/icon.svg`); il favicon la ridisegna nel tema scelto nell'app (chiaro o scuro e colore d'accento)
 - icone Material Symbols Rounded
 - angoli ampi, liste segmentate, sezioni segmentate comprimibili, chip di stato, gruppi di pulsanti collegati, schede, barra di ricerca in alto, menu del pulsante d'azione flottante, barra degli strumenti flottante, selettore della data, barra di navigazione flottante e barra di navigazione laterale, fogli dal basso e dialoghi
-- forme che si trasformano l'una nell'altra nell'introduzione, e un cerchio che si allarga cambiando colori o tema chiaro e scuro (View Transitions)
+- forme che si trasformano l'una nell'altra nell'introduzione, e un cerchio che si allarga cambiando colori o tema chiaro e scuro, con un anello del nuovo colore sul bordo (View Transitions)
 - transizioni di Material 3: asse condiviso tra i giorni e tra le schede dei Voti, dissolvenza incrociata verso la ricerca e tra le viste Lista e Giorno dell'orario; sui telefoni, cambiando scheda, le pagine salgono dal basso
 - forme espressive (MaterialShapes): i voti in un "biscotto" a nove lobi, l'indicatore di caricamento che cambia forma ruotando, avatar e stati vuoti nelle forme di Material
 - medie in anelli con la parte piena ondulata e barre di avanzamento ondulate
@@ -189,7 +189,8 @@ js/
 ├── components.js     Componenti (liste e sezioni segmentate, chip, badge voto, anelli ondulati, righe agenda…)
 ├── calendar-bar.js   Settimana e mese come gruppo di pulsanti
 ├── date-picker.js    Selettore della data di Material 3
-├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo (testo e linea)
+├── icons.js, shapes.js, logo.js  Icone Material Symbols, forme di M3 Expressive, logo (testo e barra)
+├── app-icon.js       Icona di BCW (tracciati della scritta e della barra) per favicon e icone
 ├── viewer.js         Anteprima dei file con zoom e schermo intero
 ├── charts.js         Grafici SVG
 ├── dom.js            Aggiornamento del DOM per confronto
@@ -198,7 +199,8 @@ config.json           Proxy e server BCW predefiniti
 server.js             Server statico e proxy (Node, senza dipendenze)
 proxy/                Proxy come Cloudflare Worker
 sw.js                 Service worker per l'uso offline
-logo/                 Logo (BCW con la linea) e linea da sola, in SVG
+logo/                 Logo (la scritta BCW con la barra sotto), in SVG
+icons/                Icona dell'app e favicon, dagli stessi tracciati di js/app-icon.js
 ```
 
 Le viste producono HTML a partire dallo stato; `dom.js` applica al documento solo le differenze, così restano intatti fuoco, scorrimento e animazioni.
