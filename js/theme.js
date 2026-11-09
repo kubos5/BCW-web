@@ -5,7 +5,6 @@
 // con le stesse variabili (chiaro e scuro) che viene salvato nel browser, così all'apertura
 // `js/theme-boot.js` lo applica subito, prima del primo disegno.
 
-import { appIconSVG, drawAppIcon } from './app-icon.js';
 
 export const DEFAULT_ACCENT = '#a23e2f';
 
@@ -107,28 +106,23 @@ export const Theme = {
   },
 
   /**
-   * Favicon: l'icona di BCW (`js/app-icon.js`) nei colori del tema in uso, come l'icona dell'app
-   * per iPhone con "Tema dell'app": sfondo nel contenitore primario (in scuro lo sfondo più scuro),
-   * scritta `on-surface`, barra `brand`. Anche la versione PNG, per i browser senza SVG.
+   * Favicon: solo la linea di BCW, nel colore del marchio del tema in uso (chiaro o scuro e colore
+   * d'accento scelti nell'app). Anche la versione PNG, per i browser senza SVG.
    */
   updateFavicon() {
-    const style = getComputedStyle(document.documentElement);
-    const read = (name) => style.getPropertyValue(name).trim();
-    const dark = String(style.colorScheme).includes('dark');
-    const colors = {
-      background: read(dark ? '--surface-container-lowest' : '--primary-container'),
-      ink: read('--on-surface'), brand: read('--brand'), radius: FAVICON_RADIUS,
-    };
-    const signature = JSON.stringify(colors);
-    if (!colors.brand || signature === faviconSignature) return;
-    faviconSignature = signature;
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim();
+    if (!color || color === faviconColor) return;
+    faviconColor = color;
     const svg = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
-    if (svg) svg.href = `data:image/svg+xml,${encodeURIComponent(appIconSVG(colors))}`;
+    if (svg) svg.href = faviconSVG(color);
     const png = document.querySelector('link[rel="icon"][type="image/png"]');
     const context = png && document.createElement('canvas').getContext('2d');
-    if (context && typeof Path2D === 'function') {
+    if (context?.roundRect) {
       context.canvas.width = context.canvas.height = 192;
-      drawAppIcon(context, 192, colors);
+      context.fillStyle = color;
+      context.beginPath();
+      context.roundRect(12, 84.5, 168, 23, 11.5);
+      context.fill();
       png.href = context.canvas.toDataURL('image/png');
     }
   },
@@ -142,9 +136,12 @@ export const Theme = {
 };
 
 let pending = null;
-let faviconSignature = null;
-/** Angoli del favicon, in punti della tela di 1024 (come le icone arrotondate di iOS). */
-const FAVICON_RADIUS = 230;
+let faviconColor = null;
+
+/** La linea di BCW (come icons/favicon.svg) in un colore. */
+export function faviconSVG(color) {
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="4" y="28.18" width="56" height="7.64" rx="3.82" fill="${color}"/></svg>`)}`;
+}
 
 async function generate(prefs, signature) {
   let cached = null;

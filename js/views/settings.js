@@ -20,7 +20,7 @@ import { esc, fmt, GradeFormat, sentenceCased, nameCased, startOfDay } from '../
 import { proxySheet } from './login.js';
 import { BCWServer, SyncCategory } from '../cloud.js';
 
-export const VERSION = '3.3';
+export const VERSION = '3.3.1';
 
 // MARK: - Mattoni del modulo
 
@@ -151,16 +151,21 @@ function onboardingSection() {
 
 /** Il codice di BCW su GitHub e il profilo dell'autore (3.3, come nell'app). */
 function githubSection() {
-  const items = [
-    ['BCW', "L'app per iPhone e iPad (repository principale)", 'github', 'https://github.com/kubos5/BCW/'],
-    ['BCW-web', 'La versione web', 'globe', 'https://github.com/kubos5/BCW-web/'],
-    ['BCW-api', 'Il server degli account BCW', 'server', 'https://github.com/kubos5/BCW-api/'],
-    ['kubos5', "Il profilo dell'autore su GitHub", 'person', 'https://github.com/kubos5/'],
-  ];
-  return section(items.map(([title, subtitle, iconName, href]) => listItem({
+  const link = ([title, subtitle, iconName, href]) => listItem({
     title, subtitle, href, leading: `<span class="form-icon">${icon(iconName)}</span>`, trailing: icon('externalLink', { cls: 'small trailing-icon' }),
     attrs: ' title="Apre GitHub in una nuova scheda"',
-  })), { header: 'Su GitHub' });
+  });
+  // Le versioni di BCW, poi il server e l'autore, in gruppi separati.
+  const groups = [
+    [
+      ['BCW', 'BCW per iOS', 'ios', 'https://github.com/kubos5/BCW'],
+      ['BCW-web', 'BCW per Web', 'globe', 'https://github.com/kubos5/BCW-web'],
+      ['BCW-android', 'BCW per Android', 'android', 'https://github.com/kubos5/BCW-android'],
+    ],
+    [['BCW-api', 'Backend', 'api', 'https://github.com/kubos5/BCW-api']],
+    [['kubos5', 'Autore di BCW <3', 'favorite', 'https://github.com/kubos5']],
+  ];
+  return groups.map((items, i) => section(items.map(link), i === 0 ? { header: 'Su GitHub' } : {})).join('');
 }
 
 function generalPane(ctx) {

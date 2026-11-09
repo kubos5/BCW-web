@@ -231,7 +231,7 @@ function hero(step) {
     ? `<span class="ob-hero-center" data-key="ob-center-${info.icon}">${icon(info.icon)}</span>`
     : `<span class="ob-hero-center logo" data-key="ob-center-logo">${logo('ob-logo', { stacked: true })}</span>`;
   // Sugli schermi larghi più grande (`--wide`, limitata dalla finestra nel CSS). La forma con le
-  // altre due scivola con la molla quando cambia posto (`data-flip`, come il logo dell'accesso).
+  // altre due scivola con la molla quando cambia posto (`data-flip`).
   const wide = Math.round(info.size * (big ? 1.35 : 1.95));
   return `<div class="ob-hero ${step === 'welcome' ? 'welcome' : ''}" style="--base:${info.size}px;--wide:${wide}px" aria-hidden="true" data-key="ob-hero">
     <div class="ob-hero-art" data-flip="ob-hero">

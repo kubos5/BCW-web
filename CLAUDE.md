@@ -57,10 +57,9 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   in `--brand`; `stacked` con la barra sotto, come nell'introduzione e nell'icona dell'app), così segue il tema scelto
   nell'app. Icona (3.3, come l'icona dell'app per iPhone): la scritta e la barra sotto, tracciati di `AppIcon.icon`
   dell'app in `js/app-icon.js` (`appIconSVG`, `drawAppIcon`); da lì `icons/icon.svg` e i PNG (tema Mattone: sfondo
-  `primary-container`, scritta `on-surface`, barra `brand`), `icons/favicon.svg` (angoli arrotondati, chiaro e scuro),
-  `logo/bcw-logo.svg` e il favicon che `Theme.updateFavicon()` ridisegna nel tema scelto (in scuro sfondo
-  `surface-container-lowest`). Non ci sono altre icone: tutte vengono da
-  `js/app-icon.js`. Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
+  `primary-container`, scritta `on-surface`, barra `brand`) e `logo/bcw-logo.svg`. Il favicon invece è solo la linea
+  orizzontale del marchio (`icons/favicon.svg`, chiaro e scuro), ridisegnata nel colore `--brand` del tema scelto da
+  `js/theme-boot.js` e `Theme.updateFavicon()` (`faviconSVG`, anche in PNG). Movimento con le molle `--spring`, `--spring-fast`, `--effects` (approssimate con `linear()`).
 - Larghezze: sotto 600 px barra di navigazione flottante (3.3, come nell'app: `floatingNavBar` in `app.js`, una pillola
   di 56 px sospesa sul contenuto, 14 px sopra il bordo o 10 px dentro lo spazio sicuro, con i nomi delle quattro schede:
   Dashboard, Orario, Voti, Tu; tre con l'Orario nascosto, vedi Orario). La scheda aperta è una pillola piena nel primario
@@ -87,12 +86,12 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
   (metriche di Google Sans Flex nel commento del CSS; misurare con `measureText` e la linea di base, non con le scatole).
   Dalla 3.3 un'intestazione sola nelle due disposizioni (`loginHeader`): con la tastiera chiusa il logo ha la barra sotto
   (`stacked`, parte alta 0,31 sotto la linea di base) e tra la barra e le maiuscole del titolo lo stesso vuoto che tra la
-  scritta e la barra (13,6 px); aperta, la barra va a destra. Scritta, barra e titolo hanno `data-flip`: `playFlips` in
-  `app.js` li porta dalla posizione di prima a quella nuova con la molla (FLIP); un titolo che va a capo (`wraps`, da
-  `fitLoginTitles`, al massimo tre righe: centrato sotto il logo, a sinistra accanto al logo piccolo) invece di scorrere
-  sparisce e ricompare a movimento quasi finito. Note in basso ridotte: con un accesso già fatto (aggiunta di un account,
-  primo account da abbinare, account BCW dalle Impostazioni) nessuna, altrimenti l'affiliazione e "Usa un altro server
-  BCW" o, solo nel web, "Usa un altro proxy" (senza indirizzo); le spiegazioni restano nel pannello largo.
+  scritta e la barra (13,6 px); aperta, la barra va a destra. Logo e titolo cambiano posto di scatto, come il resto
+  dell'accesso (3.3.1: l'animazione dell'app iOS sul web non serve, non reintrodurla); un titolo che va a capo (`wraps`,
+  da `fitLoginTitles`, al massimo tre righe) è centrato sotto il logo o a sinistra accanto al logo piccolo. Note in basso
+  ridotte: con un accesso già fatto (aggiunta di un account, primo account da abbinare, account BCW dalle Impostazioni)
+  nessuna, altrimenti l'affiliazione e i collegamenti "Rivedi l'introduzione" (`ob-replay`, 3.3.1) e "Usa un altro
+  server BCW" o, solo nel web, "Usa un altro proxy" (senza indirizzo); le spiegazioni restano nel pannello largo.
   Il gruppo ha `data-keep-focus` (toccarlo non toglie il fuoco: i campi dei due moduli hanno le stesse chiavi
   `f-user`/`f-pass`, quindi il cursore resta e cambia solo il valore); `data-blank-blur` chiude la tastiera toccando
   lo spazio vuoto; le note dei due moduli occupano sempre l'altezza delle più lunghe. Safari (e Chrome su Android) non
