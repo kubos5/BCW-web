@@ -53,15 +53,14 @@ export function renderLogin(ctx, { adding }) {
  * Intestazione dell'accesso (3.3, come nell'app): un solo logo nelle due disposizioni. Con la
  * tastiera chiusa la barra sta sotto la scritta (come nell'introduzione e nell'icona) e il titolo
  * sotto, con lo stesso vuoto sopra e sotto la barra; con la tastiera aperta il logo si rimpicciolisce,
- * la barra va a destra e il titolo accanto. Scritta, barra e titolo si spostano con la molla
- * (`data-flip`); un titolo che va a capo in una delle due disposizioni (`wraps`, da
- * `fitLoginTitles` in `app.js`) cambia allineamento, quindi sparisce e ricompare a movimento quasi
- * finito invece di scorrere.
+ * la barra va a destra e il titolo accanto. Sul web logo e titolo cambiano posto di scatto, come il
+ * resto dell'accesso (l'animazione dell'app non serve); un titolo che va a capo (`wraps`, da
+ * `fitLoginTitles` in `app.js`) cambia allineamento.
  */
 function loginHeader(title, { compact = false, art = true } = {}) {
   return `<div class="login-header ${compact ? 'compact' : ''}" data-key="login-header">
-    ${art && !compact ? loginArt() : ''}${logo('logo', { stacked: !compact, flip: 'login-logo' })}
-    <span class="logo-subtitle" data-key="login-title" data-flip="login-title" data-flip-mode="move">${esc(title)}</span></div>`;
+    ${art && !compact ? loginArt() : ''}${logo('logo', { stacked: !compact })}
+    <span class="logo-subtitle" data-key="login-title">${esc(title)}</span></div>`;
 }
 
 /** Forme di Material 3 Expressive che ruotano lentamente dietro al logo. */
@@ -108,7 +107,7 @@ function wideLogin(ctx, s, mode, options) {
     </div>
     ${options.linkingFirst ? '' : `<div class="login-legal">
       <span>BCW non è affiliata a Gruppo Spaggiari Parma.</span>
-      ${serverLine(mode)}
+      <span class="login-links">${introLine()}${serverLine(mode)}</span>
     </div>`}
   </div>`;
 }
@@ -191,11 +190,19 @@ function serverLine(mode) {
   return `<button class="link-button proxy-line" type="button" data-action="proxy-sheet">${icon('server')}<span>Usa un altro proxy</span></button>`;
 }
 
-/** Le note in basso, ridotte al minimo: l'affiliazione e il collegamento per cambiare server. */
+/** Rivedere l'introduzione (come da Impostazioni › Generale): un cerchio la porta sopra l'accesso. */
+function introLine() {
+  return `<button class="link-button proxy-line" type="button" data-action="ob-replay">${icon('sparkles')}<span>Rivedi l'introduzione</span></button>`;
+}
+
+/**
+ * Le note in basso, ridotte al minimo: l'affiliazione e i collegamenti per rivedere
+ * l'introduzione e per cambiare server.
+ */
 function footer(mode, { hidden = false } = {}) {
   return `<div class="login-footer ${hidden ? 'inactive' : ''}"${hidden ? ' aria-hidden="true"' : ''}>
       <p>BCW non è affiliata a Gruppo Spaggiari Parma.</p>
-      ${serverLine(mode)}
+      <div class="login-links">${introLine()}${serverLine(mode)}</div>
     </div>`;
 }
 

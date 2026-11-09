@@ -623,18 +623,14 @@ async function revealTheme(point, changes) {
 // MARK: Spostamenti con la molla
 
 /**
- * Elementi che cambiano posto tra un disegno e l'altro (`data-flip="id"`), animati con la tecnica
- * FLIP: dopo il morph ognuno parte da dove era e arriva al suo posto con la molla, come le viste di
- * SwiftUI che cambiano disposizione. `data-flip-mode="scale"` anima anche la misura (la scritta
- * del logo che si rimpicciolisce), `move` solo la posizione; un elemento `move` che va a capo
- * prima o dopo (`wraps`) invece di scorrere sparisce e ricompare a movimento quasi finito, come
- * la dissolvenza in sequenza di Material 3. Con le animazioni ridotte cambiano e basta.
+ * Elementi che cambiano posto tra un disegno e l'altro (`data-flip="id"`, la forma
+ * dell'introduzione), animati con la tecnica FLIP: dopo il morph ognuno parte da dove era e arriva
+ * al suo posto con la molla, come le viste di SwiftUI che cambiano disposizione. Con le animazioni
+ * ridotte cambiano e basta.
  */
 function captureFlips() {
   const flips = new Map();
-  for (const el of root.querySelectorAll('[data-flip]')) {
-    flips.set(el.dataset.flip, { rect: el.getBoundingClientRect(), wraps: el.classList.contains('wraps') });
-  }
+  for (const el of root.querySelectorAll('[data-flip]')) flips.set(el.dataset.flip, el.getBoundingClientRect());
   return flips;
 }
 
@@ -645,21 +641,13 @@ function playFlips(before) {
   const timing = { duration: parseFloat(style.getPropertyValue('--spring-dur')) || 435, easing: style.getPropertyValue('--spring').trim() || 'ease-out' };
   for (const el of root.querySelectorAll('[data-flip]')) {
     const old = before.get(el.dataset.flip);
-    if (!old || !old.rect.width) continue;
+    if (!old?.width) continue;
     const now = el.getBoundingClientRect();
     if (!now.width) continue;
-    const dx = old.rect.left - now.left;
-    const dy = old.rect.top - now.top;
-    const scale = el.dataset.flipMode === 'scale' ? old.rect.width / now.width : 1;
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(scale - 1) < 0.01) continue;
-    if (el.dataset.flipMode === 'move' && (old.wraps || el.classList.contains('wraps'))) {
-      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 230, delay: 220, easing: style.getPropertyValue('--effects').trim() || 'ease-out', fill: 'backwards' });
-      continue;
-    }
-    el.animate([
-      { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, transformOrigin: '0 0' },
-      { transform: 'none', transformOrigin: '0 0' },
-    ], timing);
+    const dx = old.left - now.left;
+    const dy = old.top - now.top;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+    el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], timing);
   }
 }
 

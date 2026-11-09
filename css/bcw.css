@@ -1743,6 +1743,8 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .login-main { display: flex; flex-direction: column; justify-content: center; gap: 24px; min-width: 0; }
 .login-legal { width: min(1040px, 100%); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 24px; padding: 0 24px; font-size: 12px; line-height: 16px; color: var(--on-surface-variant); }
 .login-legal .proxy-line { margin: 0; }
+/* Rivedi l'introduzione e cambia server, uno accanto all'altro (vanno a capo se non ci stanno). */
+.login-links { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 20px; }
 .proxy-line { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .proxy-line .icon { width: 16px; height: 16px; }
 /* "· Modifica" resta unito: andando a capo il punto non resta in fondo alla riga sopra. */
