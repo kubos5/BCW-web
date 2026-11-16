@@ -17,7 +17,8 @@
   <a href="https://github.com/kubos5/BCW">BCW per iOS</a> ·
   <strong><a href="https://github.com/kubos5/BCW-web">BCW per Web</a></strong> ·
   <a href="https://github.com/kubos5/BCW-android">BCW per Android</a> ·
-  <a href="https://github.com/kubos5/BCW-api">Backend</a>
+  <a href="https://github.com/kubos5/BCW-api">Backend</a> ·
+  <a href="https://github.com/kubos5/BCW-lp">Landing Page</a>
 </p>
 
 <br><br>
