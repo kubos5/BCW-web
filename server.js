@@ -4,7 +4,7 @@
 // Il browser non può chiamare direttamente `web.spaggiari.eu`: il server non consente
 // richieste da altri siti (CORS) e l'API vuole lo User-Agent dell'app ufficiale, che il
 // browser non permette di impostare. Questo proxy inoltra le richieste SOLO verso i server
-// di Classeviva e non salva nulla: credenziali e token passano e basta.
+// di Classeviva e non salva nulla: credenziali, token e cookie del sito passano e basta.
 //
 // Uso: `node server.js` (porta 8080) oppure `PORT=3000 node server.js`. Nessuna dipendenza.
 
@@ -24,6 +24,69 @@ const CLASSEVIVA_HEADERS = {
   'Z-Dev-Apikey': 'Tg1NWEwNGIgIC0K',
   Accept: 'application/json',
 };
+
+// Sito di Classeviva (4.0, come `ClassevivaWebSession` nell'app): le API del sito (`rest/w1`, stessi
+// percorsi di `rest/v1`) servono solo per i compiti del modulo Compiti (`homeworks/index`), che
+// l'API dell'app potrebbe non dare. Si leggono con il token dell'app oppure con la sessione del
+// sito: `/api/site-login` entra con le credenziali e restituisce i cookie, che l'app tiene in
+// memoria e rimanda nell'intestazione `X-BCW-Session`. Il proxy non salva nulla.
+const SITE_USER_AGENT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
+const SITE_AUTH = 'https://web.spaggiari.eu/auth-p7/app/default/AuthApi4.php';
+
+/** I cookie impostati da una risposta (`Set-Cookie`, anche più d'uno). */
+function setCookies(headers) {
+  if (typeof headers.getSetCookie === 'function') return headers.getSetCookie();
+  const raw = headers.get('set-cookie');
+  return raw ? raw.split(/,(?=\s*[^;,=\s]+=)/) : [];
+}
+
+/** Aggiunge (o toglie, se scaduti) i cookie di una risposta a quelli in `jar`. */
+function storeCookies(jar, headers) {
+  for (const line of setCookies(headers)) {
+    const [pair, ...attributes] = line.split(';');
+    const index = pair.indexOf('=');
+    if (index <= 0) continue;
+    const name = pair.slice(0, index).trim();
+    const value = pair.slice(index + 1).trim();
+    const expired = value === '' || value === 'deleted' || attributes.some((a) => /^\s*max-age\s*=\s*(0|-)/i.test(a));
+    if (expired) jar.delete(name);
+    else jar.set(name, value);
+  }
+}
+
+const cookieHeader = (jar) => [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
+
+function parseCookies(header) {
+  const jar = new Map();
+  for (const part of String(header || '').split(';')) {
+    const index = part.indexOf('=');
+    if (index > 0) jar.set(part.slice(0, index).trim(), part.slice(index + 1).trim());
+  }
+  return jar;
+}
+
+/** Accesso al sito con le credenziali di Classeviva (più profili: `aLoginSam` con l'ident). */
+async function siteLogin({ uid, pwd, ident }) {
+  const jar = new Map();
+  const authenticate = async (action, fields) => {
+    const headers = {
+      'User-Agent': SITE_USER_AGENT,
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    };
+    if (jar.size) headers.Cookie = cookieHeader(jar);
+    const response = await fetch(`${SITE_AUTH}?a=${action}`, {
+      method: 'POST', headers, body: new URLSearchParams(fields).toString(), redirect: 'manual', signal: AbortSignal.timeout(25_000),
+    });
+    storeCookies(jar, response.headers);
+    const json = await response.json().catch(() => null);
+    return json?.data?.auth ?? null;
+  };
+  let auth = await authenticate('aLoginPwd', { cid: '', uid, pwd, pin: '', target: '' });
+  if (auth && auth.loggedIn !== true && auth.verified === true && ident) auth = await authenticate('aLoginSam', { uid: ident });
+  if (!auth) return null;
+  return { loggedIn: auth.loggedIn === true, session: auth.loggedIn === true ? cookieHeader(jar) : null };
+}
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -51,13 +114,19 @@ function upstreamURL(path) {
   return null;
 }
 
+/** /api/w1/<percorso> → https://web.spaggiari.eu/rest/w1/<percorso> (API del sito). */
+function siteURL(path) {
+  const m = /^\/api\/w1(\/[^?#]*)$/.exec(path);
+  return m ? `https://web.spaggiari.eu/rest/w1${m[1]}` : null;
+}
+
 function corsHeaders(origin) {
   if (!origin || !(ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin))) return {};
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Z-Auth-Token, Z-Dev-Apikey',
-    'Access-Control-Expose-Headers': 'Content-Disposition, X-BCW-Proxy',
+    'Access-Control-Allow-Headers': 'Content-Type, Z-Auth-Token, Z-Dev-Apikey, X-BCW-Session',
+    'Access-Control-Expose-Headers': 'Content-Disposition, X-BCW-Proxy, X-BCW-Session',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
@@ -138,6 +207,75 @@ async function proxy(req, res, target) {
   }
 }
 
+/**
+ * API del sito (solo GET): con `X-BCW-Session` (i cookie di `/api/site-login`) come il browser,
+ * altrimenti con il token dell'app. Niente reindirizzamenti: con la sessione scaduta il sito rimanda
+ * alla pagina di accesso, e l'app rientra. I cookie aggiornati tornano in `X-BCW-Session`.
+ */
+async function proxySite(req, res, target) {
+  const cors = corsHeaders(req.headers.origin);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, cors);
+    res.end();
+    return;
+  }
+  if (req.method !== 'GET') {
+    res.writeHead(405, { ...cors, 'Content-Type': 'application/json', 'X-BCW-Proxy': '1' });
+    res.end('{"message":"Metodo non consentito"}');
+    return;
+  }
+  const session = req.headers['x-bcw-session'] ? String(req.headers['x-bcw-session']) : null;
+  const headers = session
+    ? { 'User-Agent': SITE_USER_AGENT, Accept: 'application/json', Cookie: session }
+    : { ...CLASSEVIVA_HEADERS, ...(req.headers['z-auth-token'] ? { 'Z-Auth-Token': String(req.headers['z-auth-token']) } : {}) };
+  try {
+    const upstream = await fetch(target, { headers, redirect: 'manual', signal: AbortSignal.timeout(25_000) });
+    const data = Buffer.from(await upstream.arrayBuffer());
+    const out = { ...cors, 'X-BCW-Proxy': '1', 'Cache-Control': 'no-store' };
+    const type = upstream.headers.get('content-type');
+    if (type) out['Content-Type'] = type;
+    if (session) {
+      const jar = parseCookies(session);
+      storeCookies(jar, upstream.headers);
+      out['X-BCW-Session'] = cookieHeader(jar);
+    }
+    res.writeHead(upstream.status, out);
+    res.end(data);
+  } catch (error) {
+    res.writeHead(502, { ...cors, 'Content-Type': 'application/json', 'X-BCW-Proxy': '1' });
+    res.end(JSON.stringify({ message: 'Impossibile contattare Classeviva.', detail: String(error?.cause?.code ?? error?.name ?? error) }));
+  }
+}
+
+/** POST /api/site-login con `{ uid, pwd, ident }`: risponde `{ loggedIn, session }`. */
+async function proxySiteLogin(req, res) {
+  const cors = corsHeaders(req.headers.origin);
+  const reply = (status, value) => {
+    res.writeHead(status, { ...cors, 'Content-Type': 'application/json', 'X-BCW-Proxy': '1', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(value));
+  };
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, cors);
+    res.end();
+    return;
+  }
+  if (req.method !== 'POST') return reply(405, { message: 'Metodo non consentito' });
+  let input;
+  try {
+    input = JSON.parse((await readBody(req)).toString() || '{}');
+  } catch {
+    return reply(400, { message: 'Richiesta non valida' });
+  }
+  if (typeof input?.uid !== 'string' || typeof input?.pwd !== 'string') return reply(400, { message: 'Richiesta non valida' });
+  try {
+    const result = await siteLogin({ uid: input.uid, pwd: input.pwd, ident: typeof input.ident === 'string' ? input.ident : null });
+    if (!result) return reply(502, { message: 'Risposta inattesa dal sito di Classeviva.' });
+    return reply(200, result);
+  } catch (error) {
+    return reply(502, { message: 'Impossibile contattare Classeviva.', detail: String(error?.cause?.code ?? error?.name ?? error) });
+  }
+}
+
 async function serveStatic(req, res, pathname) {
   let path = decodeURIComponent(pathname);
   if (path === '/') path = '/index.html';
@@ -173,6 +311,15 @@ const server = createServer(async (req, res) => {
       // Usato dall'app per verificare che il proxy sia presente.
       res.writeHead(200, { ...corsHeaders(req.headers.origin), 'Content-Type': 'application/json', 'X-BCW-Proxy': '1', 'Cache-Control': 'no-store' });
       res.end('{"ok":true}');
+      return;
+    }
+    if (pathname === '/api/site-login') {
+      await proxySiteLogin(req, res);
+      return;
+    }
+    const site = siteURL(pathname);
+    if (site) {
+      await proxySite(req, res, site);
       return;
     }
     if (pathname.startsWith('/api/')) {

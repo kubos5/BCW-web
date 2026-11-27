@@ -700,7 +700,7 @@ function renderGenerator(ctx, id) {
   const body = `<div class="sheet-pad stack gap-20">
     ${generationFields(ctx, id, s.settings)}
     <div class="stack gap-8"><button class="btn filled m wide" data-action="tt-gen-run" data-sheet="${id}"${s.generating ? ' disabled' : ''}>${s.generating ? loadingIndicator({ size: 'small' }) : icon('wand')}<span>Crea l'anteprima</span></button>
-      <p class="list-footer">BCW guarda in quale ora della giornata si è svolta ogni materia, settimana per settimana, e tiene quelle che si ripetono (le settimane recenti contano di più, supplenze e recuperi isolati vengono ignorati). Vedrai l'orario in anteprima prima di applicarlo.</p></div></div>`;
+      <p class="list-footer">BCW guarda in quale ora si è svolta ogni materia, settimana per settimana, e tiene quelle che si ripetono, ignorando supplenze isolate. Vedrai l'anteprima prima di applicarla.</p></div></div>`;
   return { title: "Genera l'orario", size: 'large', body };
 }
 

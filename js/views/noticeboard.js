@@ -8,7 +8,29 @@ import { icon } from '../icons.js';
 import { contains, esc, fmt, uniqueSorted } from '../util.js';
 
 function listState(ctx) {
-  return ctx.state('noticeboard', { search: '', category: null, onlyUnread: false, selection: null });
+  return ctx.state('noticeboard', { search: '', category: null, onlyUnread: false, selection: null, readingAll: false });
+}
+
+/** "Leggi tutto", dopo la conferma: un avviso mentre lavora e uno con l'esito. */
+async function readAll(ctx) {
+  const s = listState(ctx);
+  const count = ctx.model.unreadNoticesCount;
+  if (!count || s.readingAll) return;
+  s.readingAll = true;
+  ctx.toast('Segno le comunicazioni come lette…', 'doneAll');
+  try {
+    const failed = await ctx.model.markAllNoticesRead();
+    if (failed === 0) {
+      navigator.vibrate?.(10);
+      ctx.toast(count === 1 ? 'Comunicazione segnata come letta' : `${count} comunicazioni segnate come lette`, 'doneAll');
+    } else {
+      ctx.toast(failed === 1 ? 'Una comunicazione non è stata segnata: riprova più tardi'
+        : `${failed} comunicazioni non sono state segnate: riprova più tardi`, 'alertCircle');
+    }
+  } finally {
+    s.readingAll = false;
+    ctx.update();
+  }
 }
 
 function detailState(ctx, id) {
@@ -37,6 +59,8 @@ export const noticeboard = {
     const page = {
       title: 'Bacheca',
       subtitle: ctx.wide && unread ? (unread === 1 ? '1 da leggere' : `${unread} da leggere`) : null,
+      // "Leggi tutto" (4.0, come nell'app), dopo una conferma.
+      actions: [{ text: 'Leggi tutto', icon: 'doneAll', action: 'notice-read-all', disabled: unread === 0 || s.readingAll, help: 'Segna come lette tutte le comunicazioni' }],
       // Su schermi larghi il campo sta in cima all'elenco: nella barra c'è la ricerca generale.
       search: ctx.wide ? null : search,
       refresh: () => model.loadNotices(),
@@ -57,6 +81,18 @@ export const noticeboard = {
   actions: {
     'notice-search': (ctx, el) => { listState(ctx).search = el.dataset.clear ? '' : el.value; },
     'notice-unread': (ctx) => { const s = listState(ctx); s.onlyUnread = !s.onlyUnread; },
+    'notice-read-all': (ctx) => {
+      const unread = ctx.model.unreadNoticesCount;
+      if (!unread || listState(ctx).readingAll) return;
+      ctx.confirm({
+        title: 'Segnare tutto come letto?',
+        message: unread === 1
+          ? 'La comunicazione da leggere verrà segnata come letta, anche su Classeviva. Le adesioni e le firme richieste restano da fare.'
+          : `Le ${unread} comunicazioni da leggere verranno segnate come lette, anche su Classeviva. Le adesioni e le firme richieste restano da fare.`,
+        confirmLabel: 'Leggi tutto',
+        onConfirm: () => readAll(ctx),
+      });
+    },
     'notice-category': (ctx, el) => {
       const s = listState(ctx);
       const value = el.dataset.value || null;

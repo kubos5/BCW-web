@@ -8,7 +8,7 @@ import { AverageMode } from '../gradebook.js';
 import { AppearanceMode, DashboardMode, NewsKind } from '../prefs.js';
 import { Reminders } from '../reminders.js';
 import { Lock } from '../lock.js';
-import { AccentPresets, ColorStyle, Contrast, Corners, Motion, RoundedText, DEFAULT_ACCENT, normalizeHex, loadColorLibrary, swatchColors, Theme } from '../theme.js';
+import { AccentPresets, ColorStyle, Contrast, Corners, Motion, RoundedText, RailDensity, DEFAULT_ACCENT, normalizeHex, loadColorLibrary, swatchColors, Theme } from '../theme.js';
 import { shape } from '../shapes.js';
 import { Proxy } from '../api.js';
 import { makeICS, downloadFile } from '../calendar-export.js';
@@ -19,8 +19,11 @@ import { requestAlignment } from './timetable.js';
 import { esc, fmt, GradeFormat, sentenceCased, nameCased, startOfDay } from '../util.js';
 import { proxySheet } from './login.js';
 import { BCWServer, SyncCategory } from '../cloud.js';
+import { PLUS_PRICE, plusBanner } from '../plus.js';
 
-export const VERSION = '3.3.1';
+import { VERSION, Updates } from '../updates.js';
+
+export { VERSION };
 
 // MARK: - Mattoni del modulo
 
@@ -35,7 +38,8 @@ function toggleRow(label, checked, action, { iconName, subtitle, disabled = fals
   return `<label class="list-item form-row toggle-row ${disabled ? 'disabled' : ''}">${iconName ? `<span class="form-icon">${icon(iconName)}</span>` : ''}<span class="li-text"><strong>${esc(label)}${extra}</strong>${subtitle ? `<small>${esc(subtitle)}</small>` : ''}</span>${toggle(checked, action, { label, disabled, params })}</label>`;
 }
 
-const valueRow = (label, value) => row(label, `<span class="form-value">${esc(value)}</span>`, { cls: 'value-row' });
+/** `mono`: valori tecnici (versione, codici) in carattere monospazio (4.0, come nell'app). */
+const valueRow = (label, value, { mono = false } = {}) => row(label, `<span class="form-value${mono ? ' mono' : ''}">${esc(value)}</span>`, { cls: 'value-row' });
 
 function buttonRow(label, action, iconName, { destructive = false, disabled = false, params = {} } = {}) {
   return listItem({ title: label, action, params, cls: `form-button ${destructive ? 'danger' : ''}`, disabled, leading: `<span class="form-icon">${icon(iconName)}</span>` });
@@ -104,16 +108,27 @@ function appearancePane(ctx) {
     row('Contrasto', select(Object.entries(Contrast), p.get('contrast'), 'pref-contrast', { label: 'Contrasto' }), { iconName: 'contrast' }),
   ], {
     header: "Colore d'accento",
-    footer: 'Tutti i colori di BCW (pulsanti, superfici, schede) sono generati dal colore scelto con i colori dinamici di Material 3, nel tema chiaro e in quello scuro. I colori di materie, voti e assenze non cambiano.',
-  }) + section([
+    footer: 'Tutti i colori di BCW nascono da quello scelto, con i colori dinamici di Material 3. Materie, voti e assenze tengono i loro colori.',
+  }) + railDensitySection(ctx) + section([
     row('Angoli', select(Object.entries(Corners), p.get('corners'), 'pref-corners', { label: 'Angoli' }), { iconName: 'corners' }),
     row('Animazioni', select(Object.entries(Motion), p.get('motion'), 'pref-motion', { label: 'Animazioni' }), { iconName: 'motion' }),
     row('Caratteri arrotondati', select(Object.entries(RoundedText), p.get('roundedText'), 'pref-rounded-text', { label: 'Caratteri arrotondati' }), { iconName: 'textStyle' }),
     p.isDefaultAppearance ? '' : buttonRow("Ripristina l'aspetto di BCW", 'appearance-reset', 'refresh'),
   ], {
     header: 'Forme e movimento',
-    footer: 'Espressive: animazioni a molla con un piccolo rimbalzo, come in Material 3 Expressive. Standard: senza rimbalzo. Ridotte: brevi e senza movimenti ampi. I caratteri arrotondati usano l\'asse ROND di Google Sans Flex.',
+    footer: 'Espressive: molle con un piccolo rimbalzo. Standard: senza rimbalzo. Ridotte: animazioni brevi, senza movimenti ampi.',
   });
+}
+
+/**
+ * Spaziatura delle voci della barra laterale (solo web, 4.0.1): c'è solo sugli schermi larghi, dove
+ * la barra si vede accanto alle Impostazioni e cambia subito.
+ */
+function railDensitySection(ctx) {
+  if (!ctx.wide) return '';
+  return section([
+    row('Spaziatura', select(Object.entries(RailDensity), ctx.prefs.get('railDensity'), 'pref-rail-density', { label: 'Spaziatura della barra laterale' }), { iconName: 'densityMedium' }),
+  ], { header: 'Barra laterale', footer: 'Quanto sono vicine le sezioni nella barra a sinistra. Vale solo per questo browser.' });
 }
 
 function dataSection() {
@@ -133,14 +148,36 @@ function serverSection() {
 }
 
 function aboutSection(ctx) {
+  const loading = ctx.state('release-notes', { loading: false }).loading;
   return section([
-    valueRow('Versione', VERSION),
+    valueRow('Versione', VERSION, { mono: true }),
+    // Le note della release su GitHub (4.0, come nell'app), nello stesso foglio che si apre dopo un
+    // aggiornamento.
+    listItem({
+      title: 'Note di rilascio', subtitle: "Le novità dell'ultima versione di BCW", action: 'release-notes', disabled: loading,
+      leading: `<span class="form-icon">${icon('newReleases')}</span>`, trailing: loading ? spinner() : icon('chevronRight', { cls: 'trailing-icon' }),
+    }),
     listItem({ title: 'Apri Classeviva sul web', href: 'https://web.spaggiari.eu', leading: `<span class="form-icon">${icon('compass')}</span>`, trailing: icon('externalLink', { cls: 'small trailing-icon' }) }),
   ], {
     header: 'Informazioni',
     footer: ctx.model.isCloud
-      ? 'BCW (Better ClasseViVa) è un client non ufficiale e non è affiliato a Gruppo Spaggiari Parma S.p.A. Le credenziali degli account abbinati sono salvate cifrate nel tuo account BCW e inviate ai server di Classeviva per accedere.'
-      : 'BCW (Better ClasseViVa) è un client non ufficiale e non è affiliato a Gruppo Spaggiari Parma S.p.A. Le credenziali sono salvate solo in questo browser e inviate esclusivamente ai server di Classeviva.',
+      ? "BCW (Better ClasseViVa) è un'app non ufficiale, non affiliata a Gruppo Spaggiari Parma S.p.A. Le credenziali sono salvate cifrate nel tuo account BCW e in questo browser."
+      : "BCW (Better ClasseViVa) è un'app non ufficiale, non affiliata a Gruppo Spaggiari Parma S.p.A. Le credenziali restano in questo browser e vanno solo ai server di Classeviva.",
+  });
+}
+
+/**
+ * BCW+ (4.0.1): sul web per ora tutto è sbloccato, come in BCW per Android; il banner delle
+ * Impostazioni e l'avviso dell'Orario si rimostrano da qui.
+ */
+function plusSection(ctx) {
+  const p = ctx.prefs;
+  return section([
+    toggleRow('Mostra il banner nelle Impostazioni', p.showsPlusBanner, 'pref-plus-banner', { iconName: 'globe' }),
+    toggleRow("Mostra l'avviso nell'Orario", p.showsTimetablePlusNotice, 'pref-plus-notice', { iconName: 'workspacePremium' }),
+  ], {
+    header: 'BCW+',
+    footer: `Per ora sul web le funzioni di BCW+ sono sbloccate. Tra poco l'orario richiederà BCW+, un pagamento unico di ${PLUS_PRICE}, come nell'app per iPhone e iPad.`,
   });
 }
 
@@ -149,13 +186,16 @@ function onboardingSection() {
   return section([buttonRow("Rivedi l'introduzione", 'ob-replay', 'sparkles')]);
 }
 
-/** Il codice di BCW su GitHub e il profilo dell'autore (3.3, come nell'app). */
+/**
+ * Il codice di BCW su GitHub e i profili (3.3, come nell'app): le versioni di BCW, poi il server e le
+ * persone in gruppi a parte (l'autore e, dalla 4.0, mikqsdev, che contribuisce a BCW per Android).
+ */
 function githubSection() {
   const link = ([title, subtitle, iconName, href]) => listItem({
     title, subtitle, href, leading: `<span class="form-icon">${icon(iconName)}</span>`, trailing: icon('externalLink', { cls: 'small trailing-icon' }),
     attrs: ' title="Apre GitHub in una nuova scheda"',
   });
-  // Le versioni di BCW, poi il server e l'autore, in gruppi separati.
+  // Le versioni di BCW, poi il server e le persone, in gruppi separati.
   const groups = [
     [
       ['BCW', 'BCW per iOS', 'ios', 'https://github.com/kubos5/BCW'],
@@ -163,13 +203,16 @@ function githubSection() {
       ['BCW-android', 'BCW per Android', 'android', 'https://github.com/kubos5/BCW-android'],
     ],
     [['BCW-api', 'Backend', 'api', 'https://github.com/kubos5/BCW-api']],
-    [['kubos5', 'Autore di BCW <3', 'favorite', 'https://github.com/kubos5']],
+    [
+      ['kubos5', 'Autore di BCW <3', 'favorite', 'https://github.com/kubos5'],
+      ['mikqsdev', 'Contributore di BCW per Android', 'volunteer', 'https://github.com/mikqsdev'],
+    ],
   ];
   return groups.map((items, i) => section(items.map(link), i === 0 ? { header: 'Su GitHub' } : {})).join('');
 }
 
 function generalPane(ctx) {
-  return securitySection(ctx) + dataSection() + serverSection() + aboutSection(ctx) + onboardingSection() + githubSection();
+  return securitySection(ctx) + dataSection() + serverSection() + aboutSection(ctx) + plusSection(ctx) + onboardingSection() + githubSection();
 }
 
 function gradesPane(ctx) {
@@ -201,25 +244,25 @@ function timetablePane(ctx) {
     toggleRow('Mostra la scheda Orario', p.showsTimetableTab, 'pref-tt-tab', { iconName: 'timetable' }),
   ], {
     header: 'Scheda',
-    footer: `Nascosta, la scheda Orario sparisce dalla barra di navigazione (anche da quella degli schermi larghi). L'orario resta${synced ? " e si sincronizza ancora con l'account BCW" : ''}: nell'app per iPhone e iPad widget e attività in diretta continuano a usarlo. Per riaverla torna qui (Impostazioni, dall'ingranaggio ${ctx.wide ? 'in alto' : 'in Tu'}).`,
+    footer: `Nascosta, la scheda sparisce dalla barra, ma l'orario resta${synced ? ' e si sincronizza' : ''}. Per riaverla torna qui.`,
   }) + section([
     row('Allineamento', select(Object.values(Alignment).map((a) => [a.id, a.shortTitle]), store.alignment, 'tt-alignment', { label: 'Allineamento' }), { iconName: Alignment[store.alignment].icon }),
     toggleRow('Mostra le verifiche nella lista', p.timetableShowsTests, 'pref-tt-tests', { iconName: 'test' }),
   ], {
     header: 'Vista e allineamento',
-    footer: 'Di serie la vista Lista segna le verifiche di Classeviva e quelle segnate a mano; spegnendo "Mostra le verifiche" restano nel dettaglio dell\'evento e nella vista Giorno. Quelle nascoste, e le regole per nasconderle in automatico, sono in Verifiche nascoste (menu dell\'orario). L\'allineamento vale per tutto l\'orario e per la modalità di modifica (pulsante + dell\'orario › Modifica orario). Automatico: gli eventi iniziano all\'ora o alla mezz\'ora e durano 30 minuti o un\'ora; passando all\'automatico gli eventi non allineati vengono allineati, dopo una conferma. Libero: qualsiasi orario e durata. Gli intervalli si posizionano sempre liberamente.',
+    footer: "Automatico: gli eventi iniziano all'ora o alla mezz'ora e durano 30 o 60 minuti. Libero: qualsiasi orario. Le verifiche nascoste sono nel menu ⋯ dell'orario.",
   }) + section([
     toggleRow("Card dell'evento in corso", p.timetableShowsNowCard, 'pref-tt-now-card', { iconName: 'schedule', subtitle: "In cima all'orario di oggi" }),
   ], {
     header: 'Oggi',
-    footer: "La card in cima all'orario di oggi mostra l'evento in corso con il tempo che manca, o il prossimo. Nell'app per iPhone ha anche il pulsante per avviare o fermare l'attività in diretta, che senza la card si avvia comunque da sola.",
+    footer: "La card mostra l'evento in corso o il prossimo, con il tempo che manca.",
   }) + section([
     buttonRow("Esporta un backup dell'orario", 'tt-export', 'upload', { disabled: !hasOwner }),
     buttonRow('Importa un backup…', 'tt-import', 'download', { disabled: !hasOwner }),
     buttonRow("Elimina l'orario", 'tt-delete-all', 'trash', { destructive: true, disabled: store.isEmpty }),
   ], {
     header: "Backup dell'orario",
-    footer: `${synced ? "L'orario di ogni account abbinato si sincronizza con il tuo account BCW." : "L'orario è salvato solo in questo browser, separato per ogni account."} Il backup contiene eventi, colori, palette, note, verifiche segnate e file allegati; importandolo sostituisce l'orario attuale. È compatibile con l'app BCW per iPhone e iPad.`,
+    footer: `${synced ? "L'orario si sincronizza con il tuo account BCW." : "L'orario è salvato solo in questo browser."} Il backup contiene eventi, colori, note e file; importarlo sostituisce l'orario attuale.`,
   }) + `<input type="file" id="tt-import-input" accept=".json,application/json" hidden data-change="tt-import-file">` + timetableSyncSection(ctx);
 }
 
@@ -230,7 +273,7 @@ function timetableSyncSection(ctx) {
       buttonRow('Accedi con un account BCW…', 'cloud-login', 'cloud'),
     ], {
       header: 'Sincronizzazione',
-      footer: "Con un account BCW l'orario di ogni account Classeviva abbinato, con i file allegati, si sincronizza tra i tuoi dispositivi (app per iPhone e iPad compresa).",
+      footer: "Con un account BCW l'orario, con i file, si sincronizza su tutti i tuoi dispositivi e nell'app.",
     });
   }
   // La stessa scelta della voce Orario di Impostazioni › Account › Da sincronizzare.
@@ -261,7 +304,7 @@ function syncCategoryRow(ctx, category, { title = category.title, iconName = cat
 function syncChoicesSection(ctx) {
   return section(Object.values(SyncCategory).map((category) => syncCategoryRow(ctx, category)), {
     header: 'Da sincronizzare',
-    footer: "Vale solo per questo browser. Una voce spenta resta com'è qui e non cambia sugli altri dispositivi. Riaccendendo impostazioni, aspetto o compiti, questo browser prende quelli dell'account BCW; riaccendendo l'orario vince il lato cambiato nel frattempo (se sono cambiati entrambi, questo browser). L'icona dell'app, che si sceglie nell'app per iPhone e iPad, resta com'è sul server.",
+    footer: "Vale solo per questo browser: una voce spenta non cambia sugli altri. Riaccendendola arrivano i valori dell'account BCW; per l'orario vince il lato cambiato nel frattempo.",
   });
 }
 
@@ -342,7 +385,7 @@ export function cloudSection(ctx) {
       serverRow,
     ], {
       header: 'Account BCW',
-      footer: "Con un account BCW abbini i tuoi account Classeviva e ritrovi impostazioni, aspetto e orario su ogni dispositivo, anche nell'app per iPhone e iPad. Dopo l'accesso potrai abbinare gli account salvati in questo browser.",
+      footer: "Con un account BCW ritrovi i tuoi account Classeviva, le impostazioni e l'orario su ogni dispositivo e nell'app. Dopo l'accesso potrai abbinare gli account di questo browser.",
     });
   }
   const sync = model.sync;
@@ -362,7 +405,7 @@ export function cloudSection(ctx) {
     buttonRow("Elimina l'account BCW…", 'cloud-delete', 'trash', { destructive: true }),
   ], {
     header: 'Account BCW',
-    footer: "Si sincronizzano le impostazioni (tranne blocco, promemoria e notifiche, che valgono solo in questo browser), l'aspetto e l'orario di ogni account abbinato, con i file allegati. Sotto scegli cosa sincronizzare.",
+    footer: 'Si sincronizzano impostazioni, aspetto e orario di ogni account abbinato, con i file. Blocco, promemoria e notifiche restano in questo browser.',
   }) + syncChoicesSection(ctx);
 }
 
@@ -380,7 +423,7 @@ export function linksSection(ctx) {
   if (!model.isCloud && !s.requested) {
     return section([buttonRow('Mostra gli account BCW abbinati', 'cvv-links-show', 'cloud')], {
       header: 'Account BCW abbinati',
-      footer: `Puoi vedere a quali account BCW è abbinato ${name} e scollegarlo da ognuno. Per verificare l'accesso, il server BCW riceve il token della sessione di Classeviva (non la password).`,
+      footer: `Puoi vedere a quali account BCW è abbinato ${name} e scollegarlo. Il server BCW riceve solo il token di Classeviva, non la password.`,
     });
   }
   ctx.task(`cvv-links-${model.activeAccountID}-${s.round}`, async () => {
@@ -412,7 +455,7 @@ export function linksSection(ctx) {
   }
   return section(rows, {
     header: 'Account BCW abbinati',
-    footer: `Gli account BCW con cui si entra in ${model.activeAccount?.name ?? 'questo account Classeviva'}. Scollegandolo da uno, quell'account BCW non potrà più entrarci e l'orario sincronizzato per questo account viene eliminato dal server. Per toglierli basta l'accesso a Classeviva.`,
+    footer: `Gli account BCW che possono entrare in ${model.activeAccount?.name ?? 'questo account Classeviva'}. Scollegandone uno, non potrà più entrarci e l'orario sincronizzato verrà eliminato dal server.`,
   });
 }
 
@@ -446,7 +489,8 @@ export const settings = {
       }
       const pane = panes[s.pane] ?? panes.general;
       // Elenco e dettaglio affiancati (layout elenco-dettaglio di Material 3).
-      const list = listGroup(Object.entries(panes).map(([key, p]) => listItem({
+      // In cima all'elenco il banner di BCW+ (come nell'app, sopra le sottopagine).
+      const list = plusBanner(ctx) + listGroup(Object.entries(panes).map(([key, p]) => listItem({
         title: p.title, action: 'settings-pane', params: { value: key }, cls: key === s.pane ? 'selected' : '', leading: iconBadge(p.icon, p.tint, 40),
       })));
       return {
@@ -465,7 +509,7 @@ export const settings = {
     };
     return {
       title: 'Impostazioni',
-      body: `<div class="form">${section([nav('general'), nav('appearance')])}${section(['grades', 'dashboard', 'timetable', 'notifications'].map(nav))}${section([nav('accounts')])}</div>`,
+      body: `<div class="form">${plusBanner(ctx)}${section([nav('general'), nav('appearance')])}${section(['grades', 'dashboard', 'timetable', 'notifications'].map(nav))}${section([nav('accounts')])}</div>`,
       bottomInset: true,
     };
   },
@@ -488,6 +532,20 @@ export const settings = {
     'pref-corners': (ctx, el) => ctx.prefs.set('corners', el.value),
     'pref-motion': (ctx, el) => ctx.prefs.set('motion', el.value),
     'pref-rounded-text': (ctx, el) => ctx.prefs.set('roundedText', el.value),
+    'pref-rail-density': (ctx, el) => { if (RailDensity[el.value]) ctx.prefs.set('railDensity', el.value); },
+    'release-notes': async (ctx) => {
+      const s = ctx.state('release-notes', { loading: false });
+      if (s.loading) return;
+      s.loading = true;
+      ctx.update();
+      try {
+        const result = await Updates.showLatestNotes((sheet) => ctx.openSheet(sheet));
+        if (result === 'unavailable') ctx.toast('Non ci sono ancora note di rilascio su GitHub', 'info');
+        else if (result === 'failed') ctx.toast('Non riesco a contattare GitHub: riprova più tardi', 'wifiOff');
+      } finally {
+        s.loading = false;
+      }
+    },
     'appearance-reset': (ctx) => ctx.prefs.resetAppearance(),
     'pref-tt-tests': (ctx, el) => ctx.prefs.set('timetableShowsTests', el.checked),
     'pref-tt-tab': (ctx, el) => ctx.prefs.set('showsTimetableTab', el.checked),
@@ -743,7 +801,7 @@ export const settings = {
           title: "Sostituire l'orario attuale?",
           message: current === 0
             ? "Colori, palette e impostazioni dell'orario di questo account verranno sostituiti da quelli del backup."
-            : "L'orario attuale, con le sue note, i file, le verifiche segnate, i colori e le palette salvati, verrà eliminato definitivamente e non potrà essere recuperato. Se vuoi conservarlo, annulla ed esportane prima un backup.",
+            : "L'orario attuale, con note, file, verifiche, colori e palette, verrà eliminato per sempre. Se vuoi conservarlo, annulla ed esportane prima un backup.",
           confirmLabel: 'Sostituisci', destructive: true,
           onConfirm: async () => {
             try {
@@ -886,15 +944,15 @@ export const account = {
     let html = header + accountsSection(ctx);
     if (card) {
       html += section([
-        valueRow('Codice utente', card.ident),
+        valueRow('Codice utente', card.ident, { mono: true }),
         valueRow('Tipo di account', card.userTypeDescription),
         card.birthDate ? valueRow('Data di nascita', fmt.shortDayWithYear(card.birthDate)) : '',
-        card.fiscalCode?.trim() ? valueRow('Codice fiscale', card.fiscalCode) : '',
+        card.fiscalCode?.trim() ? valueRow('Codice fiscale', card.fiscalCode, { mono: true }) : '',
       ], { header: 'Profilo' });
       html += section([
         card.schoolDescription ? valueRow('Istituto', card.schoolDescription) : '',
         card.schoolCity?.trim() ? valueRow('Città', `${nameCased(card.schoolCity)}${card.schoolProvince ? ` (${card.schoolProvince})` : ''}`) : '',
-        card.miurSchoolCode?.trim() ? valueRow('Codice meccanografico', card.miurSchoolCode) : '',
+        card.miurSchoolCode?.trim() ? valueRow('Codice meccanografico', card.miurSchoolCode, { mono: true }) : '',
       ], { header: 'Scuola' });
     }
     html += linksSection(ctx) + cloudSection(ctx);

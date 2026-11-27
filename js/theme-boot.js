@@ -1,6 +1,6 @@
 // Applica subito, prima del primo disegno, l'aspetto scelto nelle Impostazioni: tema chiaro
 // o scuro, colori generati dal colore d'accento (salvati da `js/theme.js`), angoli,
-// animazioni e caratteri. Script classico e minuscolo, così non ritarda l'apertura.
+// animazioni, caratteri e spaziatura della barra laterale. Script classico e minuscolo, così non ritarda l'apertura.
 (function () {
   try {
     var prefs = JSON.parse(localStorage.getItem('bcw.preferences') || '{}');
@@ -9,6 +9,7 @@
     if (prefs.corners && prefs.corners !== 'standard') html.setAttribute('data-corners', prefs.corners);
     if (prefs.motion && prefs.motion !== 'expressive') html.setAttribute('data-motion', prefs.motion);
     if (prefs.roundedText && prefs.roundedText !== 'titles') html.setAttribute('data-rounded', prefs.roundedText);
+    if (prefs.railDensity && prefs.railDensity !== 'normal') html.setAttribute('data-rail', prefs.railDensity);
     var theme = JSON.parse(localStorage.getItem('bcw.theme') || 'null');
     if (theme && theme.css) {
       var style = document.createElement('style');

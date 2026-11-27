@@ -119,6 +119,10 @@ export const grades = {
       const value = Math.min(10, Math.max(4, prefs.targetAverage + Number(el.dataset.delta)));
       prefs.set('targetAverage', value);
     },
+    'goal-toggle': (ctx, el) => {
+      const view = ctx.app.viewState.get(el.dataset.goal);
+      if (view) view.open = !view.open;
+    },
     'goal-count': (ctx, el) => {
       const s = ctx.state('goal', { upcoming: 1 });
       s.upcoming = Math.min(5, Math.max(1, s.upcoming + Number(el.dataset.delta)));
@@ -298,7 +302,9 @@ export function subjectDetail(ctx, subjectId) {
     signature: `${s.period}|${sorted.length}|${running.at(-1)?.value}|${book.weighted}`,
   })}</div>` : '';
 
-  const goal = goalCalculator(ctx, list, book.weighted) + gradeSimulator(ctx, book, { period: s.period, subjectId });
+  // "Obiettivo" ed "E se prendessi…" (4.0, come `SubjectGradeTools` nell'app): due card collegate,
+  // comprimibili e chiuse all'inizio, a 2 px, con gli angoli ampi all'esterno e piccoli all'interno.
+  const goal = `<div class="connected-cards">${goalCalculator(ctx, list, book.weighted)}${gradeSimulator(ctx, book, { period: s.period, subjectId, collapsible: true })}</div>`;
   const gradesHeader = sectionHeader('Voti', { subtitle: list.length === 1 ? '1 valutazione' : `${list.length} valutazioni` });
   const gradeList = listGroup(list.map((g) => gradeCard(g, book, s.expanded.has(g.id), `subject-${subjectId}`)));
 
@@ -308,10 +314,15 @@ export function subjectDetail(ctx, subjectId) {
   return { title: name, body: `<div class="stack gap-20">${header}${periodPicker}${chart}${goal}<div class="stack gap-12">${gradesHeader}${gradeList}</div></div>` };
 }
 
-/** "Quanto devo prendere?": voto necessario per raggiungere una media obiettivo. */
+/**
+ * "Quanto devo prendere?": voto necessario per raggiungere una media obiettivo. Comprimibile e chiusa
+ * all'inizio (4.0, come nell'app); da chiusa il sottotitolo riassume il risultato. Aperta o chiusa
+ * vale per la pagina (`ctx.pageState`): uscendo si richiude.
+ */
 function goalCalculator(ctx, list, weighted) {
   const target = ctx.prefs.targetAverage;
   const s = ctx.state('goal', { upcoming: 1 });
+  const { key, state: view } = ctx.pageState('goal', { open: false });
   const needed = GradeBook.neededGrade(target, list, s.upcoming, weighted);
   let result;
   if (needed <= 1) {
@@ -322,11 +333,24 @@ function goalCalculator(ctx, list, weighted) {
     result = `<div class="row-between baseline"><span class="secondary">${s.upcoming === 1 ? 'Ti serve almeno' : 'Ti serve in media almeno'}</span>
       <span class="numeral big" style="color:${gradeColorValue(needed)}">${GradeFormat.average(needed)}</span></div>`;
   }
-  return `<div class="card goal stack gap-14"><div class="goal-head"><span class="goal-art shaped">${shape('cookie9Sided')}${icon('target')}</span>
-      <span><strong>Obiettivo</strong><small>Quanto ti serve per arrivarci</small></span></div>
+  const subtitle = view.open ? 'Quanto ti serve per arrivarci' : goalSummary(target, needed);
+  const body = `<div class="stack gap-14">
     <div class="row-between"><span>Media desiderata</span>${stepper(target, { action: 'goal-target', min: 4, max: 10, step: 0.25, format: GradeFormat.short })}</div>
     <div class="row-between"><span>Prossime prove</span>${stepper(s.upcoming, { action: 'goal-count', min: 1, max: 5, step: 1 })}</div>
     <hr class="divider">${result}</div>`;
+  return `<section class="card goal" data-key="goal"><button class="goal-head" data-action="goal-toggle" data-goal="${esc(key)}" aria-expanded="${view.open}" title="${view.open ? "Nasconde l'obiettivo" : "Apre l'obiettivo"}">
+      <span class="goal-art shaped">${shape('cookie9Sided')}${icon('target')}</span>
+      <span class="grow"><strong>Obiettivo</strong><small>${esc(subtitle)}</small></span>${chevron(!view.open, { rotateUp: true })}</button>
+    ${collapsible(view.open, body, { spacing: 14 })}</section>`;
+}
+
+/** Il risultato in breve, nel sottotitolo della card chiusa. */
+function goalSummary(target, needed) {
+  const goal = GradeFormat.short(target);
+  if (needed == null || Number.isNaN(needed)) return 'Quanto ti serve per arrivarci';
+  if (needed <= 1) return `Media ${goal} già raggiunta`;
+  if (needed > 10) return `Media ${goal} non raggiungibile`;
+  return `Per ${goal} ti serve almeno ${GradeFormat.average(needed)}`;
 }
 
 // MARK: - E se prendessi…

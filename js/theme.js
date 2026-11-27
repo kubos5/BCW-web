@@ -39,6 +39,11 @@ const contrastLevel = { standard: 0, medium: 0.5, high: 1 };
 export const Corners = { square: 'Meno arrotondati', standard: 'Standard', round: 'Più arrotondati' };
 export const Motion = { expressive: 'Espressive', standard: 'Standard', reduced: 'Ridotte' };
 export const RoundedText = { titles: 'Solo i titoli', all: 'Tutto il testo', none: 'Nessuno' };
+/**
+ * Spaziatura delle voci della barra laterale degli schermi larghi (solo web, 4.0.1): Spaziosa è
+ * quella di prima (voci di 56 px), Normale (44 px, di serie) e Compatta (36 px) più strette.
+ */
+export const RailDensity = { spacious: 'Spaziosa', normal: 'Normale', compact: 'Compatta' };
 
 const CACHE_KEY = 'bcw.theme';
 const STYLE_ID = 'bcw-theme';
@@ -80,6 +85,7 @@ export const Theme = {
     set('data-corners', prefs.get('corners'), 'standard');
     set('data-motion', prefs.get('motion'), 'expressive');
     set('data-rounded', prefs.get('roundedText'), 'titles');
+    set('data-rail', prefs.get('railDensity'), 'normal');
   },
 
   /**

@@ -6,7 +6,7 @@
 // permette di impostare. Le richieste passano quindi da un piccolo proxy (vedi `server.js`
 // o `proxy/cloudflare-worker.js`), che inoltra soltanto verso i server di Classeviva.
 
-import { parseLoginResponse } from './models.js';
+import { HOMEWORK_PATH, isHomeworksResponse, parseHomeworksResponse, parseLoginResponse } from './models.js';
 
 export class APIError extends Error {
   constructor(kind, message, extra = {}) {
@@ -136,8 +136,13 @@ export class HttpTransport {
     this.baseURL = baseURL;
   }
 
-  async send(method, path, body, token) {
-    const headers = { Accept: 'application/json', 'Z-Dev-Apikey': 'Tg1NWEwNGIgIC0K' };
+  /**
+   * `headers`: intestazioni in più (es. `X-BCW-Session` per il sito di Classeviva). `quiet`: una
+   * risposta senza il segno del proxy non lo dà per mancante (le strade facoltative del sito, che un
+   * proxy diverso, come BCW-api, può non avere).
+   */
+  async send(method, path, body, token, { headers: extra = null, quiet = false } = {}) {
+    const headers = { Accept: 'application/json', 'Z-Dev-Apikey': 'Tg1NWEwNGIgIC0K', ...extra };
     if (token) headers['Z-Auth-Token'] = token;
     let payload;
     if (method === 'POST') {
@@ -165,7 +170,7 @@ export class HttpTransport {
     // Il proxy di BCW segna ogni risposta. Senza il segno, a rispondere è il sito stesso:
     // un hosting statico (es. GitHub Pages) restituisce 404 o, per le POST, 405.
     if (!response.headers.get('X-BCW-Proxy')) {
-      Proxy.status = 'missing';
+      if (!quiet) Proxy.status = 'missing';
       throw APIError.unavailable(MISSING_PROXY);
     }
     const data = new Uint8Array(await response.arrayBuffer());
@@ -174,7 +179,65 @@ export class HttpTransport {
       contentType,
       fileName: fileName(response.headers.get('Content-Disposition')),
       data,
+      session: response.headers.get('X-BCW-Session'),
     };
+  }
+}
+
+// MARK: - Sito di Classeviva
+
+/**
+ * Le API del sito di Classeviva (`rest/w1`): stessi percorsi e formati di quelle dell'app
+ * (`rest/v1`), ma il sito entra con il cookie di sessione invece del token. Servono solo per i
+ * compiti del modulo Compiti, che l'API dell'app potrebbe non dare (4.0, come
+ * `ClassevivaWebSession` nell'app). Passano dal proxy: `/w1/…` con il token o con la sessione
+ * (`X-BCW-Session`), `/site-login` per entrare con le credenziali già salvate. La sessione resta solo
+ * in memoria, una per client, così gli account non si mescolano.
+ */
+class ClassevivaWebSession {
+  constructor() {
+    this.session = null;
+    this.signInPromise = null;
+  }
+
+  transport() { return new HttpTransport(`${Proxy.base}/w1`); }
+
+  /** GET sul sito con il token dell'app: se il sito lo accetta non serve entrare. */
+  async getWithToken(path, token) {
+    const result = await this.transport().send('GET', path, null, token, { quiet: true });
+    return result.status === 200 && isJSON(result) ? result : null;
+  }
+
+  /** GET sul sito con la sua sessione: entra (o rientra, se è scaduta) con le credenziali. */
+  async get(path, credentials) {
+    if (!this.session) await this.signIn(credentials);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await this.transport().send('GET', path, null, null, { headers: { 'X-BCW-Session': this.session }, quiet: true });
+      if (result.session) this.session = result.session;
+      if (result.status === 200 && isJSON(result)) return result;
+      // Sessione scaduta: il sito risponde 401/403 o rimanda alla pagina di accesso.
+      const expired = result.status === 401 || result.status === 403 || !isJSON(result);
+      if (!expired || attempt > 0) throw APIError.server(result.status, errorMessage(result) ?? '');
+      this.session = null;
+      await this.signIn(credentials);
+    }
+    throw APIError.notAuthenticated();
+  }
+
+  signIn(credentials) {
+    this.signInPromise ??= this.performSignIn(credentials).finally(() => { this.signInPromise = null; });
+    return this.signInPromise;
+  }
+
+  async performSignIn(credentials) {
+    if (!credentials) throw APIError.notAuthenticated();
+    const body = JSON.stringify({ uid: credentials.username, pwd: credentials.password, ident: credentials.ident ?? null });
+    const result = await new HttpTransport(Proxy.base).send('POST', '/site-login', body, null, { quiet: true });
+    const json = result.status === 200 ? parseJSON(result) : null;
+    if (json?.loggedIn !== true || typeof json.session !== 'string') {
+      throw APIError.unavailable('Il sito di Classeviva non ha accettato l\'accesso.');
+    }
+    this.session = json.session;
   }
 }
 
@@ -437,10 +500,75 @@ export class ClassevivaClient {
     return makeFile(result, suggestedName);
   }
 
+  // MARK: Compiti del modulo Compiti
+
+  /**
+   * I compiti del modulo Compiti (issue 16). Si leggono dall'API dell'app, dal sito con il token
+   * dell'app o dal sito con la sua sessione: si prova in quest'ordine e si ricorda la prima strada
+   * che risponde, finché il client vive. Senza rete, l'ultima copia salvata.
+   */
+  async homework() {
+    try {
+      const text = await this.homeworkText();
+      const value = parseHomeworksResponse(JSON.parse(text));
+      this.cache.store(text, HOMEWORK_PATH);
+      return { value, fromCache: false };
+    } catch (error) {
+      if (isOfflineError(error)) {
+        const cached = await this.cached(parseHomeworksResponse, HOMEWORK_PATH);
+        if (cached) return { value: cached, fromCache: true };
+      }
+      throw error;
+    }
+  }
+
+  /** Il server vero dell'anno in corso (non la demo, non un archivio): solo lì si prova il sito. */
+  get usesOfficialServer() {
+    return this.transport instanceof HttpTransport && this.transport.baseURL === Proxy.officialBase();
+  }
+
+  async homeworkText() {
+    await this.ensureToken();
+    if (!this.studentId) throw APIError.notAuthenticated();
+    const path = `/students/${this.studentId}/${HOMEWORK_PATH}`;
+    const routes = this.homeworkRoute ? [this.homeworkRoute] : (this.usesOfficialServer ? ['app', 'siteToken', 'siteSession'] : ['app']);
+    let lastError = APIError.unavailable('I compiti di Classeviva non sono disponibili.');
+    for (const route of routes) {
+      try {
+        let result = null;
+        if (route === 'app') {
+          result = await this.transport.send('GET', path, null, this.token);
+        } else if (route === 'siteToken') {
+          this.web ??= new ClassevivaWebSession();
+          result = await this.web.getWithToken(path, this.token);
+        } else {
+          if (!this.credentials) continue;
+          this.web ??= new ClassevivaWebSession();
+          result = await this.web.get(path, this.credentials);
+        }
+        if (result?.status === 200 && isHomeworksResponse(parseJSON(result))) {
+          if (this.homeworkRoute !== route) {
+            this.homeworkRoute = route;
+            console.info(`BCW: compiti del modulo Compiti da ${route}`);
+          }
+          return resultText(result);
+        }
+      } catch (error) {
+        // Senza rete le altre strade non vanno meglio.
+        if (isOfflineError(error)) throw error;
+        lastError = error;
+      }
+    }
+    // La strada ricordata non risponde più: la prossima volta si riprovano tutte.
+    this.homeworkRoute = null;
+    throw lastError;
+  }
+
   signOut() {
     this.token = null;
     this.tokenExpiry = null;
     this.credentials = null;
+    this.web = null;
   }
 }
 

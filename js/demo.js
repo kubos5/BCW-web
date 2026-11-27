@@ -106,6 +106,7 @@ export class DemoTransport {
         if (!from || !to) return notFound();
         return json({ agenda: this.agenda(from, to) });
       }
+      case 'homeworks': return json({ items: this.homeworks() });
       case 'lessons': {
         const from = parseAPIDate(route[1]);
         const to = parseAPIDate(route[2]);
@@ -259,6 +260,33 @@ export class DemoTransport {
       }
     }
     return result;
+  }
+
+  /**
+   * Compiti del modulo Compiti (`homeworks/index`, 4.0 come nell'app): uno ogni due giorni di scuola
+   * dalla settimana scorsa alle prossime due, alcuni con un file del docente; quelli passati fatti.
+   */
+  homeworks() {
+    const today = this.referenceDate;
+    const tasks = ['Esercizi assegnati con il modulo Compiti: svolgere la scheda allegata',
+      'Preparare una presentazione di 5 minuti', 'Completare il questionario sul libro di testo',
+      'Scrivere un riassunto di una pagina'];
+    return this.schoolDays(addDays(today, -7), addDays(today, 14)).flatMap((day, index) => {
+      if (index % 2 !== 0) return [];
+      const rng = new SeededRandom(dayIndex(day) + 31);
+      const r = row(day);
+      const s = subjects[r[rng.next(r.length)]];
+      const id = 900_000 + dayIndex(day);
+      const files = rng.next(2) === 0 ? [{ fileId: id, fileName: 'scheda.pdf' }] : [];
+      return [{
+        evtId: id, evtCode: 'NEWDC', teacherId: 1_234_567, teacherName: s.teacher,
+        homeworkDesc: tasks[rng.next(tasks.length)], homeworkDone: false,
+        homeworkMarkedDone: day < today, assignmentDate: dayKey(addDays(day, -3)),
+        assignmentTime: null, expiryDate: dayKey(day), expiryTime: null,
+        studentAttachmentsAllowed: false, subjectId: s.id, subjectDesc: s.name,
+        teacherFiles: files, teacherLinks: [], studentFiles: [],
+      }];
+    });
   }
 
   lessons(from, to) {

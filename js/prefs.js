@@ -1,6 +1,7 @@
 // Impostazioni dell'app, salvate nel browser (`localStorage`).
 
 const KEY = 'bcw.preferences';
+const IMPORTED_DONE_KEY = 'bcw.classevivaDoneHomework';
 
 const defaults = {
   averageMode: 'allGrades',
@@ -17,6 +18,8 @@ const defaults = {
   corners: 'standard',
   motion: 'expressive',
   roundedText: 'titles',
+  // Solo in questo browser (non si sincronizza): la barra laterale c'è solo sul web.
+  railDensity: 'normal',
   hideCompletedHomework: false,
   showUpcomingDays: true,
   collapsedSections: [],
@@ -27,9 +30,13 @@ const defaults = {
   showsTimetableTab: true,
   newsNotifications: [],
   unsyncedCategories: [],
+  // BCW+ (4.0.1): banner in cima alle Impostazioni e avviso in cima all'Orario. Solo in questo
+  // browser, come `showsPlusBanner` nell'app.
+  showsPlusBanner: true,
+  showsTimetablePlusNotice: true,
 };
 
-const APPEARANCE_KEYS = ['accentColor', 'colorStyle', 'contrast', 'corners', 'motion', 'roundedText'];
+const APPEARANCE_KEYS = ['accentColor', 'colorStyle', 'contrast', 'corners', 'motion', 'roundedText', 'railDensity'];
 
 export const DashboardMode = { list: { title: 'Lista', icon: 'viewAgenda' }, calendar: { title: 'Calendario', icon: 'calendarMonth' } };
 export const AppearanceMode = { system: 'Automatico', light: 'Chiaro', dark: 'Scuro' };
@@ -100,6 +107,10 @@ export class Preferences {
   get timetableShowsNowCard() { return this.values.timetableShowsNowCard !== false; }
   /** La scheda Orario nella barra di navigazione (Impostazioni › Orario). */
   get showsTimetableTab() { return this.values.showsTimetableTab !== false; }
+  /** Banner di BCW+ in cima alle Impostazioni (`js/plus.js`). */
+  get showsPlusBanner() { return this.values.showsPlusBanner !== false; }
+  /** Avviso di BCW+ in cima alla scheda Orario. */
+  get showsTimetablePlusNotice() { return this.values.showsTimetablePlusNotice !== false; }
 
   /**
    * La voce si sincronizza con l'account BCW (Impostazioni › Account › Da sincronizzare,
@@ -147,6 +158,25 @@ export class Preferences {
   }
 
   isCompleted(event) { return this.completed.has(event.id); }
+
+  /**
+   * Compiti del modulo Compiti segnati come fatti su Classeviva: diventano fatti anche in BCW, una
+   * volta sola. Se poi si segnano da fare in BCW restano da fare (`bcw.classevivaDoneHomework`, solo
+   * in questo browser, ricorda quelli già presi), come nell'app.
+   */
+  importDoneHomework(ids) {
+    if (!ids.length) return;
+    let imported;
+    try { imported = new Set(JSON.parse(localStorage.getItem(IMPORTED_DONE_KEY) || '[]')); } catch { imported = new Set(); }
+    const fresh = ids.filter((id) => !imported.has(id));
+    if (!fresh.length) return;
+    for (const id of fresh) imported.add(id);
+    try { localStorage.setItem(IMPORTED_DONE_KEY, JSON.stringify([...imported])); } catch { /* archiviazione piena */ }
+    const missing = fresh.filter((id) => !this.completed.has(id));
+    if (!missing.length) return;
+    for (const id of missing) this.completed.add(id);
+    this.save();
+  }
 
   toggleCompleted(event) {
     if (this.completed.has(event.id)) this.completed.delete(event.id);

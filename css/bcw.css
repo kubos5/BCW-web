@@ -1297,8 +1297,18 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 
 .shell-body { flex: 1; min-height: 0; display: flex; position: relative; }
 
-/* Barra di navigazione espansa (M3 Expressive): voci di 56 px con l'indicatore a pillola. */
+/* Barra di navigazione espansa (M3 Expressive): voci con l'indicatore a pillola. La spaziatura si
+   sceglie in Impostazioni › Aspetto (`data-rail` su <html>, solo web): Normale (di serie) voci di
+   44 px, Spaziosa quelle di 56 px di prima, Compatta di 36 px. Ridotta (solo icone) cambia lo
+   spazio sopra e sotto ogni voce. */
 .rail {
+  --rail-item: 44px;
+  --rail-gap: 0px;
+  --rail-head-top: 12px;
+  --rail-head-pad: 6px;
+  --rail-c-top: 2px;
+  --rail-c-bottom: 4px;
+  --rail-c-gap: 4px;
   width: var(--rail);
   flex: none;
   display: flex;
@@ -1311,17 +1321,34 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 }
 
 .rail-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; }
-.rail-group { display: flex; flex-direction: column; gap: 2px; }
-.rail-group h2 { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--on-surface-variant); padding: 16px 16px 6px; white-space: nowrap; overflow: hidden; }
+:root[data-rail="spacious"] .rail { --rail-item: 56px; --rail-gap: 2px; --rail-head-top: 16px; --rail-c-top: 4px; --rail-c-bottom: 6px; }
+:root[data-rail="compact"] .rail { --rail-item: 36px; --rail-head-top: 8px; --rail-head-pad: 4px; --rail-c-top: 1px; --rail-c-bottom: 3px; --rail-c-gap: 2px; }
+.rail-group { display: flex; flex-direction: column; }
+.rail-group.main, .rail-items { display: flex; flex-direction: column; gap: var(--rail-gap); }
 .rail-group hr { display: none; }
+/* Gruppi comprimibili (Comunicazioni, Valutazioni…): il titolo è un pulsante con la freccia; da
+   chiuso porta la somma dei contatori e, se dentro c'è la sezione aperta, il colore della scelta. */
+.rail-group-head { position: relative; isolation: isolate; flex: none; display: flex; align-items: center; gap: 8px; margin-top: calc(var(--rail-head-top) - var(--rail-head-pad)); padding: var(--rail-head-pad) 10px var(--rail-head-pad) 16px; border-radius: 16px;
+  color: var(--on-surface-variant); font-size: 14px; line-height: 20px; font-weight: 600; text-align: left; white-space: nowrap; transition: color var(--effects-fast-dur) linear; -webkit-tap-highlight-color: transparent; }
+.rail-group-head::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; z-index: -1; transition: opacity var(--effects-fast-dur) linear; }
+@media (hover: hover) { .rail-group-head:hover::after { opacity: .08; } }
+.rail-group-head:active::after { opacity: .12; }
+.rail-group-head:focus-visible { outline: 2px solid var(--secondary); outline-offset: -2px; }
+.rail-group-head.current { color: var(--on-secondary-container); }
+.rail-group-head.current::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--secondary-container); z-index: -1; animation: fade-in var(--effects-dur) var(--effects); }
+.rail-group-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rail-group-head .rail-count { padding: 0 2px; }
+.rail-group-chev { flex: none; width: 20px; height: 20px; transition: transform var(--spring-dur) var(--spring); }
+.rail-group-head[aria-expanded="false"] .rail-group-chev { transform: rotate(-90deg); }
+.rail .collapsible-inner { padding: 0; margin: 0; -webkit-mask-image: none; mask-image: none; }
 
 .rail-item {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 56px;
+  height: var(--rail-item);
   padding: 0 8px 0 4px;
-  border-radius: 28px;
+  border-radius: calc(var(--rail-item) / 2);
   color: var(--on-surface-variant);
   position: relative;
   isolation: isolate;
@@ -1343,10 +1370,10 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 
 /* Barra ridotta: solo icone, con le etichette sotto. */
 .shell.rail-collapsed .rail { padding: 8px 8px 12px; }
-.shell.rail-collapsed .rail-group h2 { display: none; }
+.shell.rail-collapsed .rail-group-head { display: none; }
 .shell.rail-collapsed .rail-group hr { display: block; border: 0; height: 1px; background: var(--outline-variant); margin: 8px 16px; }
-.shell.rail-collapsed .rail-item { flex-direction: column; height: auto; padding: 4px 0 6px; gap: 4px; border-radius: 0; }
-.shell.rail-collapsed .rail-item::before, .shell.rail-collapsed .rail-item::after { inset: 4px 12px auto; height: 32px; border-radius: 16px; transform-origin: center; }
+.shell.rail-collapsed .rail-item { flex-direction: column; height: auto; padding: var(--rail-c-top) 0 var(--rail-c-bottom); gap: var(--rail-c-gap); border-radius: 0; }
+.shell.rail-collapsed .rail-item::before, .shell.rail-collapsed .rail-item::after { inset: var(--rail-c-top) 12px auto; height: 32px; border-radius: 16px; transform-origin: center; }
 .shell.rail-collapsed .rail-indicator { width: 56px; }
 .shell.rail-collapsed .rail-indicator .badge { display: grid; }
 .shell.rail-collapsed .rail-label { flex: none; width: 100%; font-size: 12px; line-height: 16px; text-align: center; padding: 0 2px; }
@@ -1831,9 +1858,24 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
    verso; quella che esce (disegnata sopra per un istante) scivola dall'altro e svanisce. */
 .axis { position: relative; }
 .axis-in { animation: axis-in var(--spring-dur) var(--spring); }
-@keyframes axis-in { from { opacity: 0; transform: translateX(calc(var(--dir) * 48px)); } }
+@keyframes axis-in { from { opacity: 0; transform: translateX(calc(var(--dir) * var(--axis-distance, 48px))); } }
 .axis-exit-layer { position: fixed; z-index: 7; overflow: hidden; pointer-events: none; }
 .axis-exit { position: absolute; margin: 0; animation: axis-out 200ms var(--effects) forwards; }
+/* Uscita al suo posto (`inPlace`, l'introduzione): sopra la pagina nuova, senza tocchi. Come
+   `sharedAxisX(distance: 64)` dell'app, la pagina nuova entra da 64 px e quella vecchia esce di 64. */
+.axis-exit.in-place { z-index: 1; pointer-events: none; }
+.ob-axis, .ob-aside-axis { --axis-distance: 64px; }
+/* Introduzione: asse condiviso X di Material 3 con i suoi tempi: la pagina che esce svanisce nei
+   primi 90 ms mentre scivola via, quella nuova compare subito dopo scivolando al suo posto con la
+   molla. Prima le due pagine si vedevano insieme (due "Continua" e due titoli sfalsati). */
+:is(.ob-axis, .ob-aside-axis) > .axis-in { animation: axis-in-move var(--spring-dur) var(--spring), axis-in-fade 210ms linear 90ms backwards; }
+:is(.ob-axis, .ob-aside-axis) > .axis-exit { animation: axis-out-move 300ms cubic-bezier(.3, 0, .8, .15) forwards, axis-out-fade 90ms linear forwards; }
+@keyframes axis-in-move { from { transform: translateX(calc(var(--dir) * var(--axis-distance, 48px))); } }
+@keyframes axis-in-fade { from { opacity: 0; } }
+@keyframes axis-out-move { from { transform: translateX(var(--from)); } to { transform: translateX(var(--to)); } }
+@keyframes axis-out-fade { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :is(.ob-axis, .ob-aside-axis) > .axis-in { animation: fade-in var(--effects-dur) var(--effects); } }
+:root[data-motion="reduced"] :is(.ob-axis, .ob-aside-axis) > .axis-in { animation: fade-in var(--effects-dur) var(--effects); }
 @keyframes axis-out { from { opacity: 1; transform: translateX(var(--from)); } to { opacity: 0; transform: translateX(var(--to)); } }
 :root[data-motion="reduced"] .axis-in { animation-name: fade-in; }
 :root[data-motion="reduced"] .axis-exit { animation-duration: 100ms; }
@@ -2019,7 +2061,8 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .chart-dot { stroke: var(--surface-container-low); stroke-width: 3; }
 
 .goal { padding: 18px; border-radius: var(--r-xl); background: var(--surface-container-low); font-size: 16px; }
-.goal-head { display: flex; align-items: center; gap: 12px; }
+.goal-head { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border-radius: var(--r-l); }
+.goal-head .grow { flex: 1; min-width: 0; }
 .goal-head strong { display: block; font-size: 18px; font-weight: 550; }
 .goal-head small { display: block; font-size: 13px; color: var(--on-surface-variant); }
 .goal-art { width: 40px; height: 40px; color: var(--on-tertiary-container); --shape-fill: var(--tertiary-container); }
@@ -2043,6 +2086,11 @@ input[type="color"].color-input::-webkit-color-swatch { border: 0; border-radius
 .mini-grade { min-width: 30px; height: 24px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: var(--r-s); font-size: 12px; font-weight: 700; color: var(--tint); background: color-mix(in srgb, var(--tint) 15%, transparent); }
 .chev-right { color: var(--on-surface-variant); width: 22px; height: 22px; }
 .goal .row-between { min-height: 40px; }
+/* "Obiettivo" ed "E se prendessi…" nella pagina di una materia (4.0, come `SubjectGradeTools`
+   nell'app): card collegate a 2 px, angoli ampi all'esterno e piccoli all'interno. */
+.connected-cards { display: flex; flex-direction: column; gap: 2px; }
+.connected-cards > .card:not(:first-child) { border-top-left-radius: var(--r-xs); border-top-right-radius: var(--r-xs); }
+.connected-cards > .card:not(:last-child) { border-bottom-left-radius: var(--r-xs); border-bottom-right-radius: var(--r-xs); }
 
 /* "E se prendessi…" (3.3): card come l'obiettivo; nei Voti si comprime toccando l'intestazione
    (lo spazio tra intestazione e modulo sta dentro la parte che si comprime, così da chiusa la
@@ -2778,6 +2826,24 @@ html.theme-reveal::view-transition-new(reveal-ring) { animation: none; }
 .ob-pv-title { width: 44px; height: 7px; border-radius: 3px; background: color-mix(in srgb, var(--on-surface-variant) 35%, transparent); }
 .ob-pv-row { height: 16px; border-radius: 6px; background: var(--surface-container-highest); }
 .ob-pv-row.accent { background: var(--primary-container); }
+/* Spaziatura della barra laterale (solo sugli schermi larghi): la barra in piccolo, con le voci
+   alla distanza scelta (a metà: 56, 44 e 36 px diventano 28, 22 e 18), accanto al pannello. */
+.ob-choices.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.onboarding.wide .ob-choices.three .ob-choice-preview { height: 150px; }
+.onboarding .ob-pv.ob-pv-shell { flex-direction: row; gap: 6px; height: 100%; padding: 10px 0 0 6px; background: var(--surface-container); }
+.ob-pv-shell.spacious { --pv-h: 28px; --pv-gap: 1px; --pv-head: 8px; }
+.ob-pv-shell.normal { --pv-h: 22px; --pv-gap: 0px; --pv-head: 6px; }
+.ob-pv-shell.compact { --pv-h: 18px; --pv-gap: 0px; --pv-head: 4px; }
+.ob-pv-rail { flex: 0 0 56%; min-width: 0; display: flex; flex-direction: column; gap: var(--pv-gap); overflow: hidden; }
+.ob-pv-item { flex: none; display: flex; align-items: center; gap: 7px; height: var(--pv-h); padding: 0 8px; border-radius: calc(var(--pv-h) / 2); }
+.ob-pv-item.on { background: var(--secondary-container); }
+.ob-pv-item b { flex: none; width: 10px; height: 10px; border-radius: 3px; background: color-mix(in srgb, var(--on-surface-variant) 60%, transparent); }
+.ob-pv-item em { height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--on-surface-variant) 35%, transparent); }
+.ob-pv-item.on b, .ob-pv-item.on em { background: var(--on-secondary-container); }
+.ob-pv-head { flex: none; width: 38%; height: 4px; margin: var(--pv-head) 0 calc(var(--pv-head) / 2) 8px; border-radius: 2px; background: color-mix(in srgb, var(--on-surface-variant) 28%, transparent); }
+.ob-pv-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px 8px; border-radius: 10px 0 0 0; background: var(--surface); }
+.ob-pv-panel i { height: 12px; border-radius: 4px; background: var(--surface-container-highest); }
+.ob-pv-panel i:first-child { width: 60%; height: 7px; margin-bottom: 2px; border-radius: 3px; background: color-mix(in srgb, var(--on-surface-variant) 35%, transparent); }
 
 /* Accesso, account e orario. */
 .ob-form { gap: 10px; }
@@ -2845,3 +2911,70 @@ html.theme-reveal::view-transition-new(reveal-ring) { animation: none; }
 .onboarding.wide .ob-pv-week i { height: 30px; }
 .onboarding.wide .ob-pv-month i { height: 22px; }
 .onboarding.wide .ob-pv-row { height: 20px; }
+
+/* MARK: - BCW+ (4.0.1, `js/plus.js`)
+   Banner in cima alle Impostazioni, come "Build GitHub" dell'app e il banner di BCW per Android:
+   contenitore secondario, una forma grande che sporge dall'angolo in basso a destra e ruota piano
+   (60 s a giro), una piccola sopra, l'icona in una forma, i testi e la X. Avviso piccolo in cima
+   all'Orario: una riga nel contenitore primario, con la X. */
+.plus-banner { position: relative; isolation: isolate; overflow: hidden; flex: none; container-type: inline-size; min-height: 96px; padding: 18px 14px 18px 16px; border-radius: var(--r-xl); background: var(--secondary-container); color: var(--on-secondary-container); }
+.plus-banner-body { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "art text close"; align-items: center; column-gap: 14px; row-gap: 12px; min-height: 60px; }
+/* Colonna stretta (elenco delle Impostazioni sugli schermi larghi): icona e X sopra, testi sotto. */
+@container (max-width: 320px) {
+  .plus-banner-body { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "art . close" "text text text"; align-items: start; }
+}
+.plus-banner-deco { position: absolute; z-index: -1; color: color-mix(in srgb, var(--secondary) 10%, transparent); pointer-events: none; }
+.plus-banner-deco.big { width: 150px; height: 150px; right: -46px; bottom: -58px; animation: lock-spin 60s linear infinite; }
+.plus-banner-deco.small { width: 44px; height: 44px; right: 96px; bottom: 60px; color: color-mix(in srgb, var(--secondary) 8%, transparent); }
+.plus-banner-art { grid-area: art; width: 52px; height: 52px; --shape-fill: var(--secondary); color: var(--on-secondary); }
+.plus-banner-art > .icon { width: 28px; height: 28px; }
+.plus-banner-text { grid-area: text; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.plus-banner-text strong { font-size: 20px; line-height: 26px; font-weight: 650; font-variation-settings: "ROND" var(--rond); }
+.plus-banner-text small { font-size: 13px; line-height: 18px; opacity: .82; }
+.plus-banner-close { grid-area: close; position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 18px; color: inherit; background: color-mix(in srgb, currentColor 10%, transparent);
+  transition: border-radius var(--spring-fast-dur) var(--spring-fast), transform var(--spring-fast-dur) var(--spring-fast); -webkit-tap-highlight-color: transparent; }
+.plus-banner-close .icon { width: 20px; height: 20px; }
+@media (hover: hover) { .plus-banner-close:hover { background: color-mix(in srgb, currentColor 16%, transparent); } }
+.plus-banner-close:active { border-radius: 12px; transform: scale(.95); }
+.plus-banner-close:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.split-side .plus-banner { margin-bottom: 4px; }
+
+.plus-notice { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 4px 10px 12px; border-radius: var(--r-l); background: color-mix(in srgb, var(--primary-container) 55%, var(--surface-container-low)); color: var(--on-primary-container); }
+.plus-notice-art { width: 36px; height: 36px; --shape-fill: var(--primary); color: var(--on-primary); }
+.plus-notice-art > .icon { width: 20px; height: 20px; }
+.plus-notice-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.plus-notice-text strong { font-size: 14px; line-height: 20px; font-weight: 650; }
+.plus-notice-text small { font-size: 12.5px; line-height: 17px; opacity: .85; }
+.plus-notice-close { flex: none; color: inherit; }
+.page-body > .plus-notice { margin-bottom: 12px; }
+
+@media (prefers-reduced-motion: reduce) { .plus-banner-deco.big { animation: none; } }
+:root[data-motion="reduced"] .plus-banner-deco.big { animation: none; }
+
+/* MARK: - Note di rilascio (4.0, `js/updates.js`) e valori tecnici in monospazio */
+.form-value.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; letter-spacing: 0; }
+.release { display: flex; flex-direction: column; gap: 20px; padding: 8px 20px 24px; max-width: 600px; margin: 0 auto; }
+.release-head { display: flex; align-items: center; gap: 16px; }
+.release-art { width: 64px; height: 64px; color: var(--on-primary-container); --shape-fill: var(--primary-container); animation: release-art-in var(--spring-slow-dur, 600ms) var(--spring); }
+.release-art > .icon { width: 30px; height: 30px; }
+@keyframes release-art-in { from { transform: scale(.5) rotate(-30deg); opacity: 0; } }
+.release-head strong { display: block; font-size: 24px; line-height: 30px; font-weight: 550; color: var(--on-surface); font-variation-settings: "ROND" var(--rond); }
+.release-head small { display: block; margin-top: 3px; font-size: 13px; color: var(--on-surface-variant); }
+.release-notes { display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: var(--r-xl); background: var(--surface-container); color: var(--on-surface); font-size: 16px; line-height: 22px; animation: page-in var(--spring-dur) var(--spring) both; user-select: text; }
+.release-notes p { margin: 0; }
+.release-notes a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.release-notes code { padding: 1px 5px; border-radius: 6px; background: var(--surface-container-highest); }
+.release-notes h3 { margin: 4px 0 0; font-weight: 650; }
+.release-notes .rn-h1, .release-notes .rn-h2 { font-size: 20px; line-height: 26px; color: var(--primary); font-variation-settings: "ROND" var(--rond); }
+.release-notes .rn-h3 { font-size: 17px; line-height: 23px; color: var(--primary); font-variation-settings: "ROND" var(--rond); }
+.release-notes .rn-h4 { font-size: 15px; line-height: 21px; }
+.rn-bullet { display: flex; align-items: baseline; gap: 10px; padding-left: calc(var(--depth, 0) * 18px); }
+.rn-dot { flex: none; width: 8px; height: 8px; --shape-fill: var(--primary); transform: translateY(-1px); }
+.rn-bullet.nested .rn-dot { --shape-fill: var(--on-surface-variant); }
+.rn-numbered { display: flex; align-items: baseline; gap: 8px; }
+.rn-number { flex: none; font-weight: 650; color: var(--primary); }
+.rn-quote { padding-left: 12px; border-left: 3px solid var(--outline-variant); font-size: 14px; color: var(--on-surface-variant); }
+.rn-gap { display: block; height: 4px; }
+.rn-empty { color: var(--on-surface-variant); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .release-art, .release-notes { animation: none; } }
+:root[data-motion="reduced"] :is(.release-art, .release-notes) { animation: none; }

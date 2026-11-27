@@ -338,6 +338,8 @@ export function agendaEventRow(event, { done = false, expanded = false, showsDat
   if (showsDate) meta.push(fmt.relativeDayName(event.begin));
   if (event.kind !== 'homework') meta.push(event.timeDescription);
   if (event.authorName && event.subjectName != null) meta.push(event.authorName);
+  // I file e i link del docente di un compito del modulo Compiti si aprono dal sito di Classeviva.
+  if (event.attachments > 0) meta.push(event.attachments === 1 ? '1 allegato su Classeviva' : `${event.attachments} allegati su Classeviva`);
   return `<div class="agenda-row ${expanded ? 'expanded' : ''}" data-key="ev-${scope}${event.id}" data-context="agenda"${data({ id: event.id })}>
     ${leading}
     <div class="grow" data-action="agenda-expand"${data({ id: event.id, scope })}>
@@ -459,9 +461,14 @@ export function avatar(initials, { size = 64, color, cls = '', shapeName = 'circ
  * Pagina che cambia con la transizione ad asse condiviso X (giorni, schede): la nuova entra
  * dal lato del verso (`dir`), quella vecchia esce dall'altro (vedi `animateAxisExits` in app.js).
  */
-export function axisPage(name, dir, key, content, { cls = '' } = {}) {
+/**
+ * `inPlace`: la pagina che esce resta nel suo contenitore (con gli stessi stili, la stessa altezza
+ * e gli scorrimenti di prima) invece di passare in un livello sopra la pagina: serve quando il suo
+ * aspetto dipende da dove sta (le pagine dell'introduzione, con le azioni in fondo).
+ */
+export function axisPage(name, dir, key, content, { cls = '', inPlace = false } = {}) {
   const d = dir < 0 ? -1 : 1;
-  return `<div class="axis ${cls}" data-axis="${name}" data-axis-dir="${d}"><div class="axis-page ${dir ? 'axis-in' : ''}" style="--dir:${d}" data-key="${esc(key)}">${content}</div></div>`;
+  return `<div class="axis ${cls}" data-axis="${name}" data-axis-dir="${d}"${inPlace ? ' data-axis-exit="in-place"' : ''}><div class="axis-page ${dir ? 'axis-in' : ''}" style="--dir:${d}" data-key="${esc(key)}">${content}</div></div>`;
 }
 
 /**
