@@ -2,7 +2,8 @@
 // Generale › Rivedi l'introduzione. Finché non si sceglie un colore BCW è in bianco e nero
 // (`data-mono` su <html>, impostato già da `js/theme-boot.js`); i colori arrivano con un cerchio
 // che si allarga dal campione toccato (`revealTheme` in `app.js`). Passaggi: accoglienza, colori,
-// tema, forme e movimento, vista della Dashboard, funzioni, accesso a Classeviva, account BCW,
+// tema, forme e movimento, vista della Dashboard, spaziatura della barra laterale (solo sugli
+// schermi larghi, 4.0.1), funzioni, accesso a Classeviva, account BCW,
 // orario ricavato dalle lezioni (con la scheda Orario e un account), fine. In cima a ogni
 // passaggio una forma di M3 Expressive che si trasforma nella successiva; sotto, il contenuto che
 // scorre di lato (asse condiviso) e le azioni ferme in fondo. Da 840 px, come la shell dell'app, la
@@ -68,6 +69,10 @@ export function newOnboarding({ replay = false } = {}) {
     username: '', password: '', error: null, loading: false, choices: [],
     bcwChoice: 'none', bcwUsername: '', bcwPassword: '', bcwConfirm: '', bcwError: null, bcwLoading: false,
     draft: null, generating: false, genError: null,
+    // C'è già un orario (in questo browser o nell'account BCW appena aperto): il passaggio dell'orario
+    // non serve. Si decide all'apertura e andando avanti dall'account BCW (4.0, come nell'app), così
+    // applicando la bozza il passaggio non sparisce. `null` = non ancora guardato.
+    hasTimetable: null, checkingTimetable: false,
   };
 }
 
@@ -79,6 +84,7 @@ const STEPS = {
   interface: { shape: 'softBurst', icon: 'sparkles', size: 84 },
   feel: { shape: 'clover8Leaf', icon: 'corners', size: 84 },
   dashboard: { shape: 'gem', icon: 'dashboard', size: 84 },
+  sidebar: { shape: 'pill', icon: 'sideNavigation', size: 84 },
   features: { shape: 'puffy', icon: 'tune', size: 84 },
   classeviva: { shape: 'cookie9Sided', icon: 'graduationCap', size: 84 },
   bcw: { shape: 'sunny', icon: 'cloud', size: 84 },
@@ -87,12 +93,42 @@ const STEPS = {
 };
 const ORDER = Object.keys(STEPS);
 
-/** I passaggi che si vedono: l'orario dalle lezioni solo con la scheda Orario e un account. */
+/**
+ * I passaggi che si vedono: la barra laterale solo sugli schermi larghi (dove c'è), l'orario dalle
+ * lezioni solo con la scheda Orario, un account e se un orario non c'è già.
+ */
 function visibleSteps(ctx) {
-  return ORDER.filter((step) => step !== 'timetable' || (ctx.prefs.showsTimetableTab && ctx.model.phase === 'signedIn'));
+  const ob = ctx.app.onboarding;
+  return ORDER.filter((step) => {
+    if (step === 'sidebar') return !!ctx.wide;
+    if (step === 'timetable') return timetableAllowed(ctx) && !ob?.hasTimetable;
+    return true;
+  });
 }
 
+const timetableAllowed = (ctx) => ctx.prefs.showsTimetableTab && ctx.model.phase === 'signedIn';
+
 function go(ctx, delta) {
+  const ob = ctx.app.onboarding;
+  // Prima del passaggio dell'orario si guarda se l'orario c'è già: con l'account BCW appena aperto
+  // può essere sul server e non ancora in questo browser (al massimo 4 secondi).
+  if (delta > 0 && ob?.step === 'bcw' && timetableAllowed(ctx)) {
+    if (ob.checkingTimetable) return;
+    ob.checkingTimetable = true;
+    ctx.model.hasTimetableData()
+      .then((has) => { ob.hasTimetable = has; })
+      .catch(() => {})
+      .finally(() => {
+        ob.checkingTimetable = false;
+        if (ctx.app.onboarding === ob && ob.step === 'bcw') advance(ctx, delta);
+        ctx.update();
+      });
+    return;
+  }
+  advance(ctx, delta);
+}
+
+function advance(ctx, delta) {
   const ob = ctx.app.onboarding;
   const steps = visibleSteps(ctx);
   const index = ORDER.indexOf(ob.step);
@@ -115,6 +151,8 @@ function centerOf(el) {
 
 export function renderOnboarding(ctx) {
   const ob = ctx.app.onboarding;
+  // Riaprendo l'introduzione con un orario già fatto il passaggio non conta fin dall'inizio.
+  if (ob.hasTimetable == null && ctx.model.phase !== 'launching') ob.hasTimetable = !ctx.model.timetable.isEmpty;
   const steps = visibleSteps(ctx);
   // Un passaggio sparito (l'orario, spegnendo la scheda) porta al successivo.
   if (!steps.includes(ob.step)) ob.step = steps.find((s) => ORDER.indexOf(s) > ORDER.indexOf(ob.step)) ?? 'done';
@@ -162,6 +200,7 @@ function renderStep(ctx, step) {
     case 'interface': return interfacePage(ctx);
     case 'feel': return feelPage(ctx);
     case 'dashboard': return dashboardPage(ctx);
+    case 'sidebar': return sidebarPage(ctx);
     case 'features': return featuresPage(ctx);
     case 'classeviva': return classevivaPage(ctx);
     case 'bcw': return bcwPage(ctx);
@@ -216,8 +255,8 @@ function errorBox(message) {
  * centro e altre due forme più piccole attorno; nell'accoglienza al centro c'è il logo. Le forme
  * sono disegnate da `animateMorphShapes` (fuori dal morph, `data-morph-skip`).
  */
-const SATELLITES_A = ['pill', 'gem', 'cookie6Sided', 'pentagon', 'sunny', 'clover4Leaf', 'puffyDiamond', 'arch', 'pill', 'flower'];
-const SATELLITES_B = ['cookie9Sided', 'pill', 'sunny', 'gem', 'puffy', 'softBoom', 'pill', 'cookie7Sided', 'clover4Leaf', 'clover8Leaf'];
+const SATELLITES_A = ['pill', 'gem', 'cookie6Sided', 'pentagon', 'sunny', 'cookie4Sided', 'clover4Leaf', 'puffyDiamond', 'arch', 'pill', 'flower'];
+const SATELLITES_B = ['cookie9Sided', 'pill', 'sunny', 'gem', 'puffy', 'cookie12Sided', 'softBoom', 'pill', 'cookie7Sided', 'clover4Leaf', 'clover8Leaf'];
 
 function hero(step) {
   const info = STEPS[step];
@@ -513,6 +552,35 @@ function dashboardPage(ctx) {
     nextButton());
 }
 
+// MARK: - Barra laterale (solo web)
+
+const RAIL_CHOICES = [
+  ['spacious', 'Spaziosa', 'Voci ampie e ariose'],
+  ['normal', 'Normale', 'Più raccolta'],
+  ['compact', 'Compatta', 'Tutto a colpo d\'occhio'],
+];
+
+/**
+ * Una barra laterale in piccolo con il pannello della pagina accanto: le voci (la prima scelta,
+ * nella pillola) e i titoli dei gruppi alla distanza della spaziatura, così si vede quante sezioni
+ * stanno nello stesso spazio.
+ */
+function railPreview(density) {
+  const item = (width, on = false) => `<span class="ob-pv-item ${on ? 'on' : ''}"><b></b><em style="width:${width}%"></em></span>`;
+  const head = '<span class="ob-pv-head"></span>';
+  const rows = [item(62, true), item(44), item(36), item(28), head, item(58), item(70), head, item(52), item(40), head, item(46), item(60), item(38), item(54), item(42), item(50)].join('');
+  return `<span class="ob-pv ob-pv-shell ${density}"><span class="ob-pv-rail">${rows}</span>
+    <span class="ob-pv-panel"><i></i><i></i><i></i><i></i></span></span>`;
+}
+
+function sidebarPage(ctx) {
+  const current = ctx.prefs.get('railDensity');
+  return stepParts('Come vuoi la barra laterale?',
+    "A sinistra ci sono tutte le sezioni di BCW: scegli quanto spazio lasciare tra l'una e l'altra. Si cambia anche dopo, in Impostazioni › Aspetto.",
+    stagger(1, `<div class="ob-choices three">${RAIL_CHOICES.map(([value, title, subtitle]) => previewChoice(title, subtitle, current === value, 'ob-rail-density', value, railPreview(value))).join('')}</div>`),
+    nextButton());
+}
+
 // MARK: - Funzioni
 
 function featuresPage(ctx) {
@@ -617,7 +685,7 @@ function bcwPage(ctx) {
     return stepParts('Sei nel tuo account BCW', 'Impostazioni, orario e account abbinati ti seguono su ogni dispositivo.',
       stagger(1, `<div class="ob-summary"><span class="ob-summary-art shaped">${shape('cookie9Sided')}${icon('cloud')}</span>
         <span class="grow"><strong>${esc(model.cloudUser?.username ?? '')}</strong><small>${esc(BCWServer.isConfigured ? hostOf(BCWServer.base) : '')}</small></span></div>`),
-      nextButton());
+      nextButton({ loading: ob.checkingTimetable }));
   }
   const subtitle = "È facoltativo. Con un nome utente e una password ritrovi tutto su ogni dispositivo, anche nell'app per iPhone e iPad.";
   if (ob.bcwChoice === 'none') {
@@ -867,6 +935,11 @@ export const onboardingActions = {
     if (ctx.prefs.dashboardMode === el.dataset.value) return;
     navigator.vibrate?.(4);
     ctx.prefs.set('dashboardMode', el.dataset.value);
+  },
+  'ob-rail-density': (ctx, el) => {
+    if (ctx.prefs.get('railDensity') === el.dataset.value) return;
+    navigator.vibrate?.(4);
+    ctx.prefs.set('railDensity', el.dataset.value);
   },
   'ob-news': async (ctx, el) => {
     const kinds = ['grades', 'notices', 'notes', 'absences', 'agenda'];

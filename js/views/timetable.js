@@ -21,6 +21,7 @@ import {
 import {
   detailSheet, editorSheet, generatorSheet, hiddenTestsSheet, seriesSheet, shiftSheet, deleteEntryDialog, timetableSheetActions,
 } from './timetable-sheets.js';
+import { plusTimetableNotice } from '../plus.js';
 
 // MARK: - Stato
 
@@ -168,9 +169,12 @@ export const timetable = {
     const capsule = mode === 'day' && content.unmatchedTests.length ? unmatchedCapsule(content.unmatchedTests) : '';
     const extras = draftHeader(ctx) + (s.editing ? editHint(ctx) : '') + capsule;
     const bar = calendarBar(ctx, { selected: day, action: 'tt-select', shiftAction: 'tt-week-shift', pickAction: 'tt-pick', dir: s.weekDir });
+    // BCW+ (4.0.1): l'orario è ancora gratuito, ma tra poco lo richiederà. Non nelle modalità
+    // temporanee (modifica e anteprima della bozza).
+    const notice = s.editing || isDraft ? '' : plusTimetableNotice(ctx);
 
     if (ctx.wide) {
-      return { title, actions, fabMenu, toolbar, hidesNav: s.editing || isDraft, ...wideLayout(ctx, mode, content, extras, bar) };
+      return { title, actions, fabMenu, toolbar, hidesNav: s.editing || isDraft, ...wideLayout(ctx, mode, content, notice + extras, bar) };
     }
 
     // Telefoni: in alto la settimana, ferma; sotto il giorno (Lista) o la sua giornata (Giorno).
@@ -185,7 +189,7 @@ export const timetable = {
     } else {
       body = `<div class="day-swipe" data-day-swipe="tt-day-shift">${axisPage('tt-day', s.dir, `ttd-${dayKey(day)}`, dayList(ctx, content))}</div>`;
     }
-    body = `<div class="view-swap" data-key="tt-view-${mode}">${body}</div>`;
+    body = `${notice}<div class="view-swap" data-key="tt-view-${mode}">${body}</div>`;
     return {
       title,
       actions,

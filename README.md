@@ -52,7 +52,7 @@ GitHub Pages pubblica solo file statici: l'app si apre, la demo funziona, ma l'a
 
 Per controllare che il Worker funzioni apri `https://bcw-proxy.tuonome.workers.dev/ping` nel browser: deve rispondere `{"ok":true}`.
 
-Quando `proxy/cloudflare-worker.js` cambia, ripeti il punto 2 per aggiornare il Worker. Ad esempio, dalla versione che segue i reindirizzamenti di Classeviva si scaricano gli allegati della Bacheca serviti da un altro indirizzo.
+Quando `proxy/cloudflare-worker.js` cambia, ripeti il punto 2 per aggiornare il Worker. Ad esempio, dalla versione che segue i reindirizzamenti di Classeviva si scaricano gli allegati della Bacheca serviti da un altro indirizzo, e dalla 4.0 il proxy sa leggere anche dal sito di Classeviva (`/w1/…` e `/site-login`) i compiti assegnati con il modulo Compiti, se l'API dell'app non li dà. Con un proxy non aggiornato quei compiti semplicemente non compaiono.
 
 ### Proxy predefinito
 
@@ -79,6 +79,10 @@ Chi entra con un account Classeviva vede in Impostazioni › Account a quali acc
 
 Il server è [BCW-api](https://github.com/kubos5/BCW-api), un Cloudflare Worker con un database D1. Il suo indirizzo predefinito si imposta in `config.json`, alla voce `api`; ognuno può cambiarlo da Impostazioni › Account › Server BCW (o da "Usa un altro server BCW" in fondo alla schermata di accesso, scegliendo Account BCW). BCW-api fa anche da proxy per Classeviva, quindi può stare anche nella voce `proxy`.
 
+### BCW+
+
+Nell'app per iPhone e iPad BCW+ è un acquisto unico (2,99 €) che sblocca orario, attività in diretta e widget. Sul web per ora non si compra: come in BCW per Android tutte le funzioni sono sbloccate. Arriverà presto anche qui per l'orario, quindi in cima alle Impostazioni un banner lo spiega e in cima alla scheda Orario un avviso dice che l'orario è ancora gratuito; si nascondono con la X e si rimostrano da Impostazioni › Generale › BCW+.
+
 ### Installazione come app
 
 BCW è una Progressive Web App: in Safari su iPhone e iPad usa Condividi › Aggiungi alla schermata Home, in Chrome ed Edge il pulsante Installa nella barra degli indirizzi. Installata, si apre a tutto schermo e funziona anche offline con gli ultimi dati scaricati.
@@ -95,13 +99,14 @@ Le stesse dell'app nativa:
 - ricerca dalla barra in cima alla Dashboard, con la vista e l'avatar dell'account (che apre gli account): toccandola diventa il campo e i risultati prendono il posto della pagina
 - toccando di nuovo la scheda aperta si torna in cima alla pagina in vista (anche a una pagina aperta dentro la scheda, poi alla pagina principale); se si è già in cima, la Dashboard va a domani, l'Orario al giorno con il prossimo evento e i Voti tornano alla media dell'anno
 - puoi segnare i compiti come fatti e, opzionalmente, nasconderli
+- anche i compiti assegnati con il modulo Compiti di Classeviva (non solo come annotazioni dell'agenda) compaiono insieme agli altri, con il numero di allegati del docente (da aprire su Classeviva); quelli segnati come fatti su Classeviva diventano fatti anche in BCW
 - Voti con la media in primo piano e i periodi in un gruppo di pulsanti collegati, grafico dell'andamento, schede Ultimi voti (divisi per mese, espandibili e filtrabili per materia) e Materie
 - effetto di ogni voto sulla media della materia (▲/▼) e grafico dei voti di ogni materia
-- dato un obiettivo di media, il voto necessario nelle prossime 1-5 prove
+- dato un obiettivo di media, il voto necessario nelle prossime 1-5 prove; nella pagina di una materia "Obiettivo" ed "E se prendessi…" sono due card collegate, chiuse all'inizio, e da chiusa l'obiettivo riassume il risultato
 - "E se prendessi…": come cambierebbe la media (della materia e generale) con uno o più voti ipotetici, nei Voti (scegliendo la materia di ogni voto tra tutte quelle dell'anno, anche senza voti) e nella pagina di ogni materia; i voti ipotetici non vengono salvati
 - media di tutti i voti o media delle medie, con o senza pesi
 - Tu con il profilo al centro (Gestisci account, Cambia o Aggiungi), statistiche collegate, "Da vedere" (comunicazioni e note da leggere, assenze da giustificare) e tutte le altre sezioni in liste segmentate; le Impostazioni si aprono dall'ingranaggio
-- bacheca con filtri e ricerca, adesione, firma e risposta alle comunicazioni e anteprima degli allegati: immagini da ingrandire (pulsanti, pizzico, doppio tocco, Ctrl + rotellina, tasti + − 0) e scorrere, adatte alla finestra o alla larghezza, anteprima a schermo intero con i controlli in alto, apertura in una nuova scheda senza scaricare e Scarica
+- bacheca con filtri e ricerca, "Leggi tutto" (dopo una conferma segna come lette tutte le comunicazioni, anche su Classeviva), adesione, firma e risposta alle comunicazioni e anteprima degli allegati: immagini da ingrandire (pulsanti, pizzico, doppio tocco, Ctrl + rotellina, tasti + − 0) e scorrere, adatte alla finestra o alla larghezza, anteprima a schermo intero con i controlli in alto, apertura in una nuova scheda senza scaricare e Scarica
 - note disciplinari e annotazioni, assenze e ritardi con quelli da giustificare
 - scrutini e pagelle con riepilogo per periodo e insufficienze
 - anni precedenti: pagelle dall'archivio di Classeviva e accesso al sito per il resto
@@ -115,8 +120,9 @@ Le stesse dell'app nativa:
 - account BCW: account Classeviva abbinati con un solo accesso, impostazioni e orario sincronizzati tra i dispositivi (scegliendo cosa sincronizzare), scollegamento dagli account BCW anche dal lato Classeviva
 - modalità demo con dati di esempio, anche con un account già collegato (uscendo si torna all'account)
 - notifiche per nuovi voti, comunicazioni, note, assenze e compiti, da attivare in Impostazioni › Notifiche
-- impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account; in Generale anche "Rivedi l'introduzione" e i collegamenti su GitHub (BCW per iOS, Web e Android, il backend e l'autore)
-- alla prima apertura un'introduzione guida tra colori, tema, forme e movimento, vista della Dashboard, funzioni, accesso a Classeviva, account BCW e orario ricavato dalle lezioni: BCW parte in bianco e nero e i colori arrivano con un cerchio che si allarga dal colore scelto, con il bordo del nuovo colore come nell'app; sugli schermi larghi l'introduzione è un pannello in due colonne (titolo e forma a sinistra, scelte a destra)
+- impostazioni divise in Generale, Aspetto, Voti, Dashboard, Orario, Notifiche e Account; in Generale anche la versione, le note di rilascio, BCW+, "Rivedi l'introduzione" e i collegamenti su GitHub (BCW per iOS, Web e Android, il backend, l'autore e mikqsdev, che contribuisce a BCW per Android)
+- dopo un aggiornamento un foglio mostra le note della release di GitHub di quella versione (mai alla prima apertura); si riaprono da Impostazioni › Generale › Note di rilascio
+- alla prima apertura un'introduzione guida tra colori, tema, forme e movimento, vista della Dashboard, spaziatura della barra laterale (sugli schermi larghi, con un'anteprima per ogni scelta), funzioni, accesso a Classeviva, account BCW e orario ricavato dalle lezioni (saltato se un orario c'è già, anche nell'account BCW): BCW parte in bianco e nero e i colori arrivano con un cerchio che si allarga dal colore scelto, con il bordo del nuovo colore come nell'app; sugli schermi larghi l'introduzione è un pannello in due colonne (titolo e forma a sinistra, scelte a destra)
 - aspetto personalizzabile (Impostazioni › Aspetto): tema chiaro, scuro o automatico, colore d'accento (campioni o un colore qualsiasi) da cui si generano tutti i colori del sito, stile dei colori (Tonale, Vivace, Espressivo, Fedele, Neutro, Arcobaleno, Macedonia), contrasto, angoli più o meno arrotondati, animazioni espressive, standard o ridotte, caratteri arrotondati; "Ripristina l'aspetto di BCW" riporta tutto com'era
 
 ### Orario
@@ -148,7 +154,7 @@ L'orario è salvato nel browser, separato per ogni account (il documento in `loc
 
 ### Su schermi larghi
 
-Il layout dell'app adattato a uno schermo largo, come le app Google sul web: in alto la barra con il logo, la barra di ricerca, Aggiorna, Impostazioni e l'avatar dell'account (che apre il menu degli account); a sinistra la barra di navigazione espansa con tutte le sezioni e i contatori delle cose da leggere o giustificare (si riduce alle sole icone con il pulsante in alto); la pagina in un pannello con gli angoli ampi. Pagine a due colonne (Dashboard con la settimana o il mese e i prossimi giorni accanto al giorno, Orario, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca e impostazioni con elenco e dettaglio affiancati, elenchi in più colonne. In Bacheca, Agenda e Materiale la ricerca della pagina sta nel contenuto. Nelle pagine a più colonne le barre di scorrimento non compaiono, così le colonne mantengono la loro larghezza.
+Il layout dell'app adattato a uno schermo largo, come le app Google sul web: in alto la barra con il logo, la barra di ricerca, Aggiorna, Impostazioni e l'avatar dell'account (che apre il menu degli account); a sinistra la barra di navigazione espansa con tutte le sezioni e i contatori delle cose da leggere o giustificare (si riduce alle sole icone con il pulsante in alto; la spaziatura delle voci si sceglie in Impostazioni › Aspetto › Barra laterale: Spaziosa, Normale o Compatta); la pagina in un pannello con gli angoli ampi. Pagine a due colonne (Dashboard con la settimana o il mese e i prossimi giorni accanto al giorno, Orario, Voti, dettaglio materia, Scrutini, Anni precedenti, Lezioni), bacheca e impostazioni con elenco e dettaglio affiancati, elenchi in più colonne. In Bacheca, Agenda e Materiale la ricerca della pagina sta nel contenuto. Nelle pagine a più colonne le barre di scorrimento non compaiono, così le colonne mantengono la loro larghezza.
 
 Scorciatoie: ⌘F (Ctrl+F) per cercare; con Alt (⌥ su Mac) Alt+1…9 per le sezioni (1 Dashboard, 2 Orario, 3 Voti, 4 Tu, 5 Bacheca, 6 Note, 7 Assenze, 8 Agenda, 9 Materiale), Alt+R per aggiornare, Alt+Maiusc+T per andare a domani nella Dashboard, Alt+T per tornare al giorno predefinito e Alt+N per un nuovo evento nell'Orario (con la scheda Orario nascosta Alt+1…3 per Dashboard, Voti e Tu), Invio per uscire da Modifica orario.
 
@@ -159,6 +165,8 @@ Sotto gli 840 pixel di larghezza l'app usa il layout dei telefoni, uguale a quel
 - le credenziali sono salvate nel browser (`localStorage`) invece che nel Portachiavi, e inviate solo ai server di Classeviva tramite il proxy (con un account BCW anche al server di BCW, che le conserva cifrate)
 - le notifiche arrivano mentre BCW è aperta, anche in una scheda in secondo piano o installata come app; per avvisi sempre affidabili conviene esportare l'agenda nel Calendario
 - niente widget, attività in diretta, Liquid Glass e scelta dell'icona: sono dell'app per iPhone e iPad (le loro scelte salvate nell'orario e nell'account BCW restano)
+- BCW+ per ora non si compra: tutte le funzioni sono sbloccate (vedi sopra)
+- niente avviso delle versioni nuove: il sito si aggiorna da solo
 - nella schermata di accesso, oltre al server BCW, c'è il collegamento per cambiare il proxy di Classeviva (senza un proxy funzionante l'accesso non parte)
 - su iPhone e iPad le notifiche web funzionano solo con BCW aggiunta alla schermata Home
 
@@ -201,6 +209,8 @@ js/
 ├── theme.js          Aspetto: colori dal colore d'accento, angoli, animazioni, caratteri
 ├── theme-boot.js     Applica l'aspetto salvato prima del primo disegno (alla prima apertura il bianco e nero)
 ├── onboarding.js     Introduzione: passaggi, forme che si trasformano, colori scelti con il cerchio
+├── plus.js           BCW+: banner delle Impostazioni e avviso dell'Orario
+├── updates.js        Versione e note di rilascio da GitHub
 ├── vendor/           material-color-utilities (licenza Apache 2.0), raccolta in un file
 ├── demo.js, pdf.js   Server demo e PDF di esempio
 ├── components.js     Componenti (liste e sezioni segmentate, chip, badge voto, anelli ondulati, righe agenda…)

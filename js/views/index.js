@@ -13,6 +13,7 @@ import { timetable } from './timetable.js';
 import { addAccountSheet } from './login.js';
 import { addToCalendar } from '../calendar-export.js';
 import { fmt } from '../util.js';
+import { plusActions } from '../plus.js';
 
 export { sections, sectionGroups, sectionBadge } from './sections-meta.js';
 
@@ -47,6 +48,7 @@ async function copy(ctx, text, message = 'Copiato negli appunti.') {
 }
 
 export const commonActions = {
+  ...plusActions,
   'agenda-toggle': (ctx, el) => {
     const event = findEvent(ctx, el);
     if (!event) return;

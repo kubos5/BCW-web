@@ -7,14 +7,14 @@ import { DemoTransport } from './demo.js';
 import { GradeBook } from './gradebook.js';
 import { Preferences } from './prefs.js';
 import { Reminders } from './reminders.js';
-import { TimetableStore } from './timetable.js';
+import { TimetableStore, decodeTimetable } from './timetable.js';
 import { News } from './news.js';
 import { CloudError, CloudStorage, CloudSync, accountFromServer, cloudRequest, isCloudOffline } from './cloud.js';
 import {
   parseAbsencesResponse, parseAgendaResponse, parseCalendarResponse, parseCardResponse, parseDidacticsResponse,
   parseDocumentCheck, parseDocumentsResponse, parseGradesResponse, parseLessonsResponse, parseNoteReadResponse,
   parseNoticeDetail, parseNoticeboardResponse, parseNotesResponse, parsePeriodsResponse, parseSchoolbooksResponse,
-  parseSubjectsResponse,
+  parseSubjectsResponse, parseHomeworksResponse, homeworkEvent, homeworkEventID, mergeAgenda, HOMEWORK_PATH,
 } from './models.js';
 import { addDays, apiString, dayKey, nameCased, schoolYear, startOfDay, uuid, StableID } from './util.js';
 
@@ -97,6 +97,9 @@ export class AppModel {
     this.periods = [];
     this.subjects = [];
     this.agenda = [];
+    // Le due fonti di `agenda`: `agenda/all` e i compiti del modulo Compiti (`homeworks/index`),
+    // che arrivano a parte (`updateAgenda`).
+    this.agendaSources = { events: [], homework: [] };
     this.absences = [];
     this.notices = [];
     this.notes = [];
@@ -667,6 +670,33 @@ export class AppModel {
     if (this.cloud) this.refreshCloud({ force: true });
   }
 
+  /**
+   * C'è già un orario per l'account attivo: in questo browser o, con l'account BCW, sul server
+   * (appena entrati la sincronizzazione può non averlo ancora scaricato). L'introduzione salta
+   * allora il passaggio dell'orario (4.0, come nell'app). Al massimo 4 secondi di attesa.
+   */
+  async hasTimetableData() {
+    const store = this.timetable;
+    if (!store.isEmpty || store.draft) return true;
+    const id = this.activeAccountID;
+    if (!this.cloud || this.isDemo || !this.preferences.syncs('timetable') || !id || !this.accounts.some((a) => a.id === id)) return false;
+    const remote = cloudRequest('GET', `/sync/timetable/${id}`, { token: this.cloud.token, timeout: 4000 })
+      .then((document) => {
+        if (!document?.version || !document.data) return false;
+        try {
+          return decodeTimetable(typeof document.data === 'string' ? JSON.parse(document.data) : document.data).entries.length > 0;
+        } catch {
+          return false;
+        }
+      })
+      .catch(() => null);
+    const timeout = new Promise((resolve) => { setTimeout(() => resolve(null), 4000); });
+    const first = await Promise.race([remote, timeout]);
+    // Senza risposta in tempo si guarda di nuovo il browser (la sincronizzazione può essere
+    // arrivata nel frattempo).
+    return first ?? !this.timetable.isEmpty;
+  }
+
   // MARK: Caricamento
 
   get agendaPath() {
@@ -686,6 +716,7 @@ export class AppModel {
       client.cached(parseNotesResponse, 'notes/all'),
       client.cached(parseCalendarResponse, 'calendar/all'),
     ]);
+    const homework = await client.cached(parseHomeworksResponse, HOMEWORK_PATH);
     let grades = null;
     for (const path of gradePaths) {
       grades = await client.cached(parseGradesResponse, path);
@@ -698,7 +729,9 @@ export class AppModel {
       if (!this.grades.length && grades) this.grades = grades.grades.sort((a, b) => b.date - a.date);
       if (!this.periods.length && periods) this.periods = periods.periods;
       if (!this.subjects.length && subjects) this.subjects = subjects.subjects;
-      if (!this.agenda.length && agenda) this.agenda = agenda.events.sort((a, b) => a.begin - b.begin);
+      if (!this.agenda.length && (agenda || homework)) {
+        this.updateAgenda({ events: agenda?.events ?? [], homework: (homework?.items ?? []).map(homeworkEvent) });
+      }
       if (!this.absences.length && absences) this.absences = absences.events.sort((a, b) => b.date - a.date);
       if (!this.notices.length && notices) this.notices = this.sortedNotices(notices.items);
       if (!this.notes.length && notes) this.notes = notes.notes;
@@ -811,8 +844,39 @@ export class AppModel {
   }
 
   async loadAgenda() {
-    await this.run(parseAgendaResponse, this.agendaPath, (r) => { this.agenda = r.events.sort((a, b) => a.begin - b.begin); });
+    await Promise.all([
+      this.run(parseAgendaResponse, this.agendaPath, (r) => this.updateAgenda({ events: r.events })),
+      this.loadHomework(),
+    ]);
     this.rescheduleReminders();
+  }
+
+  /**
+   * I compiti del modulo Compiti di Classeviva (4.0, issue 16), che `agenda/all` non contiene. Se
+   * non arrivano restano quelli di prima, senza errori nel banner: è una fonte in più. Quelli
+   * segnati come fatti su Classeviva diventano fatti anche in BCW, una volta sola.
+   */
+  async loadHomework() {
+    const client = this.client;
+    if (!client) return;
+    let result;
+    try {
+      result = await client.homework();
+    } catch {
+      return;
+    }
+    if (client !== this.client) return;
+    const items = result.value.items;
+    this.preferences.importDoneHomework(items.filter((h) => h.isDone).map((h) => homeworkEventID(h.id)));
+    this.updateAgenda({ homework: items.map(homeworkEvent) });
+    this.changed();
+  }
+
+  /** Unisce le due fonti dell'agenda (una fonte che manca resta com'era). */
+  updateAgenda({ events, homework } = {}) {
+    if (events) this.agendaSources.events = events;
+    if (homework) this.agendaSources.homework = homework;
+    this.agenda = mergeAgenda(this.agendaSources.events, this.agendaSources.homework);
   }
 
   loadAbsences() {
@@ -925,6 +989,29 @@ export class AppModel {
   }
 
   get unreadNoticesCount() { return this.notices.filter((n) => !n.isRead).length; }
+
+  /**
+   * "Leggi tutto" della Bacheca (4.0, come nell'app): segna come lette tutte le comunicazioni da
+   * leggere, aprendole su Classeviva come la lettura normale (che è l'unico modo per segnarle),
+   * quattro alla volta. Adesioni e firme non vengono toccate. Restituisce quante non è riuscita a
+   * segnare.
+   */
+  async markAllNoticesRead() {
+    const pending = this.notices.filter((n) => !n.isRead);
+    let failed = 0;
+    const worker = async () => {
+      for (let notice = pending.shift(); notice; notice = pending.shift()) {
+        try {
+          await this.openNotice(notice);
+        } catch {
+          failed += 1;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, pending.length) }, worker));
+    this.changed();
+    return failed;
+  }
 
   // MARK: Note
 

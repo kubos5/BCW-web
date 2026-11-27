@@ -214,14 +214,15 @@ export function parseAgendaEvent(c) {
     subjectId: int(c, 'subjectId'),
     subjectName: nilIfEmpty(str(c, 'subjectDesc')),
     homeworkId: int(c, 'homeworkId'),
+    attachments: 0,
   };
   e.end = parseDate(str(c, 'evtDatetimeEnd')) ?? e.begin;
   if (e.subjectName) e.subjectName = sentenceCased(e.subjectName);
   e.id = int(c, 'evtId') ?? StableID.make(e.code, e.notes, dayKey(e.begin));
-  // Classeviva distingue i compiti (AGHW) dagli altri eventi (AGNT/AGCR);
-  // le verifiche non hanno un codice dedicato, quindi le riconosciamo dal testo.
+  // Classeviva distingue i compiti (AGHW, e NEWDC quelli del modulo Compiti) dagli altri eventi
+  // (AGNT/AGCR); le verifiche non hanno un codice dedicato, quindi le riconosciamo dal testo.
   const text = e.notes.toLowerCase();
-  if (e.code === 'AGHW') e.kind = 'homework';
+  if (e.code === 'AGHW' || e.code === HOMEWORK_MODULE_CODE) e.kind = 'homework';
   else if (testWords.some((w) => text.includes(w))) e.kind = 'test';
   else if (e.code === 'AGNT' && e.subjectName != null && homeworkWords.some((w) => text.includes(w))) e.kind = 'homework';
   else e.kind = 'event';
@@ -234,6 +235,106 @@ export function parseAgendaEvent(c) {
 }
 
 export const parseAgendaResponse = (c) => ({ events: arr(c, 'agenda', parseAgendaEvent) });
+
+// MARK: - Compiti del modulo Compiti
+
+/**
+ * Compiti del modulo Compiti di Classeviva (4.0, come `Homework` nell'app; issue 16 su GitHub):
+ * i docenti possono assegnare i compiti come compiti veri e propri (codice NEWDC) invece che come
+ * annotazioni dell'agenda. Non sono in `agenda/all` e arrivano da `homeworks/index` (formato da
+ * https://github.com/open-viva/endpoints#compiti). In BCW diventano eventi dell'agenda di tipo
+ * compito nel giorno di consegna (`homeworkEvent`), così compaiono ovunque ci siano i compiti.
+ */
+export const HOMEWORK_MODULE_CODE = 'NEWDC';
+export const HOMEWORK_PATH = 'homeworks/index';
+
+/**
+ * Id in BCW di un compito del modulo Compiti: il suo id con il segno meno, perché gli id dei
+ * compiti e quelli degli eventi dell'agenda sono numerati a parte e potrebbero coincidere (i compiti
+ * fatti, sincronizzati con l'account BCW, sono un elenco di id).
+ */
+export const homeworkEventID = (id) => -Math.abs(id);
+
+/** "14:30" o "14:30:00" → minuti dalla mezzanotte. */
+function minutesOf(text) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(text ?? '').trim());
+  if (!m) return null;
+  const hours = Number(m[1]);
+  const minutes = Number(m[2]);
+  return hours < 24 && minutes < 60 ? hours * 60 + minutes : null;
+}
+
+export function parseHomework(c) {
+  const day = parseDate(str(c, 'expiryDate'));
+  if (!day) throw new Error('Compito senza data di consegna');
+  const text = (str(c, 'homeworkDesc') ?? '').trim();
+  const time = minutesOf(str(c, 'expiryTime'));
+  const due = startOfDay(day);
+  if (time != null) due.setHours(Math.floor(time / 60), time % 60);
+  const subjectName = nilIfEmpty(str(c, 'subjectDesc'));
+  const count = (key) => (Array.isArray(c?.[key]) ? c[key].length : 0);
+  return {
+    id: int(c, 'evtId') ?? StableID.make('NEWDC', text, dayKey(day)),
+    text,
+    teacherName: nameCased(str(c, 'teacherName') ?? ''),
+    subjectId: int(c, 'subjectId'),
+    subjectName: subjectName ? sentenceCased(subjectName) : null,
+    assignedOn: parseDate(str(c, 'assignmentDate')),
+    due,
+    hasDueTime: time != null,
+    // Segnato come fatto su Classeviva (`homeworkMarkedDone`) o chiuso (`homeworkDone`).
+    isDone: bool(c, 'homeworkMarkedDone') || bool(c, 'homeworkDone'),
+    // File e link del docente: BCW non li apre, sono sul sito di Classeviva.
+    attachments: count('teacherFiles') + count('teacherLinks'),
+  };
+}
+
+export function parseHomeworksResponse(c) {
+  const items = arr(c, 'items', parseHomework);
+  return { items: items.length ? items : arr(c, 'homeworks', parseHomework) };
+}
+
+/**
+ * Una risposta di `homeworks/index`: un oggetto con l'elenco dei compiti, anche vuoto. Distingue i
+ * compiti da una risposta qualsiasi (una pagina di errore, un JSON d'altro tipo).
+ */
+export function isHomeworksResponse(json) {
+  return !!json && typeof json === 'object' && (Array.isArray(json.items) || Array.isArray(json.homeworks));
+}
+
+/** Un compito del modulo Compiti come evento dell'agenda, nel giorno di consegna. */
+export function homeworkEvent(h) {
+  const e = {
+    id: homeworkEventID(h.id),
+    code: HOMEWORK_MODULE_CODE,
+    begin: h.due,
+    end: h.due,
+    isFullDay: !h.hasDueTime,
+    notes: h.text,
+    authorName: h.teacherName,
+    classDescription: null,
+    subjectId: h.subjectId,
+    subjectName: h.subjectName,
+    homeworkId: h.id,
+    attachments: h.attachments,
+    kind: 'homework',
+    day: startOfDay(h.due),
+  };
+  e.title = e.subjectName ?? (e.authorName || 'Compito');
+  e.timeDescription = e.isFullDay ? 'Tutto il giorno' : fmt.time(e.begin);
+  return e;
+}
+
+/**
+ * Eventi di `agenda/all` più i compiti del modulo Compiti, in ordine. Un compito che l'agenda ha già
+ * (un evento AGHW con il suo `homeworkId`) non viene ripetuto.
+ */
+export function mergeAgenda(events, homework) {
+  if (!homework.length) return [...events].sort((a, b) => a.begin - b.begin);
+  const linked = new Set(events.filter((e) => e.code !== HOMEWORK_MODULE_CODE && e.homeworkId != null).map((e) => e.homeworkId));
+  const extra = homework.filter((e) => !linked.has(e.homeworkId ?? 0));
+  return [...events, ...extra].sort((a, b) => a.begin - b.begin);
+}
 
 export function parseLesson(c) {
   const l = {

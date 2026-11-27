@@ -22,6 +22,7 @@ import { logo } from './logo.js';
 import { routes, sections, sectionGroups, commonActions, sectionBadge } from './views/index.js';
 import { renderLogin, loginActions } from './views/login.js';
 import { isFirstRun, newOnboarding, renderOnboarding, animateMorphShapes, onboardingActions } from './onboarding.js';
+import { Updates } from './updates.js';
 
 // MARK: - Stato
 
@@ -537,6 +538,20 @@ function render() {
   updateBarState();
   fitKeyboard();
   playFlips(flips);
+  presentReleaseNotesIfNeeded();
+}
+
+/**
+ * Note di rilascio dopo un aggiornamento (`js/updates.js`), con BCW pronta: non sopra l'avvio,
+ * l'introduzione, il blocco o un foglio o dialogo già aperto.
+ */
+function presentReleaseNotesIfNeeded() {
+  if (!Updates.pending || model.phase === 'launching' || app.onboarding || Lock.isLocked || app.sheet || app.dialog) return;
+  Updates.presentIfNeeded((sheet) => {
+    if (app.onboarding || Lock.isLocked || app.sheet || app.dialog) return false;
+    openSheet(sheet);
+    return true;
+  });
 }
 
 // MARK: Cerchio dei colori
@@ -1736,8 +1751,11 @@ async function start() {
   model.bootstrap();
   // Prima apertura: l'introduzione, in bianco e nero finché non si sceglie un colore (il bianco e
   // nero l'ha già messo `js/theme-boot.js`, prima del primo disegno).
-  if (isFirstRun()) app.onboarding = newOnboarding();
+  const firstRun = isFirstRun();
+  if (firstRun) app.onboarding = newOnboarding();
   else document.documentElement.removeAttribute('data-mono');
+  // Dopo un aggiornamento (mai alla prima apertura) le note della versione nuova.
+  Updates.launch({ firstRun });
   if (model.preferences.get('useLock') && model.phase === 'signedIn') Lock.lock();
   Reminders.start();
   render();

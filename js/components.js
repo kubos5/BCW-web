@@ -338,6 +338,8 @@ export function agendaEventRow(event, { done = false, expanded = false, showsDat
   if (showsDate) meta.push(fmt.relativeDayName(event.begin));
   if (event.kind !== 'homework') meta.push(event.timeDescription);
   if (event.authorName && event.subjectName != null) meta.push(event.authorName);
+  // I file e i link del docente di un compito del modulo Compiti si aprono dal sito di Classeviva.
+  if (event.attachments > 0) meta.push(event.attachments === 1 ? '1 allegato su Classeviva' : `${event.attachments} allegati su Classeviva`);
   return `<div class="agenda-row ${expanded ? 'expanded' : ''}" data-key="ev-${scope}${event.id}" data-context="agenda"${data({ id: event.id })}>
     ${leading}
     <div class="grow" data-action="agenda-expand"${data({ id: event.id, scope })}>
