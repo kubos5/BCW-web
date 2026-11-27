@@ -461,9 +461,14 @@ export function avatar(initials, { size = 64, color, cls = '', shapeName = 'circ
  * Pagina che cambia con la transizione ad asse condiviso X (giorni, schede): la nuova entra
  * dal lato del verso (`dir`), quella vecchia esce dall'altro (vedi `animateAxisExits` in app.js).
  */
-export function axisPage(name, dir, key, content, { cls = '' } = {}) {
+/**
+ * `inPlace`: la pagina che esce resta nel suo contenitore (con gli stessi stili, la stessa altezza
+ * e gli scorrimenti di prima) invece di passare in un livello sopra la pagina: serve quando il suo
+ * aspetto dipende da dove sta (le pagine dell'introduzione, con le azioni in fondo).
+ */
+export function axisPage(name, dir, key, content, { cls = '', inPlace = false } = {}) {
   const d = dir < 0 ? -1 : 1;
-  return `<div class="axis ${cls}" data-axis="${name}" data-axis-dir="${d}"><div class="axis-page ${dir ? 'axis-in' : ''}" style="--dir:${d}" data-key="${esc(key)}">${content}</div></div>`;
+  return `<div class="axis ${cls}" data-axis="${name}" data-axis-dir="${d}"${inPlace ? ' data-axis-exit="in-place"' : ''}><div class="axis-page ${dir ? 'axis-in' : ''}" style="--dir:${d}" data-key="${esc(key)}">${content}</div></div>`;
 }
 
 /**

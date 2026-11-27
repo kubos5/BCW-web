@@ -2,8 +2,8 @@
 // Generale › Rivedi l'introduzione. Finché non si sceglie un colore BCW è in bianco e nero
 // (`data-mono` su <html>, impostato già da `js/theme-boot.js`); i colori arrivano con un cerchio
 // che si allarga dal campione toccato (`revealTheme` in `app.js`). Passaggi: accoglienza, colori,
-// tema, forme e movimento, vista della Dashboard, spaziatura della barra laterale (solo sugli
-// schermi larghi, 4.0.1), funzioni, accesso a Classeviva, account BCW,
+// tema (sugli schermi larghi anche la spaziatura della barra laterale, 4.0.1, dove l'app chiede lo
+// stile dell'interfaccia), forme e movimento, vista della Dashboard, funzioni, accesso a Classeviva, account BCW,
 // orario ricavato dalle lezioni (con la scheda Orario e un account), fine. In cima a ogni
 // passaggio una forma di M3 Expressive che si trasforma nella successiva; sotto, il contenuto che
 // scorre di lato (asse condiviso) e le azioni ferme in fondo. Da 840 px, come la shell dell'app, la
@@ -84,7 +84,6 @@ const STEPS = {
   interface: { shape: 'softBurst', icon: 'sparkles', size: 84 },
   feel: { shape: 'clover8Leaf', icon: 'corners', size: 84 },
   dashboard: { shape: 'gem', icon: 'dashboard', size: 84 },
-  sidebar: { shape: 'pill', icon: 'sideNavigation', size: 84 },
   features: { shape: 'puffy', icon: 'tune', size: 84 },
   classeviva: { shape: 'cookie9Sided', icon: 'graduationCap', size: 84 },
   bcw: { shape: 'sunny', icon: 'cloud', size: 84 },
@@ -94,16 +93,12 @@ const STEPS = {
 const ORDER = Object.keys(STEPS);
 
 /**
- * I passaggi che si vedono: la barra laterale solo sugli schermi larghi (dove c'è), l'orario dalle
- * lezioni solo con la scheda Orario, un account e se un orario non c'è già.
+ * I passaggi che si vedono: l'orario dalle lezioni solo con la scheda Orario, un account e se un
+ * orario non c'è già.
  */
 function visibleSteps(ctx) {
   const ob = ctx.app.onboarding;
-  return ORDER.filter((step) => {
-    if (step === 'sidebar') return !!ctx.wide;
-    if (step === 'timetable') return timetableAllowed(ctx) && !ob?.hasTimetable;
-    return true;
-  });
+  return ORDER.filter((step) => step !== 'timetable' || (timetableAllowed(ctx) && !ob?.hasTimetable));
 }
 
 const timetableAllowed = (ctx) => ctx.prefs.showsTimetableTab && ctx.model.phase === 'signedIn';
@@ -160,8 +155,10 @@ export function renderOnboarding(ctx) {
   const index = steps.indexOf(step);
   const wide = !!ctx.wide;
   const typing = isTyping(ctx);
+  // Lo spazio in cima ha la sua chiave: senza, passando dall'accoglienza (o alla fine) il morph lo
+  // riusava per il contenitore delle pagine, che risultava nuovo, e la pagina compariva di colpo.
   const top = step === 'welcome' || step === 'done'
-    ? '<div class="ob-top-spacer"></div>'
+    ? '<div class="ob-top-spacer" data-key="ob-top-spacer"></div>'
     : `<div class="ob-top" data-key="ob-top"><button class="icon-btn" data-action="ob-back" aria-label="Indietro" title="Indietro">${icon('arrowBack')}</button>
       ${wavyProgress(index, Math.max(1, steps.length - 1), { label: "Avanzamento dell'introduzione" })}
       <button class="btn text xs" data-action="ob-skip">Salta</button></div>`;
@@ -173,7 +170,7 @@ export function renderOnboarding(ctx) {
     const body = parts.center ? centerPage(parts) : page(parts);
     return `<div class="onboarding ${typing ? 'typing' : ''}" ${attrs}>
       <div class="ob-column">${top}${typing ? '' : hero(step)}
-        ${axisPage('onboarding', ob.dir, key, body, { cls: 'ob-axis' })}</div></div>`;
+        ${axisPage('onboarding', ob.dir, key, body, { cls: 'ob-axis', inPlace: true })}</div></div>`;
   }
   // Schermi larghi: titolo e spiegazione scorrono di lato nella colonna a sinistra, sopra la
   // forma; il contenuto nella colonna a destra. Nell'accoglienza e alla fine la colonna a sinistra
@@ -182,8 +179,8 @@ export function renderOnboarding(ctx) {
   const main = parts.center ? centerPage(parts) : page(parts, { heading: false });
   return `<div class="onboarding wide" ${attrs}><div class="ob-frame">${top}
       <div class="ob-panel ${parts.center ? 'center' : ''}">
-        <div class="ob-aside">${axisPage('ob-aside', ob.dir, `${key}-aside`, heading, { cls: 'ob-aside-axis' })}${hero(step)}</div>
-        ${axisPage('onboarding', ob.dir, key, main, { cls: 'ob-axis' })}</div></div></div>`;
+        <div class="ob-aside">${axisPage('ob-aside', ob.dir, `${key}-aside`, heading, { cls: 'ob-aside-axis', inPlace: true })}${hero(step)}</div>
+        ${axisPage('onboarding', ob.dir, key, main, { cls: 'ob-axis', inPlace: true })}</div></div></div>`;
 }
 
 /** Con la tastiera aperta sui telefoni (sugli schermi larghi c'è posto per tutto). */
@@ -200,7 +197,6 @@ function renderStep(ctx, step) {
     case 'interface': return interfacePage(ctx);
     case 'feel': return feelPage(ctx);
     case 'dashboard': return dashboardPage(ctx);
-    case 'sidebar': return sidebarPage(ctx);
     case 'features': return featuresPage(ctx);
     case 'classeviva': return classevivaPage(ctx);
     case 'bcw': return bcwPage(ctx);
@@ -255,8 +251,8 @@ function errorBox(message) {
  * centro e altre due forme più piccole attorno; nell'accoglienza al centro c'è il logo. Le forme
  * sono disegnate da `animateMorphShapes` (fuori dal morph, `data-morph-skip`).
  */
-const SATELLITES_A = ['pill', 'gem', 'cookie6Sided', 'pentagon', 'sunny', 'cookie4Sided', 'clover4Leaf', 'puffyDiamond', 'arch', 'pill', 'flower'];
-const SATELLITES_B = ['cookie9Sided', 'pill', 'sunny', 'gem', 'puffy', 'cookie12Sided', 'softBoom', 'pill', 'cookie7Sided', 'clover4Leaf', 'clover8Leaf'];
+const SATELLITES_A = ['pill', 'gem', 'cookie6Sided', 'pentagon', 'sunny', 'clover4Leaf', 'puffyDiamond', 'arch', 'pill', 'flower'];
+const SATELLITES_B = ['cookie9Sided', 'pill', 'sunny', 'gem', 'puffy', 'softBoom', 'pill', 'cookie7Sided', 'clover4Leaf', 'clover8Leaf'];
 
 function hero(step) {
   const info = STEPS[step];
@@ -498,11 +494,17 @@ function interfacePage(ctx) {
   const icons = { system: 'contrast', light: 'sun', dark: 'circleFill' };
   const modes = connectedGroup(Object.entries(AppearanceMode).map(([value, title]) => [value, `<span class="ob-mode">${icon(icons[value])}<span>${esc(title)}</span></span>`]),
     prefs.get('appearance'), 'ob-appearance', { height: 64 });
+  // Sugli schermi larghi, dove l'app chiede lo stile dell'interfaccia (Material 3 o Liquid Glass),
+  // la spaziatura della barra laterale; con il layout dei telefoni la barra non c'è.
+  const rail = ctx.wide ? stagger(3, railChoices(ctx)) : '';
   return stepParts("Com'è la tua app?",
-    'Chiara o scura, e con quanto contrasto tra i colori. Si cambia anche dopo, in Impostazioni › Aspetto.',
+    ctx.wide
+      ? 'Chiara o scura, con quanto contrasto e quanto spazio nella barra laterale. Si cambia anche dopo, in Impostazioni › Aspetto.'
+      : 'Chiara o scura, e con quanto contrasto tra i colori. Si cambia anche dopo, in Impostazioni › Aspetto.',
     stagger(1, `<div class="stack gap-8"><h3 class="list-header">Tema</h3>${modes}</div>`)
       + stagger(2, listGroup([formRow('Contrasto', select(Object.entries(Contrast), prefs.get('contrast'), 'pref-contrast', { label: 'Contrasto' }), { iconName: 'contrast' })],
-        { footer: 'Più contrasto rende testi e pulsanti più netti sullo sfondo.' })),
+        { footer: 'Più contrasto rende testi e pulsanti più netti sullo sfondo.' }))
+      + rail,
     nextButton());
 }
 
@@ -552,7 +554,7 @@ function dashboardPage(ctx) {
     nextButton());
 }
 
-// MARK: - Barra laterale (solo web)
+// MARK: - Barra laterale (solo web, nel passaggio del tema sugli schermi larghi)
 
 const RAIL_CHOICES = [
   ['spacious', 'Spaziosa', 'Voci ampie e ariose'],
@@ -573,12 +575,11 @@ function railPreview(density) {
     <span class="ob-pv-panel"><i></i><i></i><i></i><i></i></span></span>`;
 }
 
-function sidebarPage(ctx) {
+/** Le tre spaziature, nel passaggio del tema (solo sugli schermi larghi). */
+function railChoices(ctx) {
   const current = ctx.prefs.get('railDensity');
-  return stepParts('Come vuoi la barra laterale?',
-    "A sinistra ci sono tutte le sezioni di BCW: scegli quanto spazio lasciare tra l'una e l'altra. Si cambia anche dopo, in Impostazioni › Aspetto.",
-    stagger(1, `<div class="ob-choices three">${RAIL_CHOICES.map(([value, title, subtitle]) => previewChoice(title, subtitle, current === value, 'ob-rail-density', value, railPreview(value))).join('')}</div>`),
-    nextButton());
+  return `<div class="stack gap-8"><h3 class="list-header">Barra laterale</h3>
+    <div class="ob-choices three">${RAIL_CHOICES.map(([value, title, subtitle]) => previewChoice(title, subtitle, current === value, 'ob-rail-density', value, railPreview(value))).join('')}</div></div>`;
 }
 
 // MARK: - Funzioni

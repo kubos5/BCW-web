@@ -78,7 +78,7 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
 - Da 840 px (come le app Google sul web): barra superiore con logo (un link all'indirizzo base, `goHome()`: Dashboard
   dall'inizio, chiude ricerca e pagine aperte; con Ctrl/⌘/Maiusc resta un link, `data-spa`), ricerca generale (fuori dalla `.page`, così non perde il
   fuoco), Aggiorna, Impostazioni e avatar (menu degli account); barra di navigazione espansa con tutte le sezioni
-  (riducibile; tra 840 e 1000 si apre sopra il contenuto); pagina in un pannello con angoli ampi; ricerche di pagina nel
+  (riducibile, gruppi comprimibili; tra 840 e 1000 si apre sopra il contenuto); pagina in un pannello con angoli ampi; ricerche di pagina nel
   contenuto (`localSearchField`); Impostazioni e Bacheca con elenco e dettaglio affiancati.
 - Accesso (`views/login.js`): sui telefoni come nell'app; con un campo attivo (tastiera aperta, `pointer: coarse`)
   disposizione compatta in alto (logo piccolo e titolo su una riga, gruppo Classeviva/Account BCW, campi, Accedi);
@@ -226,8 +226,14 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
     Spaziosa = le voci di 56 px di prima, Normale = 44 px di serie, Compatta = 36 px), attributo `data-rail` su
     `<html>` (anche da `theme-boot.js`), variabili `--rail-*` in `.rail` (anche per la barra ridotta). Solo in questo
     browser (non è in `SYNCED_PREFERENCES`), riportata a Normale da "Ripristina l'aspetto di BCW". In Impostazioni ›
-    Aspetto › Barra laterale solo sugli schermi larghi; nell'introduzione il passaggio `sidebar` (dopo la Dashboard,
-    solo con `ctx.wide`) con tre anteprime (`railPreview`, la barra in piccolo a metà misura accanto al pannello).
+    Aspetto › Barra laterale solo sugli schermi larghi; nell'introduzione dentro "Com'è la tua app?" (dove l'app chiede
+    lo stile dell'interfaccia, Liquid Glass), solo con `ctx.wide`: con il layout dei telefoni la barra non c'è
+    (`railChoices`, tre anteprime `railPreview`, la barra in piccolo a metà misura accanto al pannello).
+  - Gruppi della barra laterale comprimibili (richiesta dell'utente): Comunicazioni, Valutazioni, Frequenza e Didattica
+    (`sectionGroups` con `id`) si chiudono toccandone il titolo (`rail-group-toggle`, `collapsible`), salvati in
+    `bcw.railGroupsCollapsed` (solo in questo browser); le quattro schede principali restano sempre in vista. Da
+    chiuso il titolo porta la somma dei contatori e, se dentro c'è la sezione aperta, lo sfondo della scelta.
+    Ridotta alle icone (o chiusa tra 840 e 1000 px) la barra mostra tutte le sezioni.
   - Compiti del modulo Compiti (issue 16 dell'app): `homeworks/index` (`parseHomeworksResponse` in `models.js`),
     eventi dell'agenda di tipo compito con codice NEWDC nel giorno di consegna e id negativo (`homeworkEventID`);
     `AppModel.updateAgenda` unisce `agenda/all` e i compiti (`agendaSources`, `mergeAgenda` non ripete un compito
@@ -255,6 +261,15 @@ Rispondi all'utente in **italiano**. Testi UI e commenti in italiano.
     l'introduzione, andando avanti dall'account BCW, guarda se c'è già un orario (`hasTimetableData`, anche sul
     server, al massimo 4 s) e allora salta il passaggio dell'orario. La barra di navigazione flottante aveva già una
     pillola sola che scivola (come la 4.0 dell'app e Android). Testi: BCW è femminile.
+  - Transizione tra i passaggi dell'introduzione (sfarfallio segnalato dall'utente): la pagina che esce passava in un
+    livello sopra tutto (`axis-exit-layer` in `body`) e perdeva altezza e stili che dipendono da dove sta (azioni in
+    fondo, titoli e pulsanti degli schermi larghi): per un fotogramma "Continua" saltava a metà pagina. Ora
+    `axisPage(…, { inPlace: true })` la rimette nel suo contenitore con la sua altezza e i suoi scorrimenti
+    (`data-exiting`, che il morph di `dom.js` salta finché non si toglie da sola) e i tempi sono quelli dell'asse
+    condiviso di M3: esce svanendo in 90 ms, la nuova entra da 64 px (come `sharedAxisX(distance: 64)` dell'app)
+    comparendo dopo, così le due pagine non si vedono insieme. Lo spazio in cima dell'accoglienza e della fine ha la
+    sua chiave (`ob-top-spacer`): senza, il morph lo riusava come contenitore delle pagine e la pagina compariva di
+    colpo. Le altre pagine ad asse condiviso (giorni, schede dei Voti) usano ancora il livello sopra.
 - Per provare usare "Prova la demo" (`js/demo.js`, dati deterministici generati nel browser); nell'Orario "Genera"
   crea la bozza dalle lezioni della demo. Per rivedere la prima apertura: cancellare `bcw.onboardingCompleted` (e gli
   account) dal `localStorage`; nelle prove automatiche impostarlo prima di aprire la pagina, con `bcw.lastRunVersion`

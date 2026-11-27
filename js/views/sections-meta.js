@@ -28,11 +28,11 @@ export const extraRows = {
 };
 
 export const sectionGroups = [
-  { title: null, sections: ['dashboard', 'timetable', 'grades', 'you'] },
-  { title: 'Comunicazioni', sections: ['noticeboard', 'notes'] },
-  { title: 'Valutazioni', sections: ['reports', 'previous'] },
-  { title: 'Frequenza', sections: ['absences'] },
-  { title: 'Didattica', sections: ['didactics', 'lessons', 'agenda', 'subjects', 'schoolbooks', 'calendar'] },
+  { id: 'main', title: null, sections: ['dashboard', 'timetable', 'grades', 'you'] },
+  { id: 'communications', title: 'Comunicazioni', sections: ['noticeboard', 'notes'] },
+  { id: 'evaluations', title: 'Valutazioni', sections: ['reports', 'previous'] },
+  { id: 'attendance', title: 'Frequenza', sections: ['absences'] },
+  { id: 'teaching', title: 'Didattica', sections: ['didactics', 'lessons', 'agenda', 'subjects', 'schoolbooks', 'calendar'] },
 ];
 
 export function sectionSubtitle(model, key) {

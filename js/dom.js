@@ -4,6 +4,12 @@
 
 const keyOf = (node) => (node.nodeType === 1 ? node.getAttribute('data-key') : null);
 
+/**
+ * Una pagina che esce con la transizione ad asse condiviso, rimessa al suo posto per l'animazione
+ * (`data-exiting`, `animateAxisExits` in `app.js`): il morph la salta finché non si toglie da sola.
+ */
+const isExiting = (node) => node.nodeType === 1 && node.hasAttribute('data-exiting');
+
 function sameType(a, b) {
   return a.nodeType === b.nodeType && (a.nodeType !== 1 || a.tagName === b.tagName);
 }
@@ -17,23 +23,29 @@ export function morph(target, html) {
 function morphChildren(fromParent, toParent) {
   const keyed = new Map();
   for (let c = fromParent.firstChild; c; c = c.nextSibling) {
-    const key = keyOf(c);
+    const key = isExiting(c) ? null : keyOf(c);
     if (key != null) keyed.set(key, c);
   }
+  const skipExiting = (node) => {
+    let c = node;
+    while (c && isExiting(c)) c = c.nextSibling;
+    return c;
+  };
   const newKeys = new Set();
   for (let c = toParent.firstChild; c; c = c.nextSibling) {
     const key = keyOf(c);
     if (key != null) newKeys.add(key);
   }
-  let cursor = fromParent.firstChild;
+  let cursor = skipExiting(fromParent.firstChild);
   let next = toParent.firstChild;
   while (next) {
     const following = next.nextSibling;
     // I nodi con una chiave che non c'è più si tolgono subito: altrimenti i nodi successivi
     // andrebbero spostati davanti a loro, e spostare un elemento gli toglie il fuoco.
+    cursor = skipExiting(cursor);
     while (cursor && keyOf(cursor) != null && !newKeys.has(keyOf(cursor))) {
       const removed = cursor;
-      cursor = cursor.nextSibling;
+      cursor = skipExiting(cursor.nextSibling);
       keyed.delete(keyOf(removed));
       fromParent.removeChild(removed);
     }
@@ -47,7 +59,7 @@ function morphChildren(fromParent, toParent) {
       match = cursor;
     }
     if (match) {
-      if (match === cursor) cursor = cursor.nextSibling;
+      if (match === cursor) cursor = skipExiting(cursor.nextSibling);
       else fromParent.insertBefore(match, cursor);
       morphNode(match, next);
     } else {
@@ -57,7 +69,7 @@ function morphChildren(fromParent, toParent) {
   }
   while (cursor) {
     const following = cursor.nextSibling;
-    fromParent.removeChild(cursor);
+    if (!isExiting(cursor)) fromParent.removeChild(cursor);
     cursor = following;
   }
 }

@@ -16,7 +16,7 @@ import { Reminders } from './reminders.js';
 import { Proxy } from './api.js';
 import { BCWServer } from './cloud.js';
 import { esc } from './util.js';
-import { avatar, loadingIndicator, subjectColor } from './components.js';
+import { avatar, collapsible, loadingIndicator, subjectColor } from './components.js';
 import { shape } from './shapes.js';
 import { logo } from './logo.js';
 import { routes, sections, sectionGroups, commonActions, sectionBadge } from './views/index.js';
@@ -29,6 +29,8 @@ import { Updates } from './updates.js';
 const model = new AppModel(() => app.update());
 
 const RAIL_KEY = 'bcw.railCollapsed';
+/** Gruppi della barra laterale chiusi (Comunicazioni, Valutazioni…), solo in questo browser. */
+const RAIL_GROUPS_KEY = 'bcw.railGroupsCollapsed';
 
 const app = {
   model,
@@ -54,6 +56,7 @@ const app = {
   refreshing: new Set(),
   railCollapsed: readFlag(RAIL_KEY),
   railOpen: false,
+  railGroupsCollapsed: readSet(RAIL_GROUPS_KEY),
   /** Operazioni da eseguire dopo il prossimo disegno (es. scorrere a un'ora dell'orario). */
   afterRender: [],
   scheduled: false,
@@ -90,6 +93,15 @@ const app = {
 
 function readFlag(key) {
   try { return localStorage.getItem(key) === '1'; } catch { return false; }
+}
+
+function readSet(key) {
+  try {
+    const list = JSON.parse(localStorage.getItem(key) || '[]');
+    return new Set(Array.isArray(list) ? list.filter((x) => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
 }
 
 window.bcw = app;
@@ -689,9 +701,13 @@ function fitLoginTitles() {
 function captureAxisPages() {
   return [...root.querySelectorAll('[data-axis]')].map((container) => {
     const node = container.firstElementChild;
-    if (!node?.dataset.key) return null;
+    if (!node?.dataset.key || node.hasAttribute('data-exiting')) return null;
     const clip = (container.closest('[data-scroll]') ?? container).getBoundingClientRect();
-    return { name: container.dataset.axis, node, rect: node.getBoundingClientRect(), clip };
+    // Tolta e rimessa al suo posto (uscita `in-place`), un'area che scorre ripartirebbe dall'alto.
+    const scrolls = container.dataset.axisExit === 'in-place'
+      ? [...node.querySelectorAll('*')].filter((el) => el.scrollTop > 0).map((el) => [el, el.scrollTop])
+      : [];
+    return { name: container.dataset.axis, node, rect: node.getBoundingClientRect(), clip, scrolls };
   }).filter(Boolean);
 }
 
@@ -699,11 +715,31 @@ function captureAxisPages() {
 let swipeRelease = 0;
 
 function animateAxisExits(leaving) {
-  for (const { name, node, rect, clip } of leaving) {
+  for (const { name, node, rect, clip, scrolls } of leaving) {
     if (node.isConnected || !rect.width) continue;
     const container = root.querySelector(`[data-axis="${name}"]`);
     if (!container || container.firstElementChild?.dataset.key === node.dataset.key) continue;
     const dir = Number(container.dataset.axisDir) || 1;
+    if (container.dataset.axisExit === 'in-place') {
+      // Al suo posto nel contenitore, sopra la pagina nuova: il morph la salta (`data-exiting`)
+      // finché non si toglie da sola. Prima, in un livello sopra tutto, perdeva gli stili che
+      // dipendono da dove sta (le azioni in fondo, i titoli degli schermi larghi) e per un
+      // istante i suoi elementi comparivano in altre posizioni.
+      const now = container.getBoundingClientRect();
+      node.classList.remove('axis-in');
+      node.classList.add('axis-exit', 'in-place');
+      node.setAttribute('data-exiting', '');
+      node.setAttribute('aria-hidden', 'true');
+      node.inert = true;
+      node.style.cssText = `left:${rect.left - now.left}px;top:${rect.top - now.top}px;width:${rect.width}px;height:${rect.height}px;--dir:${dir};--from:${swipeRelease}px;--to:${-dir * 64 + swipeRelease}px`;
+      container.appendChild(node);
+      for (const [el, top] of scrolls) el.scrollTop = top;
+      for (const animation of node.getAnimations({ subtree: true })) {
+        if (animation.effect?.target !== node) animation.cancel();
+      }
+      setTimeout(() => node.remove(), 400);
+      continue;
+    }
     const top = Math.max(clip.top, 0);
     const layer = document.createElement('div');
     layer.className = 'axis-exit-layer';
@@ -1044,8 +1080,15 @@ function renderDesktop(ctx, page) {
   </div>`;
 }
 
+/**
+ * Barra di navigazione espansa: le quattro schede principali sempre in vista, poi i gruppi
+ * (Comunicazioni, Valutazioni, Frequenza, Didattica) che si chiudono toccandone il titolo; da
+ * chiuso il titolo porta la somma dei contatori e, se dentro c'è la sezione aperta, il suo colore.
+ * Ridotta alle icone, i titoli non ci sono e si vedono tutte le sezioni.
+ */
 function renderRail() {
   const current = app.nav.current;
+  const reduced = app.railIsCollapsed;
   const groups = sectionGroups.map((group, index) => {
     const keys = index ? group.sections : group.sections.filter((key) => visibleTabs().includes(key));
     const rows = keys.map((key) => {
@@ -1056,7 +1099,14 @@ function renderRail() {
       return `<button class="rail-item ${selected ? 'selected' : ''}" data-action="select-section" data-key-name="${key}" title="${shortcut ? `${s.title} (Alt+${shortcut})` : s.title}" aria-current="${selected ? 'page' : 'false'}">
         <span class="rail-indicator">${icon(selected && s.iconSelected ? s.iconSelected : s.icon)}${badge ? `<span class="badge">${badge}</span>` : ''}</span><span class="rail-label">${esc(s.title)}</span>${badge ? `<span class="rail-count">${badge}</span>` : ''}</button>`;
     }).join('');
-    return `<div class="rail-group">${group.title ? `<h2>${esc(group.title)}</h2>` : ''}${index ? '<hr>' : ''}${rows}</div>`;
+    if (!index) return `<div class="rail-group main" data-key="rail-${group.id}">${rows}</div>`;
+    const closed = app.railGroupsCollapsed.has(group.id);
+    const open = !closed || reduced;
+    const count = keys.reduce((sum, key) => sum + (sectionBadge(model, key) || 0), 0);
+    const holdsCurrent = closed && keys.includes(current);
+    const head = `<button class="rail-group-head ${holdsCurrent ? 'current' : ''}" data-action="rail-group-toggle" data-group="${group.id}" aria-expanded="${!closed}" title="${closed ? `Mostra ${esc(group.title)}` : `Nascondi ${esc(group.title)}`}">
+      <span class="rail-group-title">${esc(group.title)}</span>${closed && count ? `<span class="rail-count">${count}</span>` : ''}${icon('chevronDown', { cls: 'rail-group-chev' })}</button>`;
+    return `<div class="rail-group" data-key="rail-${group.id}">${head}<hr>${collapsible(open, `<div class="rail-items">${rows}</div>`)}</div>`;
   }).join('');
   return `<aside class="rail"><nav class="rail-scroll" data-scroll="rail" aria-label="Sezioni">${groups}</nav></aside><div class="rail-scrim" data-action="toggle-rail"></div>`;
 }
@@ -1197,6 +1247,15 @@ const shellActions = {
   'go-home': () => goHome(),
   'nav-back': () => back(),
   'navigate': (ctx, el) => navigate(el.dataset.to),
+  'rail-group-toggle': (ctx, el) => {
+    const id = el.dataset.group;
+    if (!id) return;
+    if (app.railGroupsCollapsed.has(id)) app.railGroupsCollapsed.delete(id);
+    else app.railGroupsCollapsed.add(id);
+    try { localStorage.setItem(RAIL_GROUPS_KEY, JSON.stringify([...app.railGroupsCollapsed])); } catch { /* ignorato */ }
+    navigator.vibrate?.(4);
+    app.update();
+  },
   'toggle-rail': () => {
     if (app.railOverlays) {
       app.railOpen = !app.railOpen;
